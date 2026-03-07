@@ -1,0 +1,10 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@tobyt/expo-pdf-markup": ["../src/index"],
+      "@tobyt/expo-pdf-markup/*": ["../src/*"]
+    }
+  }
+}

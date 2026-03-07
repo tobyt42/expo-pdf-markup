@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android", "web"],
+  "apple": {
+    "modules": ["ExpoPdfMarkupModule"]
+  },
+  "android": {
+    "modules": ["dev.terhoeven.expopdfmarkup.ExpoPdfMarkupModule"]
+  }
+}
