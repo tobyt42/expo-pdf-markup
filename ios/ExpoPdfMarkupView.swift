@@ -20,6 +20,10 @@ class ExpoPdfMarkupView: ExpoView {
 
     addSubview(pdfView)
 
+    if let scrollView = pdfView.subviews.first(where: { $0 is UIScrollView }) as? UIScrollView {
+      scrollView.contentInsetAdjustmentBehavior = .never
+    }
+
     NotificationCenter.default.addObserver(
       self,
       selector: #selector(handlePageChanged),
