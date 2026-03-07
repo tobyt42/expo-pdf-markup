@@ -1,19 +1,10 @@
 import type { StyleProp, ViewStyle } from 'react-native';
 
-export type OnLoadEventPayload = {
-  url: string;
-};
-
-export type ExpoPdfMarkupModuleEvents = {
-  onChange: (params: ChangeEventPayload) => void;
-};
-
-export type ChangeEventPayload = {
-  value: string;
-};
-
 export type ExpoPdfMarkupViewProps = {
-  url: string;
-  onLoad: (event: { nativeEvent: OnLoadEventPayload }) => void;
+  source: string;
+  page?: number;
+  onPageChanged?: (event: { nativeEvent: { page: number; pageCount: number } }) => void;
+  onLoadComplete?: (event: { nativeEvent: { pageCount: number } }) => void;
+  onError?: (event: { nativeEvent: { message: string } }) => void;
   style?: StyleProp<ViewStyle>;
 };

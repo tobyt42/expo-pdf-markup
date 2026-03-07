@@ -9,6 +9,10 @@
     "clean": "expo-module clean",
     "lint": "expo-module lint",
     "test": "expo-module test",
+    "typecheck": "expo-module typecheck",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
+    "validate": "export EXPO_NONINTERACTIVE=1 && npm run typecheck && npm run lint && npm run format:check && npm run test",
     "prepare": "expo-module prepare",
     "prepublishOnly": "expo-module prepublishOnly",
     "expo-module": "expo-module",
@@ -28,12 +32,16 @@
   "author": "Toby Terhoeven <toby@terhoeven.dev> (https://github.com/tobyt42)",
   "license": "MIT",
   "homepage": "https://github.com/tobyt42/expo-pdf-markup#readme",
-  "dependencies": {},
   "devDependencies": {
-    "@types/react": "~19.1.1",
-    "expo-module-scripts": "^55.0.2",
+    "@types/react": "~19.2.10",
+    "@types/react-test-renderer": "^19.1.0",
     "expo": "^55.0.5",
-    "react-native": "0.82.1"
+    "expo-module-scripts": "^55.0.2",
+    "react-native": "0.83.2",
+    "react-native-web": "^0.21.2"
+  },
+  "jest": {
+    "preset": "expo-module-scripts"
   },
   "peerDependencies": {
     "expo": "*",

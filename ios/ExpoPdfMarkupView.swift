@@ -1,38 +1,80 @@
 import ExpoModulesCore
-import WebKit
+import PDFKit
 
-// This view will be used as a native component. Make sure to inherit from `ExpoView`
-// to apply the proper styling (e.g. border radius and shadows).
 class ExpoPdfMarkupView: ExpoView {
-  let webView = WKWebView()
-  let onLoad = EventDispatcher()
-  var delegate: WebViewDelegate?
+  let pdfView = PDFView()
+  let onPageChanged = EventDispatcher()
+  let onLoadComplete = EventDispatcher()
+  let onError = EventDispatcher()
 
+  private var currentSource: String?
   required init(appContext: AppContext? = nil) {
     super.init(appContext: appContext)
     clipsToBounds = true
-    delegate = WebViewDelegate { url in
-      self.onLoad(["url": url])
-    }
-    webView.navigationDelegate = delegate
-    addSubview(webView)
+
+    pdfView.autoScales = true
+    pdfView.displayMode = .singlePageContinuous
+    pdfView.displayDirection = .vertical
+
+    addSubview(pdfView)
+
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handlePageChanged),
+      name: .PDFViewPageChanged,
+      object: pdfView
+    )
+  }
+
+  deinit {
+    NotificationCenter.default.removeObserver(self)
   }
 
   override func layoutSubviews() {
-    webView.frame = bounds
-  }
-}
-
-class WebViewDelegate: NSObject, WKNavigationDelegate {
-  let onUrlChange: (String) -> Void
-
-  init(onUrlChange: @escaping (String) -> Void) {
-    self.onUrlChange = onUrlChange
+    super.layoutSubviews()
+    pdfView.frame = bounds
   }
 
-  func webView(_ webView: WKWebView, didFinish navigation: WKNavigation) {
-    if let url = webView.url {
-      onUrlChange(url.absoluteString)
+  // MARK: - Props
+
+  func loadPdf(from source: String) {
+    guard source != currentSource else { return }
+    currentSource = source
+
+    let fileURL = URL(fileURLWithPath: source)
+    guard let document = PDFDocument(url: fileURL) else {
+      onError(["message": "Failed to load PDF from: \(source)"])
+      return
     }
+
+    pdfView.document = document
+    let pageCount = document.pageCount
+    onLoadComplete(["pageCount": pageCount])
   }
+
+  func goToPage(_ pageIndex: Int) {
+    guard let document = pdfView.document else { return }
+    guard pageIndex >= 0 && pageIndex < document.pageCount else { return }
+    guard let page = document.page(at: pageIndex) else { return }
+
+    // Only navigate if we're not already on this page
+    if let currentPage = pdfView.currentPage,
+       document.index(for: currentPage) == pageIndex {
+      return
+    }
+
+    pdfView.go(to: page)
+  }
+
+  // MARK: - Page change notification
+
+  @objc private func handlePageChanged() {
+    guard let document = pdfView.document,
+          let currentPage = pdfView.currentPage else { return }
+
+    let pageIndex = document.index(for: currentPage)
+    let pageCount = document.pageCount
+    onPageChanged(["page": pageIndex, "pageCount": pageCount])
+  }
+
 }

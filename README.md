@@ -8,10 +8,10 @@ An Expo module for displaying and annotating PDFs, with support for iOS, Android
 
 ### Phase 1 — iOS: PDF rendering
 
-- [ ] Render a PDF from a local file path (PDFKit)
-- [ ] Fit-to-width, pinch zoom, double-tap zoom
-- [ ] `onPageChanged(page, total)` callback
-- [ ] Controlled `page` prop (for page restoration on orientation change)
+- [x] Render a PDF from a local file path (PDFKit)
+- [x] Fit-to-width, pinch zoom, double-tap zoom
+- [x] `onPageChanged(page, total)` callback
+- [x] Controlled `page` prop (for page restoration on orientation change)
 
 ### Phase 2 — iOS: Annotations
 
