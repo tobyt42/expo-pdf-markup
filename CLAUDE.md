@@ -4,20 +4,24 @@ Expo module for displaying and annotating PDFs on iOS (native PDFKit), with web 
 
 ## Quality checks
 
-Run all checks: `npm run validate`
+Run all checks across all platforms:
+```
+npm run qa
+```
+
+Platform-specific QA:
+- `npm run qa:ts` — typecheck + ESLint + Prettier + Jest tests
+- `npm run qa:ios` — SwiftLint + SwiftFormat + XCTest (requires simulator)
+- `npm run qa:android` — ktlint + Gradle JUnit tests
 
 Individual commands:
 - `npm run typecheck` — TypeScript type checking
-- `npm run lint` — ESLint (flat config, ESLint 9)
-- `npm run lint:swift` — SwiftLint on ios/
-- `npm run format:check` — Prettier check
-- `npm run format:swift:check` — SwiftFormat lint on ios/
-- `npm run format` — Prettier auto-fix
-- `npm run format:swift` — SwiftFormat auto-fix on ios/
-- `npm run test -- --watchAll=false` — Jest tests (runs in iOS, Android, Web, Node projects)
-- `npm run test:swift` — XCTest suite for native Swift code (requires simulator)
+- `npm run lint` / `npm run lint:swift` / `npm run lint:kotlin` — linting per platform
+- `npm run format` / `npm run format:swift` / `npm run format:kotlin` — auto-fix formatting
+- `npm run format:check` / `npm run format:swift:check` / `npm run format:kotlin:check` — check formatting
+- `npm run test` / `npm run test:swift` / `npm run test:kotlin` — tests per platform
 
-Always run `npm run validate` before committing.
+Always run `npm run qa` (or at minimum `npm run qa:ts`) before committing.
 
 ## Testing
 
@@ -37,6 +41,12 @@ Tests live in `example/ios/expopdfmarkupexampleTests/`. Run with `npm run test:s
 - Test PDF resource is bundled in the test target for `loadPdf` / `goToPage` tests
 - To add the test target to a fresh example project, run `ruby example/ios/add_test_target.rb` then `pod install`
 
+### Kotlin (JUnit)
+Tests live in `android/src/test/`. Run with `npm run test:kotlin`.
+
+- Pure JUnit (no Robolectric) — tests cover navigation logic, bounds checking, source dedup
+- Runs via Gradle from the example project: `./gradlew :tobyt-expo-pdf-markup:testDebugUnitTest`
+
 ## Code conventions
 
 ### TypeScript
@@ -49,9 +59,15 @@ Tests live in `example/ios/expopdfmarkupexampleTests/`. Run with `npm run test:s
 - SwiftLint: default rules (see `.swiftlint.yml`)
 - Requires `brew install swiftlint swiftformat`
 
+### Kotlin
+- ktlint with `android_studio` code style (see `android/.editorconfig`)
+- 4-space indent (Kotlin standard)
+- Requires `brew install ktlint`
+
 ## Project structure
 
 - `src/` — TypeScript source (view component, types, module stubs)
 - `ios/` — Swift native implementation (PDFKit)
+- `android/` — Kotlin native implementation (PdfRenderer)
 - `example/` — Expo example app for manual testing
 - `build/` — compiled output (gitignored)

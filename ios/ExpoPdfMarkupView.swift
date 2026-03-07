@@ -15,6 +15,8 @@ class ExpoPdfMarkupView: ExpoView {
     pdfView.autoScales = true
     pdfView.displayMode = .singlePageContinuous
     pdfView.displayDirection = .vertical
+    pdfView.pageBreakMargins = UIEdgeInsets(top: 4, left: 0, bottom: 4, right: 0)
+    pdfView.backgroundColor = UIColor(white: 0.92, alpha: 1)
 
     addSubview(pdfView)
 

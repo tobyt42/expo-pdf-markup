@@ -1,30 +1,80 @@
 package dev.terhoeven.expopdfmarkup
 
 import android.content.Context
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.graphics.pdf.PdfRenderer
+import android.os.ParcelFileDescriptor
 import expo.modules.kotlin.AppContext
 import expo.modules.kotlin.viewevent.EventDispatcher
 import expo.modules.kotlin.views.ExpoView
+import java.io.File
 
 class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
-  // Creates and initializes an event dispatcher for the `onLoad` event.
-  // The name of the event is inferred from the value and needs to match the event name defined in the module.
-  private val onLoad by EventDispatcher()
-
-  // Defines a WebView that will be used as the root subview.
-  internal val webView = WebView(context).apply {
-    layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
-    webViewClient = object : WebViewClient() {
-      override fun onPageFinished(view: WebView, url: String) {
-        // Sends an event to JavaScript. Triggers a callback defined on the view component in JavaScript.
-        onLoad(mapOf("url" to url))
-      }
+    private val pdfView = ContinuousPdfView(context).apply {
+        layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
     }
-  }
 
-  init {
-    // Adds the WebView to the view hierarchy.
-    addView(webView)
-  }
+    private val onPageChanged by EventDispatcher()
+    private val onLoadComplete by EventDispatcher()
+    private val onError by EventDispatcher()
+
+    private var renderer: PdfRenderer? = null
+    private var fileDescriptor: ParcelFileDescriptor? = null
+    private var currentSource: String? = null
+
+    init {
+        addView(pdfView)
+        pdfView.onPageChangeListener = { page, pageCount ->
+            onPageChanged(mapOf("page" to page, "pageCount" to pageCount))
+        }
+    }
+
+    fun loadPdf(source: String) {
+        if (source == currentSource) return
+        currentSource = source
+
+        try {
+            close()
+            val file = File(source)
+            if (!file.exists()) {
+                onError(mapOf("message" to "File not found: $source"))
+                return
+            }
+            val fd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+            fileDescriptor = fd
+            val r = PdfRenderer(fd)
+            renderer = r
+            onLoadComplete(mapOf("pageCount" to r.pageCount))
+            if (width > 0) {
+                pdfView.loadPages(r, width)
+            } else {
+                post { renderer?.let { pdfView.loadPages(it, width) } }
+            }
+        } catch (e: Exception) {
+            onError(mapOf("message" to "Failed to load PDF: ${e.message}"))
+        }
+    }
+
+    fun goToPage(pageIndex: Int) {
+        pdfView.scrollToPage(pageIndex)
+    }
+
+    private fun close() {
+        pdfView.recycle()
+        renderer?.close()
+        renderer = null
+        fileDescriptor?.close()
+        fileDescriptor = null
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        close()
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (w > 0 && w != oldw) {
+            renderer?.let { pdfView.loadPages(it, w) }
+        }
+    }
 }

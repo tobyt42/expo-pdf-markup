@@ -24,9 +24,9 @@ An Expo module for displaying and annotating PDFs, with support for iOS, Android
 
 ### Phase 3 — Android: PDF rendering
 
-- [ ] Render a PDF from a local file path (Android PdfRenderer or PdfiumAndroid)
-- [ ] Fit-to-width, pinch zoom, double-tap zoom
-- [ ] Same callback and prop API as iOS
+- [x] Render a PDF from a local file path (Android PdfRenderer)
+- [x] Fit-to-width, pinch zoom, double-tap zoom
+- [x] Same callback and prop API as iOS
 
 ### Phase 4 — Android: Annotations
 

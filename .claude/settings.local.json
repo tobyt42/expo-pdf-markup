@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(grep:*)",
-      "Bash(xcodebuild test:*)"
+      "Bash(xcodebuild test:*)",
+      "Bash(ktlint:*)",
+      "Bash(timeout 30 yarn qa:ts:*)"
     ]
   }
 }
