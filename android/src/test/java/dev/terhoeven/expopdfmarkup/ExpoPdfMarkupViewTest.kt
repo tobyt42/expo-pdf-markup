@@ -120,4 +120,65 @@ class ExpoPdfMarkupViewTest {
         assertFalse(-1 in validRange)
         assertFalse(3 in validRange)
     }
+
+    // MARK: - Color string parsing
+
+    @Test
+    fun testParseColorStringTransparent() {
+        // android.graphics.Color.TRANSPARENT == 0
+        assertEquals(0, parseColorString("transparent"))
+    }
+
+    @Test
+    fun testParseColorStringTransparentCaseInsensitive() {
+        assertEquals(0, parseColorString("Transparent"))
+        assertEquals(0, parseColorString("TRANSPARENT"))
+    }
+
+    @Test
+    fun testParseColorStringRgb() {
+        // android.graphics.Color.argb(255, r, g, b)
+        val expected = (255 shl 24) or (255 shl 16) or (0 shl 8) or 0 // opaque red
+        assertEquals(expected, parseColorString("rgb(255, 0, 0)"))
+    }
+
+    @Test
+    fun testParseColorStringRgbNoSpaces() {
+        val expected = (255 shl 24) or (0 shl 16) or (128 shl 8) or 255
+        assertEquals(expected, parseColorString("rgb(0,128,255)"))
+    }
+
+    @Test
+    fun testParseColorStringRgbaFullyOpaque() {
+        val expected = (255 shl 24) or (100 shl 16) or (150 shl 8) or 200
+        assertEquals(expected, parseColorString("rgba(100, 150, 200, 1)"))
+    }
+
+    @Test
+    fun testParseColorStringRgbaFullyTransparent() {
+        // alpha 0 → 0x00RRGGBB
+        val expected = (0 shl 24) or (100 shl 16) or (150 shl 8) or 200
+        assertEquals(expected, parseColorString("rgba(100, 150, 200, 0)"))
+    }
+
+    @Test
+    fun testParseColorStringRgbaFractionalAlpha() {
+        // alpha 0.5 → round(0.5 * 255) = 127
+        val result = parseColorString("rgba(255, 255, 255, 0.5)")
+        val alpha = (result!! ushr 24) and 0xFF
+        assertEquals(127, alpha)
+    }
+
+    @Test
+    fun testParseColorStringRgbaReactNativePaperSurface() {
+        // Typical value from react-native-paper: rgba(28, 27, 31, 1.0)
+        val expected = (255 shl 24) or (28 shl 16) or (27 shl 8) or 31
+        assertEquals(expected, parseColorString("rgba(28, 27, 31, 1.0)"))
+    }
+
+    @Test
+    fun testParseColorStringRgbClampsChannels() {
+        val expected = (255 shl 24) or (255 shl 16) or (255 shl 8) or 255
+        assertEquals(expected, parseColorString("rgb(999, 999, 999)"))
+    }
 }

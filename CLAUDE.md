@@ -10,9 +10,9 @@ npm run qa
 ```
 
 Platform-specific QA:
-- `npm run qa:ts` — typecheck + ESLint + Prettier + Jest tests
-- `npm run qa:ios` — SwiftLint + SwiftFormat + XCTest (requires simulator)
-- `npm run qa:android` — ktlint + Gradle JUnit tests
+- `npm run qa:ts` — typecheck + ESLint + Prettier (auto-fix) + Jest tests
+- `npm run qa:ios` — SwiftLint + SwiftFormat (auto-fix) + XCTest (requires simulator)
+- `npm run qa:android` — ktlint + ktlint --format (auto-fix) + Gradle JUnit tests
 
 Individual commands:
 - `npm run typecheck` — TypeScript type checking
