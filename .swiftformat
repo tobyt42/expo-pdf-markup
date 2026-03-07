@@ -1,0 +1,4 @@
+--swiftversion 5.9
+--indent 2
+--disable wrapMultilineStatementBraces
+--exclude build,example,node_modules,.expo,Pods

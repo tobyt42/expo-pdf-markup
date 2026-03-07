@@ -54,12 +54,11 @@ class ExpoPdfMarkupView: ExpoView {
 
   func goToPage(_ pageIndex: Int) {
     guard let document = pdfView.document else { return }
-    guard pageIndex >= 0 && pageIndex < document.pageCount else { return }
+    guard pageIndex >= 0, pageIndex < document.pageCount else { return }
     guard let page = document.page(at: pageIndex) else { return }
 
     // Only navigate if we're not already on this page
-    if let currentPage = pdfView.currentPage,
-       document.index(for: currentPage) == pageIndex {
+    if let currentPage = pdfView.currentPage, document.index(for: currentPage) == pageIndex {
       return
     }
 
@@ -76,5 +75,4 @@ class ExpoPdfMarkupView: ExpoView {
     let pageCount = document.pageCount
     onPageChanged(["page": pageIndex, "pageCount": pageCount])
   }
-
 }

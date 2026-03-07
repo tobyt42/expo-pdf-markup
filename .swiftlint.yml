@@ -1,0 +1,16 @@
+included:
+  - ios
+
+excluded:
+  - build
+  - example
+  - node_modules
+  - Pods
+
+
+opt_in_rules:
+  - empty_count
+  - closure_spacing
+
+disabled_rules:
+  - trailing_comma
