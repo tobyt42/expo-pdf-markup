@@ -16,6 +16,10 @@ class ExpoPdfMarkupModule : Module() {
                 view.goToPage(page)
             }
 
+            Prop("backgroundColor") { view: ExpoPdfMarkupView, color: String? ->
+                view.setPageBackgroundColor(color?.let { android.graphics.Color.parseColor(it) })
+            }
+
             Events("onPageChanged", "onLoadComplete", "onError")
         }
     }

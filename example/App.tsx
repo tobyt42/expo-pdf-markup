@@ -34,9 +34,7 @@ export default function App() {
             onPageChanged={({ nativeEvent: { page, pageCount } }) =>
               console.log(`Page ${page + 1} of ${pageCount}`)
             }
-            onError={({ nativeEvent: { message } }) =>
-              console.error(`PDF error: ${message}`)
-            }
+            onError={({ nativeEvent: { message } }) => console.error(`PDF error: ${message}`)}
           />
         )}
       </SafeAreaView>

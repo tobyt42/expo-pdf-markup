@@ -18,7 +18,7 @@ class ContinuousPdfView(context: Context) : View(context) {
     private var totalHeight = 0f
     private var contentWidth = 0f
     private val pageGap = (8 * resources.displayMetrics.density).toInt()
-    private val bgColor = Color.rgb(235, 235, 235)
+    var pageBackgroundColor = Color.rgb(235, 235, 235)
 
     private var currentScale = 1f
     private var minScale = 1f
@@ -37,7 +37,7 @@ class ContinuousPdfView(context: Context) : View(context) {
     fun loadPages(renderer: PdfRenderer, viewWidth: Int) {
         recycle()
         if (viewWidth <= 0) return
-        setBackgroundColor(bgColor)
+        setBackgroundColor(pageBackgroundColor)
 
         var yOffset = 0f
         for (i in 0 until renderer.pageCount) {

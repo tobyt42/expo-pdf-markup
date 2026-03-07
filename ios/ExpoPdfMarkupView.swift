@@ -43,6 +43,10 @@ class ExpoPdfMarkupView: ExpoView {
 
   // MARK: - Props
 
+  func setBackgroundColor(_ color: UIColor?) {
+    pdfView.backgroundColor = color ?? UIColor(white: 0.92, alpha: 1)
+  }
+
   func loadPdf(from source: String) {
     guard source != currentSource else { return }
     currentSource = source

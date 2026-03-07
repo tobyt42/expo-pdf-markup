@@ -13,6 +13,10 @@ public class ExpoPdfMarkupModule: Module {
         view.goToPage(page)
       }
 
+      Prop("backgroundColor") { (view: ExpoPdfMarkupView, color: UIColor?) in
+        view.setBackgroundColor(color)
+      }
+
       Events("onPageChanged", "onLoadComplete", "onError")
     }
   }

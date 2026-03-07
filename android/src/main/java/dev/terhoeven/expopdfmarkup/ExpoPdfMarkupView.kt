@@ -58,6 +58,11 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
         pdfView.scrollToPage(pageIndex)
     }
 
+    fun setPageBackgroundColor(color: Int?) {
+        pdfView.pageBackgroundColor = color ?: android.graphics.Color.rgb(235, 235, 235)
+        pdfView.setBackgroundColor(pdfView.pageBackgroundColor)
+    }
+
     private fun close() {
         pdfView.recycle()
         renderer?.close()
