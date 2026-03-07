@@ -13,7 +13,13 @@ An Expo module for displaying and annotating PDFs, with support for iOS, Android
 - [x] `onPageChanged(page, total)` callback
 - [x] Controlled `page` prop (for page restoration on orientation change)
 
-### Phase 2 — iOS: Annotations
+### Phase 2 — Android: PDF rendering
+
+- [x] Render a PDF from a local file path (Android PdfRenderer)
+- [x] Fit-to-width, pinch zoom, double-tap zoom
+- [x] Same callback and prop API as iOS
+
+### Phase 3 — iOS: Annotations
 
 - [ ] `annotations` prop — load annotation JSON on open
 - [ ] `onAnnotationsChanged` callback — emit updated JSON after edits
@@ -21,12 +27,6 @@ An Expo module for displaying and annotating PDFs, with support for iOS, Android
 - [ ] Annotation type: highlight and underline
 - [ ] Annotation type: sticky notes / text comments
 - [ ] Annotation JSON serialisation and deserialisation (Swift)
-
-### Phase 3 — Android: PDF rendering
-
-- [x] Render a PDF from a local file path (Android PdfRenderer)
-- [x] Fit-to-width, pinch zoom, double-tap zoom
-- [x] Same callback and prop API as iOS
 
 ### Phase 4 — Android: Annotations
 
