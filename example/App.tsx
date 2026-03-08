@@ -1,7 +1,15 @@
-import { ExpoPdfMarkupView } from '@tobyt/expo-pdf-markup';
+import { ExpoPdfMarkupView, setPdfJsWorkerSrc } from '@tobyt/expo-pdf-markup';
 import type { AnnotationMode } from '@tobyt/expo-pdf-markup';
 import { Asset } from 'expo-asset';
 import { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
+
+// Serve the pdfjs worker from the local public/ folder instead of CDN
+// to avoid CORS issues in development. public/pdf.worker.min.mjs is a copy
+// of node_modules/pdfjs-dist/build/pdf.worker.min.mjs.
+if (Platform.OS === 'web') {
+  setPdfJsWorkerSrc('/pdf.worker.min.mjs');
+}
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 

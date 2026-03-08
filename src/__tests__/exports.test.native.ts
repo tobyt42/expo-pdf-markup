@@ -15,6 +15,6 @@ describe('public API surface', () => {
     const nonTypeExports = exportedKeys.filter(
       (k) => typeof (ExportedModule as any)[k] !== 'undefined'
     );
-    expect(nonTypeExports).toEqual(['ExpoPdfMarkupView']);
+    expect(nonTypeExports).toEqual(['ExpoPdfMarkupView', 'setPdfJsWorkerSrc']); // setPdfJsWorkerSrc is a no-op on native
   });
 });

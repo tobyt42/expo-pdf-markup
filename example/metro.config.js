@@ -9,8 +9,9 @@ const config = getDefaultConfig(__dirname);
 // excludes the one from the parent folder when bundling.
 config.resolver.blockList = [
   ...Array.from(config.resolver.blockList ?? []),
-  new RegExp(path.resolve('..', 'node_modules', 'react')),
-  new RegExp(path.resolve('..', 'node_modules', 'react-native')),
+  new RegExp(`${path.resolve('..', 'node_modules', 'react')}[/\\\\]`),
+  new RegExp(`${path.resolve('..', 'node_modules', 'react-dom')}[/\\\\]`),
+  new RegExp(`${path.resolve('..', 'node_modules', 'react-native')}[/\\\\]`),
 ];
 
 config.resolver.nodeModulesPaths = [
@@ -30,5 +31,10 @@ config.transformer.getTransformOptions = async () => ({
     inlineRequires: true,
   },
 });
+
+// pdfjs-dist v4 uses `import.meta` in a Node.js-only code path. Metro bundles
+// everything as a non-module script so the browser throws a SyntaxError at
+// runtime. Patch the source text before Babel/hermes-parser ever sees it.
+config.transformer.babelTransformerPath = require.resolve('./scripts/pdfjs-metro-transformer.js');
 
 module.exports = config;
