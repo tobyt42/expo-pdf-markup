@@ -28,8 +28,8 @@ enum AnnotationSerializer {
       return createMarkupAnnotation(model: model, color: color, subtype: .highlight)
     case "underline":
       return createMarkupAnnotation(model: model, color: color, subtype: .underline)
-    case "text":
-      return createTextAnnotation(model: model, color: color)
+    case "text", "freeText":
+      return createFreeTextAnnotation(model: model, color: color)
     default:
       return nil
     }
@@ -54,6 +54,8 @@ enum AnnotationSerializer {
       type = "underline"
     case "Text":
       type = "text"
+    case "FreeText":
+      type = "freeText"
     default:
       return nil
     }
@@ -80,9 +82,12 @@ enum AnnotationSerializer {
       if type == "highlight" {
         model.alpha = 0.5
       }
-    case "text":
+    case "text", "freeText":
       model.bounds = AnnotationBounds(annotation.bounds)
       model.contents = annotation.contents
+      if let font = annotation.font {
+        model.fontSize = font.pointSize
+      }
     default:
       break
     }
@@ -211,11 +216,14 @@ enum AnnotationSerializer {
     return annotation
   }
 
-  private static func createTextAnnotation(model: AnnotationModel, color: UIColor) -> PDFAnnotation? {
-    let bounds = model.bounds?.cgRect ?? CGRect(x: 0, y: 0, width: 24, height: 24)
-    let annotation = PDFAnnotation(bounds: bounds, forType: .text, withProperties: nil)
-    annotation.color = color
-    annotation.contents = model.contents ?? "Note"
+  private static func createFreeTextAnnotation(model: AnnotationModel, color: UIColor) -> PDFAnnotation? {
+    guard let bounds = model.bounds else { return nil }
+    let annotation = PDFAnnotation(bounds: bounds.cgRect, forType: .freeText, withProperties: nil)
+    let fontSize = model.fontSize ?? 16.0
+    annotation.font = UIFont.systemFont(ofSize: fontSize)
+    annotation.fontColor = color
+    annotation.color = .clear
+    annotation.contents = model.contents ?? ""
 
     let createdAt = model.createdAt ?? Date().timeIntervalSince1970
     tagAsModuleManaged(annotation, id: model.id, createdAt: createdAt)

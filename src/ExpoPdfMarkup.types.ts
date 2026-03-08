@@ -35,11 +35,12 @@ export type UnderlineAnnotation = {
 
 export type TextAnnotation = {
   id: string;
-  type: 'text';
+  type: 'text' | 'freeText';
   page: number;
   color: string;
   bounds: AnnotationBounds;
   contents?: string;
+  fontSize?: number;
   createdAt?: number;
 };
 

@@ -462,17 +462,61 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
     guard let page = pdfView.page(for: location, nearest: true) else { return }
 
     let pdfPoint = pdfView.convert(location, to: page)
-    let bounds = CGRect(x: pdfPoint.x - 12, y: pdfPoint.y - 12, width: 24, height: 24)
 
-    let annotation = PDFAnnotation(bounds: bounds, forType: .text, withProperties: nil)
-    annotation.color = AnnotationSerializer.colorFromHex(annotationColor) ?? .yellow
-    annotation.contents = "Note"
+    // Show text input dialog
+    guard let viewController = findViewController() else { return }
+    let alert = UIAlertController(title: "Add Text", message: nil, preferredStyle: .alert)
+    alert.addTextField { textField in
+      textField.placeholder = "Enter text"
+    }
+
+    alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+    alert.addAction(UIAlertAction(title: "Add", style: .default) { [weak self] _ in
+      guard let self, let text = alert.textFields?.first?.text, !text.isEmpty else { return }
+      addFreeTextAnnotation(text: text, at: pdfPoint, on: page)
+    })
+
+    viewController.present(alert, animated: true)
+  }
+
+  private func addFreeTextAnnotation(text: String, at point: CGPoint, on page: PDFPage) {
+    let fontSize: CGFloat = 16.0
+    let font = UIFont.systemFont(ofSize: fontSize)
+    let color = AnnotationSerializer.colorFromHex(annotationColor) ?? .red
+
+    // Measure text size
+    let attributes: [NSAttributedString.Key: Any] = [.font: font]
+    let textSize = (text as NSString).size(withAttributes: attributes)
+    let padding: CGFloat = 4.0
+    let bounds = CGRect(
+      x: point.x,
+      y: point.y - textSize.height - padding,
+      width: textSize.width + padding * 2,
+      height: textSize.height + padding * 2
+    )
+
+    let annotation = PDFAnnotation(bounds: bounds, forType: .freeText, withProperties: nil)
+    annotation.font = font
+    annotation.fontColor = color
+    annotation.color = .clear
+    annotation.contents = text
 
     let id = UUID().uuidString
     AnnotationSerializer.tagAsModuleManaged(annotation, id: id, createdAt: Date().timeIntervalSince1970)
     page.addAnnotation(annotation)
 
     emitAnnotationsChanged()
+  }
+
+  private func findViewController() -> UIViewController? {
+    var responder: UIResponder? = self
+    while let next = responder?.next {
+      if let vc = next as? UIViewController {
+        return vc
+      }
+      responder = next
+    }
+    return nil
   }
 
   // MARK: - UIGestureRecognizerDelegate

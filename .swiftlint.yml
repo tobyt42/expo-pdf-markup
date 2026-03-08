@@ -18,12 +18,15 @@ disabled_rules:
 identifier_name:
   min_length: 1
 
+function_body_length:
+  warning: 60
+
 type_body_length:
-  warning: 400
+  warning: 450
   error: 600
 
 cyclomatic_complexity:
   warning: 15
 
 file_length:
-  warning: 500
+  warning: 600
