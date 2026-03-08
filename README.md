@@ -21,16 +21,16 @@ An Expo module for displaying and annotating PDFs, with support for iOS, Android
 
 ### Phase 3 — iOS: Annotations
 
-- [ ] `annotations` prop — load annotation JSON on open
-- [ ] `onAnnotationsChanged` callback — emit updated JSON after edits
-- [ ] Annotation type: ink / freehand drawing + eraser
-- [ ] Annotation type: highlight and underline
-- [ ] Annotation type: sticky notes / text comments
-- [ ] Annotation JSON serialisation and deserialisation (Swift)
+- [x] `annotations` prop — load annotation JSON on open
+- [x] `onAnnotationsChanged` callback — emit updated JSON after edits
+- [x] Annotation type: ink / freehand drawing + eraser
+- [x] Annotation type: highlight and underline
+- [x] Annotation type: free text
+- [x] Annotation JSON serialisation and deserialisation (Swift)
 
 ### Phase 4 — Android: Annotations
 
-- [ ] Annotation support (ink, highlight, sticky notes)
+- [ ] Annotation support (ink, highlight, free text)
 - [ ] Annotation JSON serialisation and deserialisation (Kotlin)
 - [ ] Cross-platform annotation portability (iOS ↔ Android)
 
