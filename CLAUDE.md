@@ -34,12 +34,12 @@ Tests live in `src/__tests__/`. The jest preset (expo-module-scripts) runs 4 pro
 - Mock `expo` in native tests that import the native view (`requireNativeView`)
 
 ### Swift (XCTest)
-Tests live in `example/ios/expopdfmarkupexampleTests/`. Run with `npm run test:swift`.
+Tests live in `ios/Tests/`. Run with `npm run test:swift`.
 
 - Uses `@testable internal import ExpoPdfMarkup` (explicit access level required by Swift 6)
 - Test target is wired via Podfile (`inherit! :search_paths`) and Xcode project
 - Test PDF resource is bundled in the test target for `loadPdf` / `goToPage` tests
-- To add the test target to a fresh example project, run `ruby example/ios/add_test_target.rb` then `pod install`
+- To add the test target to a fresh example project, run `ruby scripts/add_test_target.rb` then `pod install`
 
 ### Kotlin (JUnit)
 Tests live in `android/src/test/`. Run with `npm run test:kotlin`.
@@ -67,7 +67,7 @@ Tests live in `android/src/test/`. Run with `npm run test:kotlin`.
 ## Project structure
 
 - `src/` — TypeScript source (view component, types, module stubs)
-- `ios/` — Swift native implementation (PDFKit)
+- `ios/` — Swift native implementation (PDFKit) and XCTest suite (`ios/Tests/`)
 - `android/` — Kotlin native implementation (PdfRenderer)
 - `example/` — Expo example app for manual testing
 - `build/` — compiled output (gitignored)
