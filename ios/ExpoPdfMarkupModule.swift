@@ -17,7 +17,23 @@ public class ExpoPdfMarkupModule: Module {
         view.setBackgroundColor(color)
       }
 
-      Events("onPageChanged", "onLoadComplete", "onError")
+      Prop("annotations") { (view: ExpoPdfMarkupView, json: String?) in
+        view.loadAnnotations(from: json)
+      }
+
+      Prop("annotationMode") { (view: ExpoPdfMarkupView, mode: String?) in
+        view.setAnnotationMode(mode ?? "none")
+      }
+
+      Prop("annotationColor") { (view: ExpoPdfMarkupView, color: String?) in
+        view.annotationColor = color ?? "#FF0000"
+      }
+
+      Prop("annotationLineWidth") { (view: ExpoPdfMarkupView, width: Double?) in
+        view.annotationLineWidth = CGFloat(width ?? 2.0)
+      }
+
+      Events("onPageChanged", "onLoadComplete", "onError", "onAnnotationsChanged")
     }
   }
 }

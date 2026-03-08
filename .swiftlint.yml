@@ -14,3 +14,16 @@ opt_in_rules:
 
 disabled_rules:
   - trailing_comma
+
+identifier_name:
+  min_length: 1
+
+type_body_length:
+  warning: 400
+  error: 600
+
+cyclomatic_complexity:
+  warning: 15
+
+file_length:
+  warning: 500
