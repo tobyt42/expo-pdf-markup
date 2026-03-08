@@ -1,5 +1,11 @@
 # @tobyt/expo-pdf-markup
 
+## 0.3.1
+
+### Patch Changes
+
+- Fixed an issue on iOS, where after selecting a different colour, the previous colour would still be used for the live stroke.
+
 ## 0.3.0
 
 ### Minor Changes
