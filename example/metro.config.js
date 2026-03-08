@@ -1,5 +1,9 @@
 // Learn more https://docs.expo.io/guides/customizing-metro
 const { getDefaultConfig } = require('expo/metro-config');
+// Use a direct path here — @tobyt/expo-pdf-markup is mapped by extraNodeModules
+// inside Metro, but metro.config.js itself runs in plain Node.js before Metro starts.
+// Real consumers use: require('@tobyt/expo-pdf-markup/metro')
+const { withPdfMarkup } = require('../metro');
 const path = require('path');
 
 const config = getDefaultConfig(__dirname);
@@ -32,9 +36,4 @@ config.transformer.getTransformOptions = async () => ({
   },
 });
 
-// pdfjs-dist v4 uses `import.meta` in a Node.js-only code path. Metro bundles
-// everything as a non-module script so the browser throws a SyntaxError at
-// runtime. Patch the source text before Babel/hermes-parser ever sees it.
-config.transformer.babelTransformerPath = require.resolve('./scripts/pdfjs-metro-transformer.js');
-
-module.exports = config;
+module.exports = withPdfMarkup(config);

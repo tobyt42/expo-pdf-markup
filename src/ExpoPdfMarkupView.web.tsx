@@ -21,7 +21,9 @@ import type { PdfPageMeta } from './web/types';
 
 // Configure pdfjs worker once at module level (consumers can override before mounting)
 if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-  pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+  // Default: served from public/ by withPdfMarkup() in metro.js.
+  // Override with setPdfJsWorkerSrc() if using a different bundler or CDN.
+  pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 }
 
 /** Allow consumers to override the pdfjs worker URL before mounting the view. */
