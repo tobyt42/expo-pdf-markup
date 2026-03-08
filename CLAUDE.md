@@ -23,6 +23,28 @@ Individual commands:
 
 Always run `npm run qa` (or at minimum `npm run qa:ts`) before committing.
 
+## Releasing
+
+This project uses [Changesets](https://github.com/changesets/changesets) to manage versioning and changelogs.
+
+**When making a change that should be released:**
+```
+npm run changeset:add
+```
+Follow the prompts to describe the change and select the semver bump type. Commit the generated `.changeset/*.md` file with your code changes.
+
+**When ready to cut a release:**
+```
+npm run changeset:version   # bumps package.json, updates CHANGELOG.md, deletes the changeset files
+git add -A && git commit -m "chore: release vX.Y.Z"
+npm run release             # publishes to npm, pushes git tag, creates GitHub release
+```
+
+`npm run release` requires:
+- `npm` to be logged in (`npm whoami`)
+- `gh` to be authenticated (`gh auth status`)
+- A clean working tree on `main`
+
 ## Testing
 
 ### TypeScript (Jest)
