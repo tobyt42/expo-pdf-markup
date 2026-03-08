@@ -1,5 +1,11 @@
 # @tobyt/expo-pdf-markup
 
+## 0.2.2
+
+### Patch Changes
+
+- Fix gap at top of first page on iOS by changing pageBreakMargins to apply all margin to the bottom
+
 ## 0.2.1
 
 ### Patch Changes
