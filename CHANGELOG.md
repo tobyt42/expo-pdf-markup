@@ -1,5 +1,17 @@
 # @tobyt/expo-pdf-markup
 
+## 0.4.0
+
+### Minor Changes
+
+- 519e27b: Update metro config plugin so it works in a monorepo too
+- 4898177: The onPageChanged event now returns page width and height.
+- 5423941: When using gestures to zoom on Web, only the PDF is zoomed in/out instead of the entire UI.
+
+### Patch Changes
+
+- f15901a: Move spacer in Web implementation so it only appears inbetween pages
+
 ## 0.3.1
 
 ### Patch Changes
