@@ -1,5 +1,5 @@
 #!/bin/bash
-# Publishes the package to npm, creates a git tag, pushes it, and opens a GitHub release.
+# Publishes the package to npm, creates a git tag, pushes it, and creates a GitHub release.
 #
 # Prerequisites:
 #   - npm must be logged in (npm whoami)
@@ -13,32 +13,32 @@ set -euo pipefail
 # Ensure we're on main and the working tree is clean
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 if [[ "$BRANCH" != "main" ]]; then
-  echo "❌  Must be on main branch (currently on '$BRANCH')"
+  echo "ERROR: Must be on main branch (currently on '$BRANCH')"
   exit 1
 fi
 
 if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo "❌  Working tree has uncommitted changes – commit or stash them first"
+  echo "ERROR: Working tree has uncommitted changes -- commit or stash them first"
   exit 1
 fi
 
-# Publish to npm and create git tag
-# changeset publish also runs prepublishOnly (build + checks) via npm publish hooks
+# Publish to npm and create git tag.
+# changeset publish runs prepublishOnly (build + checks) via npm publish hooks.
 npx changeset publish
 
 VERSION=$(node -p "require('./package.json').version")
 TAG="v$VERSION"
 
-echo "🏷️   Pushing tag $TAG to origin…"
+echo "Pushing tag $TAG to origin..."
 git push origin "$TAG"
 git push origin main
 
 # Extract release notes: text between first "## <version>" and the next "## "
 NOTES=$(awk '/^## [0-9]/{if(found) exit; found=1; next} found{print}' CHANGELOG.md | sed -e '/^[[:space:]]*$/d')
 
-echo "🚀  Creating GitHub release $TAG…"
+echo "Creating GitHub release $TAG..."
 gh release create "$TAG" \
   --title "$TAG" \
   --notes "$NOTES"
 
-echo "✅  Released $TAG"
+echo "Done. Released $TAG"
