@@ -32,6 +32,13 @@ export function setPdfJsWorkerSrc(url: string): void {
 }
 
 // ---------------------------------------------------------------------------
+// Zoom constants
+// ---------------------------------------------------------------------------
+
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 5;
+
+// ---------------------------------------------------------------------------
 // PageView
 // ---------------------------------------------------------------------------
 
@@ -43,6 +50,7 @@ type PageViewProps = {
   annotationMode: AnnotationMode;
   annotationColor: string;
   annotationLineWidth: number;
+  zoomLevel: number;
   onAnnotationAdded: (annotation: Annotation) => void;
   onAnnotationRemoved: (id: string) => void;
   onTextInputRequested: (pageIndex: number, pdfPoint: AnnotationPoint) => void;
@@ -57,6 +65,7 @@ function PageView({
   annotationMode,
   annotationColor,
   annotationLineWidth,
+  zoomLevel,
   onAnnotationAdded,
   onAnnotationRemoved,
   onTextInputRequested,
@@ -156,7 +165,7 @@ function PageView({
 
   function getCanvasPoint(e: React.PointerEvent<HTMLCanvasElement>): { x: number; y: number } {
     const rect = (e.currentTarget as HTMLCanvasElement).getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    return { x: (e.clientX - rect.left) / zoomLevel, y: (e.clientY - rect.top) / zoomLevel };
   }
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -316,6 +325,8 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
   const pageContainerRefs = React.useRef<(HTMLDivElement | null)[]>([]);
   const docRef = React.useRef<PDFDocumentProxy | null>(null);
   const loadingSourceRef = React.useRef<string | null>(null);
+  const [zoomLevel, setZoomLevel] = React.useState(1);
+  const zoomRef = React.useRef(1);
 
   // ResizeObserver → containerWidth
   React.useEffect(() => {
@@ -327,6 +338,80 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
     });
     ro.observe(el);
     return () => ro.disconnect();
+  }, []);
+
+  // Pinch-to-zoom: intercept ctrl+wheel (trackpad pinch) and two-finger touch pinch.
+  // Zooms only the PDF content, leaving the rest of the UI at 1×.
+  React.useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    function applyZoom(newZoom: number, originX: number, originY: number) {
+      const clamped = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
+      if (clamped === zoomRef.current) return;
+      const ratio = clamped / zoomRef.current;
+      // Keep the origin point (pointer/pinch centre) stationary in the viewport.
+      const nextScrollLeft = (el!.scrollLeft + originX) * ratio - originX;
+      const nextScrollTop = (el!.scrollTop + originY) * ratio - originY;
+      zoomRef.current = clamped;
+      setZoomLevel(clamped);
+      // Apply after React re-renders so the CSS zoom is in effect before we set scroll.
+      requestAnimationFrame(() => {
+        el!.scrollLeft = Math.max(0, nextScrollLeft);
+        el!.scrollTop = Math.max(0, nextScrollTop);
+      });
+    }
+
+    function onWheel(e: WheelEvent) {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const rect = el!.getBoundingClientRect();
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      applyZoom(zoomRef.current * factor, e.clientX - rect.left, e.clientY - rect.top);
+    }
+
+    let pinchStart: { dist: number; zoom: number; midX: number; midY: number } | null = null;
+
+    function getTouchDist(touches: TouchList): number {
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function onTouchStart(e: TouchEvent) {
+      if (e.touches.length !== 2) return;
+      const rect = el!.getBoundingClientRect();
+      pinchStart = {
+        dist: getTouchDist(e.touches),
+        zoom: zoomRef.current,
+        midX: (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left,
+        midY: (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top,
+      };
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      if (e.touches.length !== 2 || !pinchStart) return;
+      e.preventDefault();
+      const dist = getTouchDist(e.touches);
+      applyZoom(pinchStart.zoom * (dist / pinchStart.dist), pinchStart.midX, pinchStart.midY);
+    }
+
+    function onTouchEnd(e: TouchEvent) {
+      if (e.touches.length < 2) pinchStart = null;
+    }
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd);
+    el.addEventListener('touchcancel', onTouchEnd);
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+      el.removeEventListener('touchcancel', onTouchEnd);
+    };
   }, []);
 
   // Load PDF when source or containerWidth changes
@@ -495,32 +580,36 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
       ref={scrollContainerRef}
       style={{
         overflowY: 'scroll',
+        overflowX: 'auto',
         backgroundColor,
         height: '100%',
         ...styleObj,
       }}
     >
-      {doc &&
-        pageMetas.map((meta, i) => (
-          <React.Fragment key={i}>
-            <PageView
-              doc={doc}
-              pageIndex={i}
-              meta={meta}
-              annotations={annotations}
-              annotationMode={annotationMode}
-              annotationColor={annotationColor}
-              annotationLineWidth={annotationLineWidth}
-              onAnnotationAdded={handleAnnotationAdded}
-              onAnnotationRemoved={handleAnnotationRemoved}
-              onTextInputRequested={handleTextInputRequested}
-              containerRef={(el) => {
-                pageContainerRefs.current[i] = el;
-              }}
-            />
-            {i < pageMetas.length - 1 && <div style={{ height: 8 }} aria-hidden />}
-          </React.Fragment>
-        ))}
+      <div style={{ zoom: zoomLevel }}>
+        {doc &&
+          pageMetas.map((meta, i) => (
+            <React.Fragment key={i}>
+              <PageView
+                doc={doc}
+                pageIndex={i}
+                meta={meta}
+                annotations={annotations}
+                annotationMode={annotationMode}
+                annotationColor={annotationColor}
+                annotationLineWidth={annotationLineWidth}
+                zoomLevel={zoomLevel}
+                onAnnotationAdded={handleAnnotationAdded}
+                onAnnotationRemoved={handleAnnotationRemoved}
+                onTextInputRequested={handleTextInputRequested}
+                containerRef={(el) => {
+                  pageContainerRefs.current[i] = el;
+                }}
+              />
+              {i < pageMetas.length - 1 && <div style={{ height: 8 }} aria-hidden />}
+            </React.Fragment>
+          ))}
+      </div>
     </div>
   );
 }
