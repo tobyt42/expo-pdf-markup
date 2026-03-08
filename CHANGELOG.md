@@ -1,5 +1,11 @@
 # @tobyt/expo-pdf-markup
 
+## 0.2.3
+
+### Patch Changes
+
+- fix: exclude ios/Tests from podspec source_files to prevent XCTest
+
 ## 0.2.2
 
 ### Patch Changes
