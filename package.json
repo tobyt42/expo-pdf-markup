@@ -44,6 +44,9 @@
   "author": "Toby Terhoeven <toby@terhoeven.dev> (https://github.com/tobyt42)",
   "license": "MIT",
   "homepage": "https://github.com/tobyt42/expo-pdf-markup#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "devDependencies": {
     "@types/react": "~19.2.10",
     "@types/react-test-renderer": "^19.1.0",
