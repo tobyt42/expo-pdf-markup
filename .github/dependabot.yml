@@ -1,0 +1,43 @@
+version: 2
+updates:
+  # Root library package
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      expo:
+        patterns:
+          - "expo*"
+          - "@expo/*"
+      react-native:
+        patterns:
+          - "react-native*"
+          - "@react-native/*"
+
+  # Example app
+  - package-ecosystem: npm
+    directory: /example
+    schedule:
+      interval: weekly
+    groups:
+      expo:
+        patterns:
+          - "expo*"
+          - "@expo/*"
+      react-native:
+        patterns:
+          - "react-native*"
+          - "@react-native/*"
+
+  # Android example app
+  - package-ecosystem: gradle
+    directory: /example/android
+    schedule:
+      interval: weekly
+
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
