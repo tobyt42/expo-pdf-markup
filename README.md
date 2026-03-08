@@ -7,7 +7,7 @@
 
 An Expo module for displaying and annotating PDFs, with support for iOS, Android, and Web.
 
-> **Status:** Early development — actively being tested.
+> **Status:** Early development — actively tested in the [Choir](https://www.thechoirapp.com) app.
 
 ## Platform support
 
