@@ -30,9 +30,9 @@ An Expo module for displaying and annotating PDFs, with support for iOS, Android
 
 ### Phase 4 — Android: Annotations
 
-- [ ] Annotation support (ink, highlight, free text)
-- [ ] Annotation JSON serialisation and deserialisation (Kotlin)
-- [ ] Cross-platform annotation portability (iOS ↔ Android)
+- [x] Annotation support (ink, highlight, free text)
+- [x] Annotation JSON serialisation and deserialisation (Kotlin)
+- [x] Cross-platform annotation portability (iOS ↔ Android)
 
 ### Phase 5 — Web: PDF rendering
 

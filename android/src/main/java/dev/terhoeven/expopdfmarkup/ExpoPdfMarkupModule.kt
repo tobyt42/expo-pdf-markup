@@ -59,7 +59,23 @@ class ExpoPdfMarkupModule : Module() {
                 view.setPageBackgroundColor(color?.let { parseColorString(it) })
             }
 
-            Events("onPageChanged", "onLoadComplete", "onError")
+            Prop("annotations") { view: ExpoPdfMarkupView, json: String? ->
+                view.loadAnnotations(json)
+            }
+
+            Prop("annotationMode") { view: ExpoPdfMarkupView, mode: String? ->
+                view.setAnnotationMode(mode)
+            }
+
+            Prop("annotationColor") { view: ExpoPdfMarkupView, color: String? ->
+                view.setAnnotationColor(color)
+            }
+
+            Prop("annotationLineWidth") { view: ExpoPdfMarkupView, width: Double? ->
+                view.setAnnotationLineWidth(width)
+            }
+
+            Events("onPageChanged", "onLoadComplete", "onError", "onAnnotationsChanged")
         }
     }
 }
