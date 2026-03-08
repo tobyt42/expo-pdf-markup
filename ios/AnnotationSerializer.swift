@@ -60,7 +60,13 @@ enum AnnotationSerializer {
       return nil
     }
 
-    let colorHex = hexFromColor(annotation.color ?? .red)
+    // freeText annotations store the visible colour in fontColor;
+    // annotation.color is .clear (background).
+    let isFreeText = type == "text" || type == "freeText"
+    let effectiveColor = isFreeText
+      ? (annotation.fontColor ?? annotation.color ?? .black)
+      : (annotation.color ?? .red)
+    let colorHex = hexFromColor(effectiveColor)
     var model = AnnotationModel(
       id: id,
       type: type,

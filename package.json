@@ -1,6 +1,6 @@
 {
   "name": "@tobyt/expo-pdf-markup",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "An Expo module for displaying and annotating PDFs",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -29,7 +29,10 @@
     "expo-module": "expo-module",
     "open:ios": "xed example/ios",
     "open:android": "open -a \"Android Studio\" example/android",
-    "docs": "typedoc"
+    "docs": "typedoc",
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
+    "changeset:publish": "changeset publish"
   },
   "keywords": [
     "react-native",
@@ -48,6 +51,7 @@
     "access": "public"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.30.0",
     "@types/react": "~19.2.10",
     "@types/react-test-renderer": "^19.1.0",
     "expo": "^55.0.5",
