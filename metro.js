@@ -30,15 +30,13 @@ const path = require('path');
 let _upstream = null;
 function upstream(projectRoot) {
   if (_upstream) return _upstream;
-  // Resolve expo relative to the *consumer's* project root (passed via options),
-  // not relative to this file's location. This file lives inside the library
-  // package which may have its own copy of expo without @expo/metro-config nested
-  // inside it.
-  const expoDir = path.dirname(
-    require.resolve('expo/package.json', { paths: [projectRoot] })
-  );
+  // Resolve @expo/metro-config from the consumer's project root. Using
+  // require.resolve with a paths option works in both standard installs (where
+  // @expo/metro-config is a transitive dep reachable from the project) and hoisted
+  // monorepos (where it is deduplicated to the workspace root). Hard-coding the
+  // path through expo's own node_modules directory breaks in the monorepo case.
   _upstream = require(
-    path.join(expoDir, 'node_modules/@expo/metro-config/build/babel-transformer')
+    require.resolve('@expo/metro-config/build/babel-transformer', { paths: [projectRoot] })
   );
   return _upstream;
 }

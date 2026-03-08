@@ -38,7 +38,9 @@ class ContinuousPdfView(context: Context) : View(context) {
     private val scaleDetector = ScaleGestureDetector(context, ScaleListener())
     private val gestureDetector = GestureDetector(context, GestureListener())
 
-    var onPageChangeListener: ((page: Int, pageCount: Int, pageWidth: Int, pageHeight: Int) -> Unit)? = null
+    var onPageChangeListener: (
+        (page: Int, pageCount: Int, pageWidth: Int, pageHeight: Int) -> Unit
+    )? = null
 
     // Annotation state
     var annotations: List<AnnotationModel> = emptyList()

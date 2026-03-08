@@ -16,6 +16,7 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
       inkShapeLayer?.strokeColor = (AnnotationSerializer.colorFromHex(annotationColor) ?? .red).cgColor
     }
   }
+
   var annotationLineWidth: CGFloat = 2.0
 
   private var inkPanGesture: UIPanGestureRecognizer?
