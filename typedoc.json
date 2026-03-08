@@ -1,0 +1,11 @@
+{
+  "entryPoints": ["src/index.ts"],
+  "out": "docs",
+  "name": "@tobyt/expo-pdf-markup",
+  "entryPointStrategy": "expand",
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "includeVersion": true,
+  "readme": "README.md",
+  "githubPages": true
+}

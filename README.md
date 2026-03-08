@@ -26,6 +26,8 @@ npx pod-install
 
 ## Usage
 
+Full API reference is available at **[tobyt42.github.io/expo-pdf-markup](https://tobyt42.github.io/expo-pdf-markup/types/ExpoPdfMarkupViewProps.html)**.
+
 ```tsx
 import { ExpoPdfMarkupView } from '@tobyt/expo-pdf-markup';
 
