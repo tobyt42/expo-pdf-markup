@@ -35,9 +35,42 @@ Full API reference is available at **[tobyt42.github.io/expo-pdf-markup](https:/
 
 ```tsx
 import { ExpoPdfMarkupView } from '@tobyt/expo-pdf-markup';
+import type { AnnotationMode } from '@tobyt/expo-pdf-markup';
+import { Asset } from 'expo-asset';
+import { useEffect, useState } from 'react';
+import { StyleSheet } from 'react-native';
 
 export default function App() {
-  return <ExpoPdfMarkupView source={{ uri: 'https://example.com/document.pdf' }} />;
+  const [pdfPath, setPdfPath] = useState<string | null>(null);
+  const [annotations, setAnnotations] = useState(JSON.stringify({ version: 1, annotations: [] }));
+
+  useEffect(() => {
+    async function preparePdf() {
+      const asset = Asset.fromModule(require('./assets/document.pdf'));
+      await asset.downloadAsync();
+      if (asset.localUri) setPdfPath(asset.localUri.replace('file://', ''));
+    }
+    preparePdf();
+  }, []);
+
+  if (!pdfPath) return null;
+
+  return (
+    <ExpoPdfMarkupView
+      source={pdfPath}
+      style={StyleSheet.absoluteFill}
+      annotationMode="ink"
+      annotationColor="#FF0000"
+      annotationLineWidth={3}
+      annotations={annotations}
+      onLoadComplete={({ nativeEvent: { pageCount } }) => console.log(`Loaded ${pageCount} pages`)}
+      onPageChanged={({ nativeEvent: { page, pageCount } }) =>
+        console.log(`Page ${page + 1} of ${pageCount}`)
+      }
+      onAnnotationsChanged={({ nativeEvent }) => setAnnotations(nativeEvent.annotations)}
+      onError={({ nativeEvent: { message } }) => console.error(message)}
+    />
+  );
 }
 ```
 
@@ -54,7 +87,7 @@ cd example
 npx expo start
 ```
 
-## Core Team ✨
+## Core Team
 
 <table>
   <tr>

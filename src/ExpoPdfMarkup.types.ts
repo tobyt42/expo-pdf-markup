@@ -54,7 +54,7 @@ export type AnnotationsData = {
 export type AnnotationMode = 'none' | 'ink' | 'highlight' | 'underline' | 'text' | 'eraser';
 
 export type ExpoPdfMarkupViewProps = {
-  /** Local file path or remote URL of the PDF to display. */
+  /** Absolute local file path of the PDF to display. */
   source: string;
   /** 0-based page number to display. Can be used to restore scroll position on orientation change. */
   page?: number;
