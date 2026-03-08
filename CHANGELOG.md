@@ -1,5 +1,15 @@
 # @tobyt/expo-pdf-markup
 
+## 0.3.0
+
+### Minor Changes
+
+- PDF rendering and markup is now also supported on Web.
+
+### Patch Changes
+
+- 4dafaf4: Fixed documentation for the source prop - it only accepts absolute local file paths; remote URLs are not supported. Updated the README usage example to reflect real-world usage (loading a bundled asset via expo-asset) and demonstrate key props like annotationMode, annotationColor, annotationLineWidth, annotations, and the event callbacks.
+
 ## 0.2.3
 
 ### Patch Changes
