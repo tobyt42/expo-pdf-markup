@@ -503,7 +503,6 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
       {doc &&
         pageMetas.map((meta, i) => (
           <React.Fragment key={i}>
-            <div style={{ height: 8 }} aria-hidden />
             <PageView
               doc={doc}
               pageIndex={i}
@@ -519,6 +518,7 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
                 pageContainerRefs.current[i] = el;
               }}
             />
+            {i < pageMetas.length - 1 && <div style={{ height: 8 }} aria-hidden />}
           </React.Fragment>
         ))}
     </div>
