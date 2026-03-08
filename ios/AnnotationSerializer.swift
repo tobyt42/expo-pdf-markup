@@ -60,13 +60,19 @@ enum AnnotationSerializer {
       return nil
     }
 
-    // freeText annotations store the visible colour in fontColor;
-    // annotation.color is .clear (background).
+    // Prefer the stored hex colour (set by this module) to avoid lossy UIColor round-trips.
+    // freeText annotations otherwise use fontColor; other types use annotation.color.
     let isFreeText = type == "text" || type == "freeText"
-    let effectiveColor = isFreeText
-      ? (annotation.fontColor ?? annotation.color ?? .black)
-      : (annotation.color ?? .red)
-    let colorHex = hexFromColor(effectiveColor)
+    let storedHex = annotation.value(forAnnotationKey: PDFAnnotationKey(rawValue: "_color")) as? String
+    let colorHex: String
+    if let storedHex {
+      colorHex = storedHex
+    } else {
+      let effectiveColor = isFreeText
+        ? (annotation.fontColor ?? annotation.color ?? .black)
+        : (annotation.color ?? .red)
+      colorHex = hexFromColor(effectiveColor)
+    }
     var model = AnnotationModel(
       id: id,
       type: type,
@@ -107,10 +113,13 @@ enum AnnotationSerializer {
     annotation.value(forAnnotationKey: PDFAnnotationKey(rawValue: ownershipKey)) as? Bool == true
   }
 
-  static func tagAsModuleManaged(_ annotation: PDFAnnotation, id: String, createdAt: Double) {
+  static func tagAsModuleManaged(_ annotation: PDFAnnotation, id: String, createdAt: Double, colorHex: String? = nil) {
     annotation.setValue(true, forAnnotationKey: PDFAnnotationKey(rawValue: ownershipKey))
     annotation.setValue(id, forAnnotationKey: PDFAnnotationKey(rawValue: "_id"))
     annotation.setValue(createdAt, forAnnotationKey: PDFAnnotationKey(rawValue: "_createdAt"))
+    if let colorHex {
+      annotation.setValue(colorHex, forAnnotationKey: PDFAnnotationKey(rawValue: "_color"))
+    }
   }
 
   // MARK: - Color helpers
@@ -203,7 +212,7 @@ enum AnnotationSerializer {
     }
 
     let createdAt = model.createdAt ?? Date().timeIntervalSince1970
-    tagAsModuleManaged(annotation, id: model.id, createdAt: createdAt)
+    tagAsModuleManaged(annotation, id: model.id, createdAt: createdAt, colorHex: model.color)
     return annotation
   }
 
@@ -218,7 +227,7 @@ enum AnnotationSerializer {
     annotation.color = color.withAlphaComponent(alpha)
 
     let createdAt = model.createdAt ?? Date().timeIntervalSince1970
-    tagAsModuleManaged(annotation, id: model.id, createdAt: createdAt)
+    tagAsModuleManaged(annotation, id: model.id, createdAt: createdAt, colorHex: model.color)
     return annotation
   }
 
@@ -232,7 +241,7 @@ enum AnnotationSerializer {
     annotation.contents = model.contents ?? ""
 
     let createdAt = model.createdAt ?? Date().timeIntervalSince1970
-    tagAsModuleManaged(annotation, id: model.id, createdAt: createdAt)
+    tagAsModuleManaged(annotation, id: model.id, createdAt: createdAt, colorHex: model.color)
     return annotation
   }
 

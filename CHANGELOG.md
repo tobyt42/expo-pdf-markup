@@ -1,5 +1,11 @@
 # @tobyt/expo-pdf-markup
 
+## 0.2.1
+
+### Patch Changes
+
+- Fix freeText annotation colour round-trip by storing the original hex string as a custom PDF annotation key, preventing loss when PDFKit's fontColor returns nil outside a document context
+
 ## 0.2.0
 
 ### Minor Changes
