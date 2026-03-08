@@ -112,8 +112,8 @@ export default function App() {
       annotationLineWidth={3}
       annotations={annotations}
       onLoadComplete={({ nativeEvent: { pageCount } }) => console.log(`Loaded ${pageCount} pages`)}
-      onPageChanged={({ nativeEvent: { page, pageCount } }) =>
-        console.log(`Page ${page + 1} of ${pageCount}`)
+      onPageChanged={({ nativeEvent: { page, pageCount, pageWidth, pageHeight } }) =>
+        console.log(`Page ${page + 1} of ${pageCount} (${pageWidth}×${pageHeight}pt)`)
       }
       onAnnotationsChanged={({ nativeEvent }) => setAnnotations(nativeEvent.annotations)}
       onError={({ nativeEvent: { message } }) => console.error(message)}

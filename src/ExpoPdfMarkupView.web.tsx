@@ -420,7 +420,14 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
         }
         if (topPage !== -1 && topPage !== lastReported) {
           lastReported = topPage;
-          onPageChanged?.({ nativeEvent: { page: topPage, pageCount: doc.numPages } });
+          onPageChanged?.({
+            nativeEvent: {
+              page: topPage,
+              pageCount: doc.numPages,
+              pageWidth: pageMetas[topPage]?.pdfWidth ?? 0,
+              pageHeight: pageMetas[topPage]?.pdfHeight ?? 0,
+            },
+          });
         }
       },
       { root: scrollContainerRef.current, threshold: 0.1 }

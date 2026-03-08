@@ -540,6 +540,12 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
 
     let pageIndex = document.index(for: currentPage)
     let pageCount = document.pageCount
-    onPageChanged(["page": pageIndex, "pageCount": pageCount])
+    let bounds = currentPage.bounds(for: pdfView.displayBox)
+    onPageChanged([
+      "page": pageIndex,
+      "pageCount": pageCount,
+      "pageWidth": bounds.width,
+      "pageHeight": bounds.height,
+    ])
   }
 }

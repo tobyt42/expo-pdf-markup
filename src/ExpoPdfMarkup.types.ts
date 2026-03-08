@@ -69,7 +69,9 @@ export type ExpoPdfMarkupViewProps = {
   /** Stroke width in points applied to new ink annotations. */
   annotationLineWidth?: number;
   /** Fired when the visible page changes. */
-  onPageChanged?: (event: { nativeEvent: { page: number; pageCount: number } }) => void;
+  onPageChanged?: (event: {
+    nativeEvent: { page: number; pageCount: number; pageWidth: number; pageHeight: number };
+  }) => void;
   /** Fired once the document has finished loading. */
   onLoadComplete?: (event: { nativeEvent: { pageCount: number } }) => void;
   /** Fired when the document fails to load. */

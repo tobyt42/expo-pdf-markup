@@ -27,8 +27,8 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
 
     init {
         addView(pdfView)
-        pdfView.onPageChangeListener = { page, pageCount ->
-            onPageChanged(mapOf("page" to page, "pageCount" to pageCount))
+        pdfView.onPageChangeListener = { page, pageCount, pageWidth, pageHeight ->
+            onPageChanged(mapOf("page" to page, "pageCount" to pageCount, "pageWidth" to pageWidth, "pageHeight" to pageHeight))
         }
         pdfView.onAnnotationsChangedListener = {
             emitAnnotationsChanged()

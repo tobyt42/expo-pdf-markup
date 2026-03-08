@@ -38,7 +38,7 @@ class ContinuousPdfView(context: Context) : View(context) {
     private val scaleDetector = ScaleGestureDetector(context, ScaleListener())
     private val gestureDetector = GestureDetector(context, GestureListener())
 
-    var onPageChangeListener: ((page: Int, pageCount: Int) -> Unit)? = null
+    var onPageChangeListener: ((page: Int, pageCount: Int, pageWidth: Int, pageHeight: Int) -> Unit)? = null
 
     // Annotation state
     var annotations: List<AnnotationModel> = emptyList()
@@ -466,7 +466,9 @@ class ContinuousPdfView(context: Context) : View(context) {
         val page = getVisiblePage()
         if (page != lastNotifiedPage) {
             lastNotifiedPage = page
-            onPageChangeListener?.invoke(page, pageBitmaps.size)
+            val pw = if (page < pageWidths.size) pageWidths[page] else 0
+            val ph = if (page < pageHeights.size) pageHeights[page] else 0
+            onPageChangeListener?.invoke(page, pageBitmaps.size, pw, ph)
         }
     }
 
