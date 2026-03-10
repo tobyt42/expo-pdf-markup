@@ -7,6 +7,8 @@
 
 An Expo module for displaying and annotating PDFs, with support for iOS, Android, and Web.
 
+**[📖 API Reference](https://tobyt42.github.io/expo-pdf-markup/api/)** · **[🚀 Example App](https://tobyt42.github.io/expo-pdf-markup/example/)**
+
 > **Status:** Early development — actively tested in the [Choir](https://www.thechoirapp.com) app.
 
 ## Platform support
