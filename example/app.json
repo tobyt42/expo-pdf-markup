@@ -28,6 +28,9 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "experiments": {
+      "baseUrl": "/expo-pdf-markup/example"
+    },
     "plugins": [
       "expo-asset"
     ]
