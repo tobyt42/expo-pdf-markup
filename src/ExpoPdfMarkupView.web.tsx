@@ -22,8 +22,10 @@ import type { PdfPageMeta } from './web/types';
 // Configure pdfjs worker once at module level (consumers can override before mounting)
 if (!pdfjs.GlobalWorkerOptions.workerSrc) {
   // Default: served from public/ by withPdfMarkup() in metro.js.
+  // Relative URL so the worker resolves correctly regardless of the sub-path
+  // the app is hosted at (e.g. /example/ on GitHub Pages).
   // Override with setPdfJsWorkerSrc() if using a different bundler or CDN.
-  pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+  pdfjs.GlobalWorkerOptions.workerSrc = './pdf.worker.min.mjs';
 }
 
 /** Allow consumers to override the pdfjs worker URL before mounting the view. */
@@ -80,7 +82,7 @@ function PageView({
   const dragStartRef = React.useRef<{ x: number; y: number } | null>(null);
   const dragCurrentRef = React.useRef<{ x: number; y: number } | null>(null);
 
-  const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio ?? 1) : 1;
+  const dpr = typeof window !== 'undefined' ? window.devicePixelRatio ?? 1 : 1;
   const cssWidth = meta.canvasWidth / dpr;
   const cssHeight = meta.canvasHeight / dpr;
 

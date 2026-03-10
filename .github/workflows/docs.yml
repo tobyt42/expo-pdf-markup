@@ -18,15 +18,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+
+      # Install root dependencies (needed for typedoc and the module source)
       - run: npm ci
-      - run: npm run docs
+
+      # Build TypeDocs into site/api/
+      - run: npm run docs -- --out site/api
+
+      # Install example app dependencies
+      - run: npm ci
+        working-directory: example
+
+      # Export example app as a static web bundle into site/example/
+      - run: npx expo export --platform web --output-dir ../site/example
+        working-directory: example
+
+      # Assemble the site root: landing page + .nojekyll
+      - run: |
+          cp .github/pages/index.html site/index.html
+          touch site/.nojekyll
+
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: docs
+          path: site
 
   deploy:
     needs: build
