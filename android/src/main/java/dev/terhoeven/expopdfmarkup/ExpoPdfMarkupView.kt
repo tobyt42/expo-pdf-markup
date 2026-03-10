@@ -19,11 +19,16 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
     private val onLoadComplete by EventDispatcher()
     private val onError by EventDispatcher()
     private val onAnnotationsChanged by EventDispatcher()
+    private val onTextInputRequested by EventDispatcher()
 
     private var renderer: PdfRenderer? = null
     private var fileDescriptor: ParcelFileDescriptor? = null
     private var currentSource: String? = null
     private var pendingAnnotationsJson: String? = null
+    var useJsTextDialog: Boolean = false
+
+    private var pendingTextPage: Int = -1
+    private var pendingTextPoint: AnnotationPoint? = null
 
     init {
         addView(pdfView)
@@ -41,7 +46,13 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
             emitAnnotationsChanged()
         }
         pdfView.onTextInputRequested = { page, point ->
-            showTextInputDialog(page, point)
+            if (useJsTextDialog) {
+                pendingTextPage = page
+                pendingTextPoint = point
+                onTextInputRequested(emptyMap<String, Any>())
+            } else {
+                showTextInputDialog(page, point)
+            }
         }
     }
 
@@ -112,6 +123,13 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
         val json = AnnotationSerializer.serialize(data)
         pendingAnnotationsJson = json
         onAnnotationsChanged(mapOf("annotations" to json))
+    }
+
+    fun provideTextInput(text: String?) {
+        val page = pendingTextPage.also { pendingTextPage = -1 }
+        val point = pendingTextPoint.also { pendingTextPoint = null }
+        if (page < 0 || point == null || text.isNullOrEmpty()) return
+        pdfView.addTextAnnotation(page, point, text)
     }
 
     private fun showTextInputDialog(page: Int, point: AnnotationPoint) {

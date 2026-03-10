@@ -46,6 +46,11 @@ class ExpoPdfMarkupModule : Module() {
     override fun definition() = ModuleDefinition {
         Name("ExpoPdfMarkup")
 
+        AsyncFunction("provideTextInput") { viewTag: Int, text: String? ->
+            val view = appContext.findView<ExpoPdfMarkupView>(viewTag)
+            view?.provideTextInput(text)
+        }
+
         View(ExpoPdfMarkupView::class) {
             Prop("source") { view: ExpoPdfMarkupView, source: String ->
                 view.loadPdf(source)
@@ -75,7 +80,17 @@ class ExpoPdfMarkupModule : Module() {
                 view.setAnnotationLineWidth(width)
             }
 
-            Events("onPageChanged", "onLoadComplete", "onError", "onAnnotationsChanged")
+            Prop("useJsTextDialog") { view: ExpoPdfMarkupView, use: Boolean? ->
+                view.useJsTextDialog = use ?: false
+            }
+
+            Events(
+                "onPageChanged",
+                "onLoadComplete",
+                "onError",
+                "onAnnotationsChanged",
+                "onTextInputRequested"
+            )
         }
     }
 }

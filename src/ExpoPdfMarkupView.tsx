@@ -1,10 +1,40 @@
-import { requireNativeView } from 'expo';
+import { requireNativeModule, requireNativeView } from 'expo';
 import * as React from 'react';
+import { findNodeHandle } from 'react-native';
 
 import { ExpoPdfMarkupViewProps } from './ExpoPdfMarkup.types';
 
-const NativeView: React.ComponentType<ExpoPdfMarkupViewProps> = requireNativeView('ExpoPdfMarkup');
+type NativeViewProps = Omit<ExpoPdfMarkupViewProps, 'onTextInputRequested'> & {
+  useJsTextDialog?: boolean;
+  onTextInputRequested?: (event: { nativeEvent: Record<string, never> }) => void;
+};
 
-export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
-  return <NativeView {...props} />;
+const NativeView = requireNativeView('ExpoPdfMarkup') as React.ForwardRefExoticComponent<
+  NativeViewProps & React.RefAttributes<unknown>
+>;
+
+const NativeModule = requireNativeModule('ExpoPdfMarkup');
+
+export default function ExpoPdfMarkupView({
+  onTextInputRequested,
+  ...props
+}: ExpoPdfMarkupViewProps) {
+  const nativeRef = React.useRef<unknown>(null);
+
+  const handleNativeTextInputRequested = React.useCallback(async () => {
+    if (!onTextInputRequested) return;
+    const tag = findNodeHandle(nativeRef.current as Parameters<typeof findNodeHandle>[0]);
+    if (tag == null) return;
+    const text = await onTextInputRequested();
+    await NativeModule.provideTextInput(tag, text ?? null);
+  }, [onTextInputRequested]);
+
+  return (
+    <NativeView
+      ref={nativeRef}
+      {...props}
+      useJsTextDialog={!!onTextInputRequested}
+      onTextInputRequested={onTextInputRequested ? handleNativeTextInputRequested : undefined}
+    />
+  );
 }

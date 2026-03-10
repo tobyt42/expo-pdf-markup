@@ -7,6 +7,7 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
   let onLoadComplete = EventDispatcher()
   let onError = EventDispatcher()
   let onAnnotationsChanged = EventDispatcher()
+  let onTextInputRequested = EventDispatcher()
 
   private var currentSource: String?
   private var currentAnnotationsJSON: String?
@@ -18,6 +19,7 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
   }
 
   var annotationLineWidth: CGFloat = 2.0
+  var useJsTextDialog: Bool = false
 
   private var inkPanGesture: UIPanGestureRecognizer?
   private var inkShapeLayer: CAShapeLayer?
@@ -27,6 +29,9 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
   private var selectionObserver: NSObjectProtocol?
   private var selectionDebounceTimer: Timer?
   private var currentMarkupType: String?
+
+  private var pendingTextPage: PDFPage?
+  private var pendingTextPoint: CGPoint?
 
   required init(appContext: AppContext? = nil) {
     super.init(appContext: appContext)
@@ -468,6 +473,13 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
 
     let pdfPoint = pdfView.convert(location, to: page)
 
+    if useJsTextDialog {
+      pendingTextPage = page
+      pendingTextPoint = pdfPoint
+      onTextInputRequested([:])
+      return
+    }
+
     // Show text input dialog
     guard let viewController = findViewController() else { return }
     let alert = UIAlertController(title: "Add Text", message: nil, preferredStyle: .alert)
@@ -482,6 +494,14 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
     })
 
     viewController.present(alert, animated: true)
+  }
+
+  func provideTextInput(text: String?) {
+    guard let page = pendingTextPage, let point = pendingTextPoint else { return }
+    pendingTextPage = nil
+    pendingTextPoint = nil
+    guard let text, !text.isEmpty else { return }
+    addFreeTextAnnotation(text: text, at: point, on: page)
   }
 
   private func addFreeTextAnnotation(text: String, at point: CGPoint, on page: PDFPage) {

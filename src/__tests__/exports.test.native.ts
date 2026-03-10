@@ -2,6 +2,7 @@ import * as ExportedModule from '../index';
 
 jest.mock('expo', () => ({
   requireNativeView: jest.fn(() => 'MockNativeView'),
+  requireNativeModule: jest.fn(() => ({ provideTextInput: jest.fn() })),
 }));
 
 describe('public API surface', () => {

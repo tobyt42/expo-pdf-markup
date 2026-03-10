@@ -1,8 +1,16 @@
 import { ExpoPdfMarkupView } from '@tobyt/expo-pdf-markup';
 import type { AnnotationMode } from '@tobyt/expo-pdf-markup';
 import { Asset } from 'expo-asset';
-import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 const MODES: { label: string; mode: AnnotationMode }[] = [
@@ -29,6 +37,11 @@ export default function App() {
   const [annotationColor, setAnnotationColor] = useState('#FF0000');
   const [annotations, setAnnotations] = useState(EMPTY_ANNOTATIONS);
 
+  // Custom text dialog state
+  const [textDialogVisible, setTextDialogVisible] = useState(false);
+  const [textInput, setTextInput] = useState('');
+  const resolveRef = useRef<((text: string | null) => void) | null>(null);
+
   useEffect(() => {
     async function preparePdf() {
       const asset = Asset.fromModule(require('./assets/test.pdf'));
@@ -39,6 +52,26 @@ export default function App() {
     }
     preparePdf();
   }, []);
+
+  const handleTextInputRequested = (): Promise<string | null> => {
+    setTextInput('');
+    setTextDialogVisible(true);
+    return new Promise((resolve) => {
+      resolveRef.current = resolve;
+    });
+  };
+
+  const submitText = () => {
+    setTextDialogVisible(false);
+    resolveRef.current?.(textInput.trim() || null);
+    resolveRef.current = null;
+  };
+
+  const cancelText = () => {
+    setTextDialogVisible(false);
+    resolveRef.current?.(null);
+    resolveRef.current = null;
+  };
 
   return (
     <SafeAreaProvider>
@@ -53,6 +86,7 @@ export default function App() {
             annotationMode={annotationMode}
             annotationColor={annotationColor}
             annotationLineWidth={3}
+            onTextInputRequested={handleTextInputRequested}
             onLoadComplete={({ nativeEvent: { pageCount } }) =>
               console.log(`PDF loaded: ${pageCount} pages`)
             }
@@ -102,6 +136,32 @@ export default function App() {
             </Pressable>
           </View>
         </View>
+
+        <Modal visible={textDialogVisible} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Add Text</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Enter annotation text…"
+                placeholderTextColor="#888"
+                value={textInput}
+                onChangeText={setTextInput}
+                autoFocus
+                onSubmitEditing={submitText}
+                returnKeyType="done"
+              />
+              <View style={styles.modalActions}>
+                <Pressable style={styles.modalCancel} onPress={cancelText}>
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </Pressable>
+                <Pressable style={styles.modalConfirm} onPress={submitText}>
+                  <Text style={styles.modalConfirmText}>Add</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </SafeAreaProvider>
   );
@@ -171,5 +231,61 @@ const styles = StyleSheet.create({
   clearButton: {
     backgroundColor: '#8B0000',
     marginLeft: 'auto',
+  },
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  modalCard: {
+    backgroundColor: '#1e1e1e',
+    borderRadius: 14,
+    padding: 20,
+    width: '100%',
+    maxWidth: 360,
+    gap: 16,
+  },
+  modalTitle: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  modalInput: {
+    backgroundColor: '#2c2c2e',
+    color: '#fff',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  modalCancel: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 8,
+    backgroundColor: '#3a3a3c',
+  },
+  modalCancelText: {
+    color: '#ccc',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  modalConfirm: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 8,
+    backgroundColor: '#0A84FF',
+  },
+  modalConfirmText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
   },
 });

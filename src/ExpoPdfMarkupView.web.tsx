@@ -80,7 +80,7 @@ function PageView({
   const dragStartRef = React.useRef<{ x: number; y: number } | null>(null);
   const dragCurrentRef = React.useRef<{ x: number; y: number } | null>(null);
 
-  const dpr = typeof window !== 'undefined' ? window.devicePixelRatio ?? 1 : 1;
+  const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio ?? 1) : 1;
   const cssWidth = meta.canvasWidth / dpr;
   const cssHeight = meta.canvasHeight / dpr;
 
@@ -313,6 +313,7 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
     onLoadComplete,
     onError,
     onAnnotationsChanged,
+    onTextInputRequested,
     style,
   } = props;
 
@@ -548,8 +549,10 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
   );
 
   const handleTextInputRequested = React.useCallback(
-    (pageIndex: number, pdfPoint: AnnotationPoint) => {
-      const text = window.prompt('Enter annotation text:');
+    async (pageIndex: number, pdfPoint: AnnotationPoint) => {
+      const text = onTextInputRequested
+        ? await onTextInputRequested()
+        : window.prompt('Enter annotation text:');
       if (!text) return;
       const fontSize = 16;
       const estimatedWidth = text.length * fontSize * 0.6;
@@ -570,7 +573,7 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
         createdAt: Date.now(),
       });
     },
-    [annotationColor, handleAnnotationAdded]
+    [annotationColor, handleAnnotationAdded, onTextInputRequested]
   );
 
   const styleObj = style as React.CSSProperties | undefined;

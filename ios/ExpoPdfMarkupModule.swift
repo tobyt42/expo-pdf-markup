@@ -4,6 +4,13 @@ public class ExpoPdfMarkupModule: Module {
   public func definition() -> ModuleDefinition {
     Name("ExpoPdfMarkup")
 
+    AsyncFunction("provideTextInput") { (viewTag: Int, text: String?) in
+      DispatchQueue.main.async {
+        guard let view = self.appContext?.findView(withTag: viewTag, ofType: ExpoPdfMarkupView.self) else { return }
+        view.provideTextInput(text: text)
+      }
+    }
+
     View(ExpoPdfMarkupView.self) {
       Prop("source") { (view: ExpoPdfMarkupView, source: String) in
         view.loadPdf(from: source)
@@ -33,7 +40,11 @@ public class ExpoPdfMarkupModule: Module {
         view.annotationLineWidth = CGFloat(width ?? 2.0)
       }
 
-      Events("onPageChanged", "onLoadComplete", "onError", "onAnnotationsChanged")
+      Prop("useJsTextDialog") { (view: ExpoPdfMarkupView, use: Bool?) in
+        view.useJsTextDialog = use ?? false
+      }
+
+      Events("onPageChanged", "onLoadComplete", "onError", "onAnnotationsChanged", "onTextInputRequested")
     }
   }
 }

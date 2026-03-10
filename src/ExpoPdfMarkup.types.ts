@@ -78,5 +78,11 @@ export type ExpoPdfMarkupViewProps = {
   onError?: (event: { nativeEvent: { message: string } }) => void;
   /** Fired after annotations are created or edited. `annotations` is a serialised {@link AnnotationsData} JSON string. */
   onAnnotationsChanged?: (event: { nativeEvent: { annotations: string } }) => void;
+  /**
+   * Optional async callback for the text annotation tool. When provided, this is called instead of
+   * the native platform dialog (UIAlertController / AlertDialog) when the user taps to place a text
+   * annotation. Return the text string to create the annotation, or `null` to cancel.
+   */
+  onTextInputRequested?: () => Promise<string | null>;
   style?: StyleProp<ViewStyle>;
 };
