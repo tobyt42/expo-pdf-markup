@@ -1,5 +1,13 @@
 # @tobyt/expo-pdf-markup
 
+## 0.5.0
+
+### Minor Changes
+
+- 049130a: Example app is now deployed to Github Pages
+- 049130a: Default pdfjs worker source for web implementation is now relative
+- e62d562: Support optionally rendering text input prompt on JavaScript side
+
 ## 0.4.0
 
 ### Minor Changes
