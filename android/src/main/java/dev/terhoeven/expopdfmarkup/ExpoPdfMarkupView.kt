@@ -156,6 +156,7 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
         renderer = null
         fileDescriptor?.close()
         fileDescriptor = null
+        currentSource = null
     }
 
     override fun onDetachedFromWindow() {
