@@ -406,6 +406,7 @@ class ContinuousPdfView(context: Context) : View(context) {
 
     fun addTextAnnotation(page: Int, point: AnnotationPoint, text: String) {
         val fontSize = 16f
+        val padding = 4f
         val paint = Paint().apply { textSize = fontSize }
         val textWidth = paint.measureText(text)
         val annotation = AnnotationModel(
@@ -413,7 +414,7 @@ class ContinuousPdfView(context: Context) : View(context) {
             type = "freeText",
             page = page,
             color = annotationColor,
-            bounds = AnnotationBounds(point.x, point.y - fontSize, textWidth, fontSize * 1.2f),
+            bounds = AnnotationBounds(point.x, point.y - fontSize - padding, textWidth + padding * 2, fontSize * 1.2f + padding * 2),
             contents = text,
             fontSize = fontSize,
             createdAt = System.currentTimeMillis() / 1000.0
