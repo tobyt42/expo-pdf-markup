@@ -1,5 +1,19 @@
 # @tobyt/expo-pdf-markup
 
+## 0.6.0
+
+### Minor Changes
+
+- fc961ab: Add support for a custom font for text markups
+- 26bdae1: When in Move or Eraser mode, annotations are now surrounded by an outline to indicate the scope of the move/erasure
+- 26bdae1: A Move tool was added for drag and drop repositioning of annotations
+- 76f9b23: Text annotations can now be edited (breaking change, see example/docs)
+
+### Patch Changes
+
+- dae52fb: Reset currentSource in close
+- 8146a57: Add padding to Android freeText annotation bounds to prevent text from being clipped when rendered
+
 ## 0.5.0
 
 ### Minor Changes
