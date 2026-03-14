@@ -44,44 +44,53 @@ enum AnnotationSerializer {
       forAnnotationKey: PDFAnnotationKey(rawValue: "_createdAt")
     ) as? Double ?? Date().timeIntervalSince1970
 
-    let type: String
-    switch annotation.type {
-    case "Ink":
-      type = "ink"
-    case "Highlight":
-      type = "highlight"
-    case "Underline":
-      type = "underline"
-    case "Text":
-      type = "text"
-    case "FreeText":
-      type = "freeText"
-    default:
-      return nil
-    }
-
-    // Prefer the stored hex colour (set by this module) to avoid lossy UIColor round-trips.
-    // freeText annotations otherwise use fontColor; other types use annotation.color.
-    let isFreeText = type == "text" || type == "freeText"
-    let storedHex = annotation.value(forAnnotationKey: PDFAnnotationKey(rawValue: "_color")) as? String
-    let colorHex: String
-    if let storedHex {
-      colorHex = storedHex
-    } else {
-      let effectiveColor = isFreeText
-        ? (annotation.fontColor ?? annotation.color ?? .black)
-        : (annotation.color ?? .red)
-      colorHex = hexFromColor(effectiveColor)
-    }
+    guard let type = modelType(for: annotation.type) else { return nil }
     var model = AnnotationModel(
       id: id,
       type: type,
       page: page,
-      color: colorHex,
+      color: colorHex(for: annotation, type: type),
       createdAt: createdAt
     )
 
-    switch type {
+    populateModelDetails(&model, from: annotation)
+
+    return model
+  }
+
+  private static func modelType(for annotationType: String?) -> String? {
+    switch annotationType {
+    case "Ink":
+      "ink"
+    case "Highlight":
+      "highlight"
+    case "Underline":
+      "underline"
+    case "Text":
+      "text"
+    case "FreeText":
+      "freeText"
+    default:
+      nil
+    }
+  }
+
+  private static func colorHex(for annotation: PDFAnnotation, type: String) -> String {
+    if let storedHex = annotation.value(forAnnotationKey: PDFAnnotationKey(rawValue: "_color")) as? String {
+      return storedHex
+    }
+
+    let effectiveColor: UIColor = if type == "text" || type == "freeText" {
+      annotation.fontColor ?? annotation.color ?? .black
+    } else {
+      annotation.color ?? .red
+    }
+
+    return hexFromColor(effectiveColor)
+  }
+
+  private static func populateModelDetails(_ model: inout AnnotationModel, from annotation: PDFAnnotation) {
+    switch model.type {
     case "ink":
       model.lineWidth = annotation.border?.lineWidth ?? 2.0
       if let bezierPaths = annotation.paths {
@@ -91,7 +100,7 @@ enum AnnotationSerializer {
       }
     case "highlight", "underline":
       model.bounds = AnnotationBounds(annotation.bounds)
-      if type == "highlight" {
+      if model.type == "highlight" {
         model.alpha = 0.5
       }
     case "text", "freeText":
@@ -104,8 +113,6 @@ enum AnnotationSerializer {
     default:
       break
     }
-
-    return model
   }
 
   // MARK: - Ownership

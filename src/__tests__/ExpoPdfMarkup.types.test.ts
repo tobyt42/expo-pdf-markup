@@ -28,3 +28,18 @@ it('compiles with valid and invalid prop combinations', () => {
 
   expect(true).toBe(true);
 });
+
+it('passes text input request context to onTextInputRequested', () => {
+  accept({
+    source: 'test.pdf',
+    onTextInputRequested: async (request) => {
+      if (request.mode === 'edit') {
+        return request.currentText ?? null;
+      }
+
+      return String(request.page);
+    },
+  });
+
+  expect(true).toBe(true);
+});

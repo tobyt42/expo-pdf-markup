@@ -29,6 +29,7 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
 
     private var pendingTextPage: Int = -1
     private var pendingTextPoint: AnnotationPoint? = null
+    private var pendingTextAnnotationId: String? = null
 
     init {
         addView(pdfView)
@@ -45,13 +46,20 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
         pdfView.onAnnotationsChangedListener = {
             emitAnnotationsChanged()
         }
-        pdfView.onTextInputRequested = { page, point ->
+        pdfView.onTextInputRequested = { page, point, annotation ->
             if (useJsTextDialog) {
                 pendingTextPage = page
                 pendingTextPoint = point
-                onTextInputRequested(emptyMap<String, Any>())
+                pendingTextAnnotationId = annotation?.id
+                val payload = mutableMapOf<String, Any>(
+                    "mode" to if (annotation == null) "create" else "edit",
+                    "page" to page,
+                    "point" to mapOf("x" to point.x, "y" to point.y)
+                )
+                annotation?.contents?.let { payload["currentText"] = it }
+                onTextInputRequested(payload)
             } else {
-                showTextInputDialog(page, point)
+                showTextInputDialog(page, point, annotation)
             }
         }
     }
@@ -132,22 +140,37 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
     fun provideTextInput(text: String?) {
         val page = pendingTextPage.also { pendingTextPage = -1 }
         val point = pendingTextPoint.also { pendingTextPoint = null }
+        val annotationId = pendingTextAnnotationId.also { pendingTextAnnotationId = null }
         if (page < 0 || point == null || text.isNullOrEmpty()) return
-        pdfView.addTextAnnotation(page, point, text)
+        if (annotationId != null) {
+            pdfView.updateTextAnnotation(annotationId, text)
+        } else {
+            pdfView.addTextAnnotation(page, point, text)
+        }
     }
 
-    private fun showTextInputDialog(page: Int, point: AnnotationPoint) {
+    private fun showTextInputDialog(
+        page: Int,
+        point: AnnotationPoint,
+        annotation: AnnotationModel?
+    ) {
         val editText = EditText(context).apply {
             hint = "Enter text"
             setPadding(48, 32, 48, 32)
+            setText(annotation?.contents.orEmpty())
+            setSelection(text.length)
         }
         AlertDialog.Builder(context)
-            .setTitle("Add Text")
+            .setTitle(if (annotation == null) "Add Text" else "Edit Text")
             .setView(editText)
-            .setPositiveButton("Add") { _, _ ->
+            .setPositiveButton(if (annotation == null) "Add" else "Update") { _, _ ->
                 val text = editText.text.toString().trim()
                 if (text.isNotEmpty()) {
-                    pdfView.addTextAnnotation(page, point, text)
+                    if (annotation != null) {
+                        pdfView.updateTextAnnotation(annotation.id, text)
+                    } else {
+                        pdfView.addTextAnnotation(page, point, text)
+                    }
                 }
             }
             .setNegativeButton("Cancel", null)

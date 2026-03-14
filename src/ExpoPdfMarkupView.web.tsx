@@ -5,9 +5,9 @@ import * as React from 'react';
 import type {
   Annotation,
   AnnotationMode,
-  AnnotationPoint,
   ExpoPdfMarkupViewProps,
   TextAnnotation,
+  TextInputRequest,
 } from './ExpoPdfMarkup.types';
 import {
   canvasRectToPdfBounds,
@@ -56,7 +56,10 @@ type PageViewProps = {
   zoomLevel: number;
   onAnnotationAdded: (annotation: Annotation) => void;
   onAnnotationRemoved: (id: string) => void;
-  onTextInputRequested: (pageIndex: number, pdfPoint: AnnotationPoint) => void;
+  onTextInputRequested: (
+    request: TextInputRequest,
+    annotation: TextAnnotation | null
+  ) => void | Promise<void>;
   containerRef: (el: HTMLDivElement | null) => void;
 };
 
@@ -83,7 +86,7 @@ function PageView({
   const dragStartRef = React.useRef<{ x: number; y: number } | null>(null);
   const dragCurrentRef = React.useRef<{ x: number; y: number } | null>(null);
 
-  const dpr = typeof window !== 'undefined' ? window.devicePixelRatio ?? 1 : 1;
+  const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
   const cssWidth = meta.canvasWidth / dpr;
   const cssHeight = meta.canvasHeight / dpr;
 
@@ -274,7 +277,18 @@ function PageView({
       }
     } else if (annotationMode === 'text') {
       const pdfPoint = canvasToPdf(pt.x, pt.y, scale, pdfHeight);
-      onTextInputRequested(pageIndex, pdfPoint);
+      const hit = hitTestAnnotation(pdfPoint, annotations, pageIndex);
+      const annotation =
+        hit?.type === 'text' || hit?.type === 'freeText' ? (hit as TextAnnotation) : null;
+      onTextInputRequested(
+        {
+          mode: annotation ? 'edit' : 'create',
+          page: pageIndex,
+          point: pdfPoint,
+          currentText: annotation?.contents,
+        },
+        annotation
+      );
     } else if (annotationMode === 'eraser') {
       const pdfPoint = canvasToPdf(pt.x, pt.y, scale, pdfHeight);
       const hit = hitTestAnnotation(pdfPoint, annotations, pageIndex);
@@ -354,6 +368,19 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
   const zoomRef = React.useRef(1);
 
   // ResizeObserver → containerWidth
+  const applyAnnotations = React.useCallback(
+    (updater: (prev: Annotation[]) => Annotation[]) => {
+      setAnnotations((prev) => {
+        const next = updater(prev);
+        const json = serializeAnnotations({ version: 1, annotations: next });
+        lastAnnotationsJsonRef.current = json;
+        onAnnotationsChanged?.({ nativeEvent: { annotations: json } });
+        return next;
+      });
+    },
+    [onAnnotationsChanged]
+  );
+
   React.useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
@@ -548,57 +575,70 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
 
   const handleAnnotationAdded = React.useCallback(
     (annotation: Annotation) => {
-      setAnnotations((prev) => {
-        const next = [...prev, annotation];
-        const json = serializeAnnotations({ version: 1, annotations: next });
-        lastAnnotationsJsonRef.current = json;
-        onAnnotationsChanged?.({ nativeEvent: { annotations: json } });
-        return next;
-      });
+      applyAnnotations((prev) => [...prev, annotation]);
     },
-    [onAnnotationsChanged]
+    [applyAnnotations]
   );
 
   const handleAnnotationRemoved = React.useCallback(
     (id: string) => {
-      setAnnotations((prev) => {
-        const next = prev.filter((a) => a.id !== id);
-        const json = serializeAnnotations({ version: 1, annotations: next });
-        lastAnnotationsJsonRef.current = json;
-        onAnnotationsChanged?.({ nativeEvent: { annotations: json } });
-        return next;
-      });
+      applyAnnotations((prev) => prev.filter((a) => a.id !== id));
     },
-    [onAnnotationsChanged]
+    [applyAnnotations]
   );
 
   const handleTextInputRequested = React.useCallback(
-    async (pageIndex: number, pdfPoint: AnnotationPoint) => {
+    async (request: TextInputRequest, annotation: TextAnnotation | null) => {
       const text = onTextInputRequested
-        ? await onTextInputRequested()
-        : window.prompt('Enter annotation text:');
+        ? await onTextInputRequested(request)
+        : window.prompt(
+            request.mode === 'edit' ? 'Edit annotation text:' : 'Enter annotation text:',
+            request.currentText ?? ''
+          );
       if (!text) return;
-      const fontSize = 16;
-      const estimatedWidth = text.length * fontSize * 0.6;
-      const bounds = {
-        x: pdfPoint.x,
-        y: pdfPoint.y,
-        width: estimatedWidth,
-        height: fontSize * 1.5,
-      };
+      const fontSize = annotation?.fontSize ?? 16;
+      const width = text.length * fontSize * 0.6;
+      const height = fontSize * 1.5;
+
+      if (annotation) {
+        const bounds = {
+          x: annotation.bounds.x,
+          y: annotation.bounds.y + annotation.bounds.height - height,
+          width,
+          height,
+        };
+        applyAnnotations((prev) =>
+          prev.map((existing) =>
+            existing.id === annotation.id ? { ...annotation, bounds, contents: text } : existing
+          )
+        );
+        return;
+      }
+
       handleAnnotationAdded({
         id: newAnnotationId(),
         type: 'text',
-        page: pageIndex,
+        page: request.page,
         color: annotationColor,
-        bounds,
+        bounds: {
+          x: request.point.x,
+          y: request.point.y,
+          width,
+          height,
+        },
         contents: text,
         fontSize,
         fontFamily: annotationFontFamily,
         createdAt: Date.now(),
       });
     },
-    [annotationColor, annotationFontFamily, handleAnnotationAdded, onTextInputRequested]
+    [
+      annotationColor,
+      annotationFontFamily,
+      applyAnnotations,
+      handleAnnotationAdded,
+      onTextInputRequested,
+    ]
   );
 
   const styleObj = style as React.CSSProperties | undefined;

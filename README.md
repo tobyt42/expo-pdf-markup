@@ -124,6 +124,13 @@ export default function App() {
 }
 ```
 
+### Custom text input UI
+
+If you provide `onTextInputRequested`, the built-in native prompt is skipped and your callback is
+used instead. The callback receives a request object with `mode`, `page`, `point`, and
+`currentText` for edit flows, so you can prefill your own UI when the user taps an existing text
+annotation while the text tool is active.
+
 ## Development
 
 This module uses the [Expo Modules API](https://docs.expo.dev/modules/overview/). The `example` directory contains a test app.

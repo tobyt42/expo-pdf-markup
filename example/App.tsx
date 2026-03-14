@@ -1,5 +1,5 @@
 import { ExpoPdfMarkupView } from '@tobyt/expo-pdf-markup';
-import type { AnnotationMode } from '@tobyt/expo-pdf-markup';
+import type { AnnotationMode, TextInputRequest } from '@tobyt/expo-pdf-markup';
 import { Asset } from 'expo-asset';
 import { useFonts } from 'expo-font';
 import { useEffect, useRef, useState } from 'react';
@@ -36,6 +36,7 @@ export default function App() {
 
   // Custom text dialog state
   const [textDialogVisible, setTextDialogVisible] = useState(false);
+  const [textRequest, setTextRequest] = useState<TextInputRequest | null>(null);
   const [textInput, setTextInput] = useState('');
   const resolveRef = useRef<((text: string | null) => void) | null>(null);
 
@@ -50,8 +51,9 @@ export default function App() {
     preparePdf();
   }, []);
 
-  const handleTextInputRequested = (): Promise<string | null> => {
-    setTextInput('');
+  const handleTextInputRequested = (request: TextInputRequest): Promise<string | null> => {
+    setTextRequest(request);
+    setTextInput(request.currentText ?? '');
     setTextDialogVisible(true);
     return new Promise((resolve) => {
       resolveRef.current = resolve;
@@ -60,12 +62,14 @@ export default function App() {
 
   const submitText = () => {
     setTextDialogVisible(false);
+    setTextRequest(null);
     resolveRef.current?.(textInput.trim() || null);
     resolveRef.current = null;
   };
 
   const cancelText = () => {
     setTextDialogVisible(false);
+    setTextRequest(null);
     resolveRef.current?.(null);
     resolveRef.current = null;
   };
@@ -140,7 +144,9 @@ export default function App() {
         <Modal visible={textDialogVisible} transparent animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>Add Text</Text>
+              <Text style={styles.modalTitle}>
+                {textRequest?.mode === 'edit' ? 'Edit Text' : 'Add Text'}
+              </Text>
               <TextInput
                 style={styles.modalInput}
                 placeholder="Enter annotation text…"
@@ -156,7 +162,9 @@ export default function App() {
                   <Text style={styles.modalCancelText}>Cancel</Text>
                 </Pressable>
                 <Pressable style={styles.modalConfirm} onPress={submitText}>
-                  <Text style={styles.modalConfirmText}>Add</Text>
+                  <Text style={styles.modalConfirmText}>
+                    {textRequest?.mode === 'edit' ? 'Update' : 'Add'}
+                  </Text>
                 </Pressable>
               </View>
             </View>

@@ -60,6 +60,13 @@ export type AnnotationsData = {
 
 export type AnnotationMode = 'none' | 'ink' | 'highlight' | 'underline' | 'text' | 'eraser';
 
+export type TextInputRequest = {
+  mode: 'create' | 'edit';
+  page: number;
+  point: AnnotationPoint;
+  currentText?: string;
+};
+
 export type ExpoPdfMarkupViewProps = {
   /** Absolute local file path of the PDF to display. */
   source: string;
@@ -95,8 +102,10 @@ export type ExpoPdfMarkupViewProps = {
   /**
    * Optional async callback for the text annotation tool. When provided, this is called instead of
    * the native platform dialog (UIAlertController / AlertDialog) when the user taps to place a text
-   * annotation. Return the text string to create the annotation, or `null` to cancel.
+   * annotation. When editing an existing text annotation, `request.currentText` is populated and
+   * `request.mode` is `'edit'`. Return the text string to create/update the annotation, or `null`
+   * to cancel.
    */
-  onTextInputRequested?: () => Promise<string | null>;
+  onTextInputRequested?: (request: TextInputRequest) => Promise<string | null>;
   style?: StyleProp<ViewStyle>;
 };

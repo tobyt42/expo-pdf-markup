@@ -65,7 +65,9 @@ class ContinuousPdfView(context: Context) : View(context) {
     private var isDragging = false
 
     // Text mode callback
-    var onTextInputRequested: ((page: Int, point: AnnotationPoint) -> Unit)? = null
+    var onTextInputRequested: (
+        (page: Int, point: AnnotationPoint, annotation: AnnotationModel?) -> Unit
+    )? = null
 
     fun loadPages(renderer: PdfRenderer, viewWidth: Int) {
         recycle()
@@ -403,35 +405,72 @@ class ContinuousPdfView(context: Context) : View(context) {
         val pdfX = contentX / renderScales[pageIndex]
         val pdfY = pageHeights[pageIndex] - (localY / renderScales[pageIndex])
 
-        onTextInputRequested?.invoke(pageIndex, AnnotationPoint(pdfX, pdfY))
+        val point = AnnotationPoint(pdfX, pdfY)
+        val hit = AnnotationHitTester.hitTest(point, annotations, pageIndex)
+        val annotation = if (hit?.type == "text" || hit?.type == "freeText") hit else null
+        onTextInputRequested?.invoke(pageIndex, point, annotation)
     }
 
     fun addTextAnnotation(page: Int, point: AnnotationPoint, text: String) {
-        val fontSize = 16f
+        val annotation = buildTextAnnotation(text = text, page = page, point = point)
+        annotations = annotations + annotation
+        onAnnotationsChangedListener?.invoke()
+    }
+
+    fun updateTextAnnotation(annotationId: String, text: String) {
+        val existing = annotations.find { it.id == annotationId } ?: return
+        val updated = buildTextAnnotation(text = text, page = existing.page, existing = existing)
+        annotations = annotations.map { annotation ->
+            if (annotation.id == annotationId) updated else annotation
+        }
+        onAnnotationsChangedListener?.invoke()
+    }
+
+    private fun buildTextAnnotation(
+        text: String,
+        page: Int,
+        point: AnnotationPoint? = null,
+        existing: AnnotationModel? = null
+    ): AnnotationModel {
+        val fontSize = existing?.fontSize ?: 16f
         val padding = 4f
         val paint = Paint().apply {
             textSize = fontSize
-            typeface = AnnotationRenderer.resolveTypeface(context, annotationFontFamily)
+            typeface = AnnotationRenderer.resolveTypeface(
+                context,
+                existing?.fontFamily ?: annotationFontFamily
+            )
         }
         val textWidth = paint.measureText(text)
-        val annotation = AnnotationModel(
-            id = UUID.randomUUID().toString(),
-            type = "freeText",
-            page = page,
-            color = annotationColor,
-            bounds = AnnotationBounds(
-                point.x,
-                point.y - fontSize - padding,
+        val height = fontSize * 1.2f + padding * 2
+        val bounds = if (existing != null && existing.bounds != null) {
+            AnnotationBounds(
+                existing.bounds.x,
+                existing.bounds.y + existing.bounds.height - height,
                 textWidth + padding * 2,
-                fontSize * 1.2f + padding * 2
-            ),
+                height
+            )
+        } else {
+            val anchorPoint = requireNotNull(point)
+            AnnotationBounds(
+                anchorPoint.x,
+                anchorPoint.y - fontSize - padding,
+                textWidth + padding * 2,
+                height
+            )
+        }
+
+        return AnnotationModel(
+            id = existing?.id ?: UUID.randomUUID().toString(),
+            type = existing?.type ?: "freeText",
+            page = existing?.page ?: page,
+            color = existing?.color ?: annotationColor,
+            bounds = bounds,
             contents = text,
             fontSize = fontSize,
-            fontFamily = annotationFontFamily,
-            createdAt = System.currentTimeMillis() / 1000.0
+            fontFamily = existing?.fontFamily ?: annotationFontFamily,
+            createdAt = existing?.createdAt ?: System.currentTimeMillis() / 1000.0
         )
-        annotations = annotations + annotation
-        onAnnotationsChangedListener?.invoke()
     }
 
     // --- Helpers ---
