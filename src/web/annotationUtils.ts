@@ -108,6 +108,93 @@ function boundsContains(bounds: AnnotationBounds, point: AnnotationPoint): boole
   );
 }
 
+export function getAnnotationOutlineBounds(annotation: Annotation): AnnotationBounds | null {
+  if (annotation.type !== 'ink') {
+    return annotation.bounds;
+  }
+
+  const paths = annotation.paths ?? [];
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const stroke of paths) {
+    for (const point of stroke) {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    }
+  }
+
+  if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
+    return null;
+  }
+
+  const padding = Math.max(annotation.lineWidth ?? 2, 10);
+  return {
+    x: minX - padding,
+    y: minY - padding,
+    width: maxX - minX + padding * 2,
+    height: maxY - minY + padding * 2,
+  };
+}
+
+export function clampAnnotationTranslation(
+  annotation: Annotation,
+  deltaX: number,
+  deltaY: number,
+  pageWidth: number,
+  pageHeight: number
+): AnnotationPoint {
+  const bounds = getAnnotationOutlineBounds(annotation);
+  if (!bounds) {
+    return { x: deltaX, y: deltaY };
+  }
+
+  const minDeltaX = -bounds.x;
+  const maxDeltaX = pageWidth - (bounds.x + bounds.width);
+  const minDeltaY = -bounds.y;
+  const maxDeltaY = pageHeight - (bounds.y + bounds.height);
+
+  return {
+    x: Math.min(Math.max(deltaX, minDeltaX), maxDeltaX),
+    y: Math.min(Math.max(deltaY, minDeltaY), maxDeltaY),
+  };
+}
+
+export function translateAnnotation(
+  annotation: Annotation,
+  deltaX: number,
+  deltaY: number
+): Annotation {
+  if (deltaX === 0 && deltaY === 0) {
+    return annotation;
+  }
+
+  if (annotation.type === 'ink') {
+    return {
+      ...annotation,
+      paths: (annotation.paths ?? []).map((stroke) =>
+        stroke.map((point) => ({
+          x: point.x + deltaX,
+          y: point.y + deltaY,
+        }))
+      ),
+    };
+  }
+
+  return {
+    ...annotation,
+    bounds: {
+      ...annotation.bounds,
+      x: annotation.bounds.x + deltaX,
+      y: annotation.bounds.y + deltaY,
+    },
+  };
+}
+
 /** Return the topmost annotation hit at pdfPoint on pageIndex, or null. */
 export function hitTestAnnotation(
   pdfPoint: AnnotationPoint,
@@ -153,11 +240,25 @@ export function drawAnnotationsOnCanvas(
   ctx: CanvasRenderingContext2D,
   annotations: Annotation[],
   pageIndex: number,
-  meta: PdfPageMeta
+  meta: PdfPageMeta,
+  options: {
+    highlightAnnotations?: boolean;
+    highlightColor?: string;
+    previewAnnotationId?: string | null;
+    previewAnnotation?: Annotation | null;
+  } = {}
 ): void {
   const { scale, pdfHeight } = meta;
-  for (const annotation of annotations) {
-    if (annotation.page !== pageIndex) continue;
+  const pageAnnotations = annotations
+    .filter((annotation) => annotation.page === pageIndex)
+    .map((annotation) =>
+      options.previewAnnotationId === annotation.id && options.previewAnnotation
+        ? options.previewAnnotation
+        : annotation
+    )
+    .filter((annotation) => annotation.page === pageIndex);
+
+  for (const annotation of pageAnnotations) {
     switch (annotation.type) {
       case 'ink': {
         const paths = annotation.paths ?? [];
@@ -222,6 +323,22 @@ export function drawAnnotationsOnCanvas(
         break;
       }
     }
+  }
+
+  if (!options.highlightAnnotations) {
+    return;
+  }
+
+  for (const annotation of pageAnnotations) {
+    const bounds = getAnnotationOutlineBounds(annotation);
+    if (!bounds) continue;
+    const rect = pdfBoundsToCanvas(bounds, scale, pdfHeight);
+    ctx.save();
+    ctx.strokeStyle = options.highlightColor ?? '#0A84FF';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+    ctx.restore();
   }
 }
 

@@ -2,6 +2,7 @@ package dev.terhoeven.expopdfmarkup
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Typeface
@@ -47,6 +48,34 @@ object AnnotationRenderer {
                     context
                 )
             }
+        }
+    }
+
+    fun drawEditingAffordances(
+        canvas: Canvas,
+        annotations: List<AnnotationModel>,
+        pageIndex: Int,
+        pageYOffset: Float,
+        renderScale: Float,
+        pageHeight: Int,
+        currentScale: Float
+    ) {
+        val paint = Paint().apply {
+            color = 0xFF0A84FF.toInt()
+            strokeWidth = 2f / currentScale
+            style = Paint.Style.STROKE
+            isAntiAlias = true
+            pathEffect = DashPathEffect(floatArrayOf(10f / currentScale, 6f / currentScale), 0f)
+        }
+
+        for (annotation in annotations) {
+            if (annotation.page != pageIndex) continue
+            val bounds = AnnotationGeometry.outlineBounds(annotation) ?: continue
+            val left = bounds.x * renderScale
+            val top = (pageHeight - bounds.y - bounds.height) * renderScale + pageYOffset
+            val right = left + bounds.width * renderScale
+            val bottom = top + bounds.height * renderScale
+            canvas.drawRect(left, top, right, bottom, paint)
         }
     }
 

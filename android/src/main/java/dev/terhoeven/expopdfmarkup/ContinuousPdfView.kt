@@ -49,6 +49,24 @@ class ContinuousPdfView(context: Context) : View(context) {
             invalidate()
         }
     var annotationMode: String = "none"
+        set(value) {
+            if (field == value) return
+            field = value
+            if (value != "ink") {
+                isDrawingInk = false
+                currentInkPoints.clear()
+                inkScreenPath.reset()
+            }
+            if (value != "highlight" && value != "underline") {
+                isDragging = false
+                dragStartPoint = null
+                dragCurrentPoint = null
+            }
+            if (value != "move") {
+                clearMovePreview()
+            }
+            invalidate()
+        }
     var annotationColor: String = "#000000"
     var annotationLineWidth: Float = 2f
     var annotationFontFamily: String? = null
@@ -63,6 +81,11 @@ class ContinuousPdfView(context: Context) : View(context) {
     private var dragStartPoint: AnnotationPoint? = null
     private var dragCurrentPoint: AnnotationPoint? = null
     private var isDragging = false
+
+    // Move mode state
+    private var movingAnnotation: AnnotationModel? = null
+    private var movingPreviewAnnotation: AnnotationModel? = null
+    private var moveStartPdfPoint: AnnotationPoint? = null
 
     // Text mode callback
     var onTextInputRequested: (
@@ -116,6 +139,21 @@ class ContinuousPdfView(context: Context) : View(context) {
         super.onDraw(canvas)
         if (pageBitmaps.isEmpty()) return
 
+        val renderedAnnotations =
+            if (movingAnnotation != null && movingPreviewAnnotation != null) {
+                annotations.map { annotation ->
+                    if (annotation.id ==
+                        movingAnnotation!!.id
+                    ) {
+                        movingPreviewAnnotation!!
+                    } else {
+                        annotation
+                    }
+                }
+            } else {
+                annotations
+            }
+
         canvas.save()
         canvas.translate(-panX, -panY)
         canvas.scale(currentScale, currentScale)
@@ -131,13 +169,24 @@ class ContinuousPdfView(context: Context) : View(context) {
                 canvas.drawBitmap(pageBitmaps[i], 0f, pageYOffsets[i], null)
                 AnnotationRenderer.drawAnnotations(
                     canvas,
-                    annotations,
+                    renderedAnnotations,
                     i,
                     pageYOffsets[i],
                     renderScales[i],
                     pageHeights[i],
                     context
                 )
+                if (annotationMode == "move" || annotationMode == "eraser") {
+                    AnnotationRenderer.drawEditingAffordances(
+                        canvas,
+                        renderedAnnotations,
+                        i,
+                        pageYOffsets[i],
+                        renderScales[i],
+                        pageHeights[i],
+                        currentScale
+                    )
+                }
             }
         }
 
@@ -207,6 +256,13 @@ class ContinuousPdfView(context: Context) : View(context) {
                 }
                 gestureDetector.onTouchEvent(event)
                 return true
+            }
+
+            "move" -> {
+                if (event.pointerCount == 1) {
+                    handleMoveTouch(event)
+                    return true
+                }
             }
 
             "text" -> {
@@ -373,42 +429,70 @@ class ContinuousPdfView(context: Context) : View(context) {
     // --- Eraser mode ---
 
     private fun handleEraserTap(event: MotionEvent) {
-        val contentX = (event.x + panX) / currentScale
-        val contentY = (event.y + panY) / currentScale
-        val pageIndex = pageIndexAtContentY(contentY)
-        if (pageIndex < 0) return
-
-        val localY = contentY - pageYOffsets[pageIndex]
-        val pdfX = contentX / renderScales[pageIndex]
-        val pdfY = pageHeights[pageIndex] - (localY / renderScales[pageIndex])
-
-        val hit = AnnotationHitTester.hitTest(
-            AnnotationPoint(pdfX, pdfY),
-            annotations,
-            pageIndex
-        )
+        val pdfTouch = screenToPdfPoint(event.x, event.y) ?: return
+        val hit = AnnotationHitTester.hitTest(pdfTouch.point, annotations, pdfTouch.pageIndex)
         if (hit != null) {
             annotations = annotations.filter { it.id != hit.id }
             onAnnotationsChangedListener?.invoke()
         }
     }
 
+    private fun handleMoveTouch(event: MotionEvent) {
+        when (event.action) {
+            MotionEvent.ACTION_DOWN -> {
+                val pdfTouch = screenToPdfPoint(event.x, event.y) ?: return
+                val hit = AnnotationHitTester.hitTest(
+                    pdfTouch.point,
+                    annotations,
+                    pdfTouch.pageIndex
+                )
+                if (hit != null) {
+                    movingAnnotation = hit
+                    movingPreviewAnnotation = hit
+                    moveStartPdfPoint = pdfTouch.point
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                    invalidate()
+                }
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                val annotation = movingAnnotation ?: return
+                val startPoint = moveStartPdfPoint ?: return
+                val pdfTouch = screenToPdfPoint(event.x, event.y, annotation.page) ?: return
+                val delta = AnnotationGeometry.clampTranslation(
+                    annotation,
+                    pdfTouch.point.x - startPoint.x,
+                    pdfTouch.point.y - startPoint.y,
+                    pageWidths[annotation.page].toFloat(),
+                    pageHeights[annotation.page].toFloat()
+                )
+                movingPreviewAnnotation = AnnotationGeometry.translate(annotation, delta.x, delta.y)
+                invalidate()
+            }
+
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                val annotation = movingAnnotation
+                val preview = movingPreviewAnnotation
+                if (annotation != null && preview != null && preview != annotation) {
+                    annotations = annotations.map { existing ->
+                        if (existing.id == annotation.id) preview else existing
+                    }
+                    onAnnotationsChangedListener?.invoke()
+                }
+                clearMovePreview()
+                invalidate()
+            }
+        }
+    }
+
     // --- Text mode ---
 
     private fun handleTextTap(event: MotionEvent) {
-        val contentX = (event.x + panX) / currentScale
-        val contentY = (event.y + panY) / currentScale
-        val pageIndex = pageIndexAtContentY(contentY)
-        if (pageIndex < 0) return
-
-        val localY = contentY - pageYOffsets[pageIndex]
-        val pdfX = contentX / renderScales[pageIndex]
-        val pdfY = pageHeights[pageIndex] - (localY / renderScales[pageIndex])
-
-        val point = AnnotationPoint(pdfX, pdfY)
-        val hit = AnnotationHitTester.hitTest(point, annotations, pageIndex)
+        val pdfTouch = screenToPdfPoint(event.x, event.y) ?: return
+        val point = pdfTouch.point
+        val hit = AnnotationHitTester.hitTest(point, annotations, pdfTouch.pageIndex)
         val annotation = if (hit?.type == "text" || hit?.type == "freeText") hit else null
-        onTextInputRequested?.invoke(pageIndex, point, annotation)
+        onTextInputRequested?.invoke(pdfTouch.pageIndex, point, annotation)
     }
 
     fun addTextAnnotation(page: Int, point: AnnotationPoint, text: String) {
@@ -482,6 +566,30 @@ class ContinuousPdfView(context: Context) : View(context) {
         return 0
     }
 
+    private data class PdfTouchPoint(val pageIndex: Int, val point: AnnotationPoint)
+
+    private fun clearMovePreview() {
+        movingAnnotation = null
+        movingPreviewAnnotation = null
+        moveStartPdfPoint = null
+    }
+
+    private fun screenToPdfPoint(
+        screenX: Float,
+        screenY: Float,
+        forcedPageIndex: Int? = null
+    ): PdfTouchPoint? {
+        val contentX = (screenX + panX) / currentScale
+        val contentY = (screenY + panY) / currentScale
+        val pageIndex = forcedPageIndex ?: pageIndexAtContentY(contentY)
+        if (pageIndex < 0 || pageIndex >= pageYOffsets.size) return null
+
+        val localY = contentY - pageYOffsets[pageIndex]
+        val pdfX = contentX / renderScales[pageIndex]
+        val pdfY = pageHeights[pageIndex] - (localY / renderScales[pageIndex])
+        return PdfTouchPoint(pageIndex, AnnotationPoint(pdfX, pdfY))
+    }
+
     override fun computeScroll() {
         if (scroller.computeScrollOffset()) {
             panX = scroller.currX.toFloat()
@@ -532,6 +640,13 @@ class ContinuousPdfView(context: Context) : View(context) {
         pageWidths.clear()
         pageHeights.clear()
         renderScales.clear()
+        currentInkPoints.clear()
+        inkScreenPath.reset()
+        dragStartPoint = null
+        dragCurrentPoint = null
+        isDragging = false
+        isDrawingInk = false
+        clearMovePreview()
         totalHeight = 0f
         lastNotifiedPage = -1
     }

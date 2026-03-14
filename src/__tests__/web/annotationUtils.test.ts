@@ -1,13 +1,16 @@
 import type { Annotation, AnnotationPoint } from '../../ExpoPdfMarkup.types';
 import {
+  clampAnnotationTranslation,
   canvasToPdf,
   canvasRectToPdfBounds,
   distanceToSegment,
+  getAnnotationOutlineBounds,
   hitTestAnnotation,
   parseAnnotations,
   pdfBoundsToCanvas,
   pdfToCanvas,
   serializeAnnotations,
+  translateAnnotation,
 } from '../../web/annotationUtils';
 
 // ---------------------------------------------------------------------------
@@ -194,6 +197,56 @@ describe('hitTestAnnotation', () => {
     };
     const result = hitTestAnnotation({ x: 100, y: 60 }, [highlightAnnotation, hl2], 0);
     expect(result?.id).toBe('hl2');
+  });
+});
+
+describe('getAnnotationOutlineBounds', () => {
+  it('returns stored bounds for bounds-based annotations', () => {
+    expect(getAnnotationOutlineBounds(highlightAnnotation)).toEqual(highlightAnnotation.bounds);
+  });
+
+  it('computes padded bounds for ink annotations', () => {
+    expect(getAnnotationOutlineBounds(inkAnnotation)).toEqual({
+      x: -10,
+      y: -10,
+      width: 120,
+      height: 20,
+    });
+  });
+});
+
+describe('translateAnnotation', () => {
+  it('translates bounds-based annotations', () => {
+    expect(translateAnnotation(highlightAnnotation, 12, -8)).toMatchObject({
+      bounds: { x: 62, y: 42, width: 100, height: 20 },
+    });
+  });
+
+  it('translates every point in ink annotations', () => {
+    expect(translateAnnotation(inkAnnotation, 5, 7)).toMatchObject({
+      paths: [
+        [
+          { x: 5, y: 7 },
+          { x: 105, y: 7 },
+        ],
+      ],
+    });
+  });
+});
+
+describe('clampAnnotationTranslation', () => {
+  it('keeps bounds-based annotations on the page', () => {
+    expect(clampAnnotationTranslation(highlightAnnotation, -100, 100, 200, 100)).toEqual({
+      x: -50,
+      y: 30,
+    });
+  });
+
+  it('clamps translated ink annotations using their computed bounds', () => {
+    expect(clampAnnotationTranslation(inkAnnotation, 200, -50, 120, 100)).toEqual({
+      x: 10,
+      y: 10,
+    });
   });
 });
 

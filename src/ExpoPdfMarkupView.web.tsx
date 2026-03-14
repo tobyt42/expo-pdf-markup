@@ -10,6 +10,7 @@ import type {
   TextInputRequest,
 } from './ExpoPdfMarkup.types';
 import {
+  clampAnnotationTranslation,
   canvasRectToPdfBounds,
   canvasToPdf,
   drawAnnotationsOnCanvas,
@@ -17,6 +18,7 @@ import {
   newAnnotationId,
   parseAnnotations,
   serializeAnnotations,
+  translateAnnotation,
 } from './web/annotationUtils';
 import type { PdfPageMeta } from './web/types';
 
@@ -56,6 +58,7 @@ type PageViewProps = {
   zoomLevel: number;
   onAnnotationAdded: (annotation: Annotation) => void;
   onAnnotationRemoved: (id: string) => void;
+  onAnnotationUpdated: (annotation: Annotation) => void;
   onTextInputRequested: (
     request: TextInputRequest,
     annotation: TextAnnotation | null
@@ -74,6 +77,7 @@ function PageView({
   zoomLevel,
   onAnnotationAdded,
   onAnnotationRemoved,
+  onAnnotationUpdated,
   onTextInputRequested,
   containerRef,
 }: PageViewProps) {
@@ -85,10 +89,14 @@ function PageView({
   const inkPointsRef = React.useRef<{ x: number; y: number }[]>([]);
   const dragStartRef = React.useRef<{ x: number; y: number } | null>(null);
   const dragCurrentRef = React.useRef<{ x: number; y: number } | null>(null);
+  const moveTargetRef = React.useRef<Annotation | null>(null);
+  const moveStartPdfRef = React.useRef<{ x: number; y: number } | null>(null);
+  const movePreviewRef = React.useRef<Annotation | null>(null);
 
   const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
   const cssWidth = meta.canvasWidth / dpr;
   const cssHeight = meta.canvasHeight / dpr;
+  const showEditingHighlights = annotationMode === 'move' || annotationMode === 'eraser';
 
   // Render PDF page onto pdfCanvas
   React.useEffect(() => {
@@ -135,7 +143,11 @@ function PageView({
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       ctx.scale(dpr, dpr);
-      drawAnnotationsOnCanvas(ctx, annotations, pageIndex, meta);
+      drawAnnotationsOnCanvas(ctx, annotations, pageIndex, meta, {
+        highlightAnnotations: showEditingHighlights,
+        previewAnnotationId: moveTargetRef.current?.id ?? null,
+        previewAnnotation: movePreviewRef.current,
+      });
       // Live ink preview
       if (liveInkPoints && liveInkPoints.length > 1) {
         ctx.save();
@@ -162,7 +174,7 @@ function PageView({
         ctx.restore();
       }
     },
-    [annotations, pageIndex, meta, dpr, annotationColor, annotationLineWidth]
+    [annotations, pageIndex, meta, dpr, annotationColor, annotationLineWidth, showEditingHighlights]
   );
 
   React.useEffect(() => {
@@ -196,14 +208,26 @@ function PageView({
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
     if (annotationMode === 'none') return;
-    e.currentTarget.setPointerCapture(e.pointerId);
     const pt = getCanvasPoint(e);
-    pointerDownRef.current = true;
     if (annotationMode === 'ink') {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      pointerDownRef.current = true;
       inkPointsRef.current = [pt];
     } else if (annotationMode === 'highlight' || annotationMode === 'underline') {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      pointerDownRef.current = true;
       dragStartRef.current = pt;
       dragCurrentRef.current = pt;
+    } else if (annotationMode === 'move') {
+      const pdfPoint = canvasToPdf(pt.x, pt.y, meta.scale, meta.pdfHeight);
+      const hit = hitTestAnnotation(pdfPoint, annotations, pageIndex);
+      if (!hit) return;
+      e.currentTarget.setPointerCapture(e.pointerId);
+      pointerDownRef.current = true;
+      moveTargetRef.current = hit;
+      moveStartPdfRef.current = pdfPoint;
+      movePreviewRef.current = hit;
+      redrawAnnotations();
     }
   }
 
@@ -221,6 +245,20 @@ function PageView({
       const w = Math.abs(pt.x - start.x);
       const h = Math.abs(pt.y - start.y);
       redrawAnnotations(undefined, new DOMRect(minX, minY, w, h));
+    } else if (annotationMode === 'move') {
+      const target = moveTargetRef.current;
+      const startPdfPoint = moveStartPdfRef.current;
+      if (!target || !startPdfPoint) return;
+      const pdfPoint = canvasToPdf(pt.x, pt.y, meta.scale, meta.pdfHeight);
+      const delta = clampAnnotationTranslation(
+        target,
+        pdfPoint.x - startPdfPoint.x,
+        pdfPoint.y - startPdfPoint.y,
+        meta.pdfWidth,
+        meta.pdfHeight
+      );
+      movePreviewRef.current = translateAnnotation(target, delta.x, delta.y);
+      redrawAnnotations();
     }
   }
 
@@ -275,6 +313,17 @@ function PageView({
           createdAt: Date.now(),
         });
       }
+    } else if (annotationMode === 'move') {
+      const target = moveTargetRef.current;
+      const preview = movePreviewRef.current;
+      moveTargetRef.current = null;
+      moveStartPdfRef.current = null;
+      movePreviewRef.current = null;
+      if (target && preview && preview !== target) {
+        onAnnotationUpdated(preview);
+      } else {
+        redrawAnnotations();
+      }
     } else if (annotationMode === 'text') {
       const pdfPoint = canvasToPdf(pt.x, pt.y, scale, pdfHeight);
       const hit = hitTestAnnotation(pdfPoint, annotations, pageIndex);
@@ -297,6 +346,8 @@ function PageView({
   }
 
   const pointerEvents = annotationMode === 'none' ? 'none' : 'auto';
+  const cursor =
+    annotationMode === 'move' ? 'grab' : annotationMode === 'eraser' ? 'not-allowed' : 'crosshair';
 
   return (
     <div
@@ -322,7 +373,7 @@ function PageView({
           left: 0,
           width: cssWidth,
           height: cssHeight,
-          cursor: 'crosshair',
+          cursor,
           pointerEvents,
         }}
         onPointerDown={handlePointerDown}
@@ -587,6 +638,15 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
     [applyAnnotations]
   );
 
+  const handleAnnotationUpdated = React.useCallback(
+    (annotation: Annotation) => {
+      applyAnnotations((prev) =>
+        prev.map((existing) => (existing.id === annotation.id ? annotation : existing))
+      );
+    },
+    [applyAnnotations]
+  );
+
   const handleTextInputRequested = React.useCallback(
     async (request: TextInputRequest, annotation: TextAnnotation | null) => {
       const text = onTextInputRequested
@@ -669,6 +729,7 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
                 zoomLevel={zoomLevel}
                 onAnnotationAdded={handleAnnotationAdded}
                 onAnnotationRemoved={handleAnnotationRemoved}
+                onAnnotationUpdated={handleAnnotationUpdated}
                 onTextInputRequested={handleTextInputRequested}
                 containerRef={(el) => {
                   pageContainerRefs.current[i] = el;

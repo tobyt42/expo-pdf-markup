@@ -58,7 +58,14 @@ export type AnnotationsData = {
   annotations: Annotation[];
 };
 
-export type AnnotationMode = 'none' | 'ink' | 'highlight' | 'underline' | 'text' | 'eraser';
+export type AnnotationMode =
+  | 'none'
+  | 'ink'
+  | 'highlight'
+  | 'underline'
+  | 'text'
+  | 'eraser'
+  | 'move';
 
 export type TextInputRequest = {
   mode: 'create' | 'edit';

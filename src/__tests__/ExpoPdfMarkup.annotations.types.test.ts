@@ -23,7 +23,7 @@ it('accepts valid annotation props', () => {
   accept({
     source: 'test.pdf',
     annotations: '{"version":1,"annotations":[]}',
-    annotationMode: 'ink',
+    annotationMode: 'move',
     annotationColor: '#FF0000',
     annotationLineWidth: 3,
     onAnnotationsChanged: (_e) => {},
@@ -88,8 +88,8 @@ it('annotation discriminated union compiles correctly', () => {
 
   const annotations: Annotation[] = [ink, highlight, underline, text];
   const data: AnnotationsData = { version: 1, annotations };
-  const mode: AnnotationMode = 'eraser';
+  const mode: AnnotationMode = 'move';
   expect(data.version).toBe(1);
   expect(data.annotations).toHaveLength(4);
-  expect(mode).toBe('eraser');
+  expect(mode).toBe('move');
 });

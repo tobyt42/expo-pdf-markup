@@ -12,6 +12,7 @@ const MODES: { label: string; mode: AnnotationMode }[] = [
   { label: 'Highlight', mode: 'highlight' },
   { label: 'Underline', mode: 'underline' },
   { label: 'Text', mode: 'text' },
+  { label: 'Move', mode: 'move' },
   { label: 'Eraser', mode: 'eraser' },
 ];
 
