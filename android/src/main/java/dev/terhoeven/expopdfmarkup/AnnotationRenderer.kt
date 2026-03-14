@@ -1,6 +1,7 @@
 package dev.terhoeven.expopdfmarkup
 
 import android.content.Context
+import android.content.res.AssetManager
 import android.graphics.Canvas
 import android.graphics.DashPathEffect
 import android.graphics.Paint
@@ -171,14 +172,47 @@ object AnnotationRenderer {
         canvas.drawText(text, left, top + paint.textSize, paint)
     }
 
-    /** Resolve a typeface by family name. Tries app assets first (where expo-font places fonts),
-     *  then falls back to system typeface resolution. */
+    /** Resolve a typeface the same way React Native text does when available, so
+     *  expo-font loaded families are measured and rendered consistently with the
+     *  rest of the app. */
     fun resolveTypeface(context: Context, fontFamily: String?): Typeface {
         if (fontFamily == null) return Typeface.DEFAULT
-        return try {
-            Typeface.createFromAsset(context.assets, "fonts/$fontFamily.ttf")
-        } catch (_: Exception) {
-            Typeface.create(fontFamily, Typeface.NORMAL)
+        return resolveReactTypeface(fontFamily, context.assets)
+            ?: try {
+                Typeface.createFromAsset(context.assets, "fonts/$fontFamily.ttf")
+            } catch (_: Exception) {
+                Typeface.create(fontFamily, Typeface.NORMAL)
+            }
+    }
+
+    private fun resolveReactTypeface(fontFamily: String, assetManager: AssetManager): Typeface? {
+        val managerClasses = listOf(
+            "com.facebook.react.common.assets.ReactFontManager",
+            "com.facebook.react.views.text.ReactFontManager"
+        )
+
+        for (className in managerClasses) {
+            try {
+                val managerClass = Class.forName(className)
+                val getInstance = managerClass.getMethod("getInstance")
+                val manager = getInstance.invoke(null)
+                val getTypeface = managerClass.getMethod(
+                    "getTypeface",
+                    String::class.java,
+                    Int::class.javaPrimitiveType,
+                    AssetManager::class.java
+                )
+                return getTypeface.invoke(
+                    manager,
+                    fontFamily,
+                    Typeface.NORMAL,
+                    assetManager
+                ) as? Typeface
+            } catch (_: Exception) {
+                continue
+            }
         }
+
+        return null
     }
 }

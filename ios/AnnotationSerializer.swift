@@ -241,16 +241,38 @@ enum AnnotationSerializer {
 
   private static func createFreeTextAnnotation(model: AnnotationModel, color: UIColor) -> PDFAnnotation? {
     guard let bounds = model.bounds else { return nil }
-    let annotation = PDFAnnotation(bounds: bounds.cgRect, forType: .freeText, withProperties: nil)
     let fontSize = model.fontSize ?? 16.0
-    annotation.font = UIFont(name: model.fontFamily ?? "", size: fontSize) ?? UIFont.systemFont(ofSize: fontSize)
+    let font = UIFont(name: model.fontFamily ?? "", size: fontSize) ?? UIFont.systemFont(ofSize: fontSize)
+    let contents = model.contents ?? ""
+    let annotation = PDFAnnotation(
+      bounds: normalizedFreeTextBounds(bounds: bounds.cgRect, text: contents, font: font),
+      forType: .freeText,
+      withProperties: nil
+    )
+    annotation.font = font
     annotation.fontColor = color
     annotation.color = .clear
-    annotation.contents = model.contents ?? ""
+    annotation.contents = contents
 
     let createdAt = model.createdAt ?? Date().timeIntervalSince1970
     tagAsModuleManaged(annotation, id: model.id, createdAt: createdAt, colorHex: model.color)
     return annotation
+  }
+
+  private static func normalizedFreeTextBounds(bounds: CGRect, text: String, font: UIFont) -> CGRect {
+    guard !text.isEmpty else { return bounds }
+
+    let padding: CGFloat = 4.0
+    let textSize = (text as NSString).size(withAttributes: [.font: font])
+    let width = max(bounds.width, ceil(textSize.width + padding * 2))
+    let height = max(bounds.height, ceil(textSize.height + padding * 2))
+
+    return CGRect(
+      x: bounds.minX,
+      y: bounds.maxY - height,
+      width: width,
+      height: height
+    )
   }
 
   private static func pointsFromBezierPath(_ path: UIBezierPath) -> [CGPoint] {

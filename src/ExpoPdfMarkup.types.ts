@@ -92,7 +92,7 @@ export type ExpoPdfMarkupViewProps = {
   /**
    * Default font family for new text annotations. Platform-specific:
    * - iOS: PostScript name (`"Georgia"`, `"Courier"`) or `undefined` for system font (San Francisco)
-   * - Android: family name (`"serif"`, `"monospace"`) or `undefined` for default sans-serif
+   * - Android: React Native / Expo font family name (`"Montserrat-Regular"`, `"serif"`) or `undefined` for default sans-serif
    * - Web: CSS font family (`"Georgia, serif"`) or `undefined` for `sans-serif`
    */
   annotationFontFamily?: string;

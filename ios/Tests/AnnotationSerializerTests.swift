@@ -73,6 +73,24 @@ final class AnnotationSerializerTests: XCTestCase {
     XCTAssertEqual(annotation?.color, .clear)
   }
 
+  func testCreateFreeTextAnnotationExpandsNarrowBoundsToFitText() {
+    let originalBounds = AnnotationBounds(x: 100, y: 200, width: 40, height: 24)
+    let model = AnnotationModel(
+      id: "txt-narrow-1",
+      type: "freeText",
+      page: 0,
+      color: "#00FF00",
+      bounds: originalBounds,
+      contents: "Hello from Android",
+      fontSize: 16.0
+    )
+
+    let annotation = AnnotationSerializer.toPDFAnnotation(model)
+    XCTAssertNotNil(annotation)
+    XCTAssertGreaterThan(annotation?.bounds.width ?? 0, originalBounds.width)
+    XCTAssertEqual(annotation?.bounds.maxY, originalBounds.cgRect.maxY, accuracy: 0.01)
+  }
+
   func testUnknownTypeReturnsNil() {
     let model = AnnotationModel(
       id: "bad-1",
