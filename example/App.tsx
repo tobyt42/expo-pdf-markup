@@ -1,16 +1,9 @@
 import { ExpoPdfMarkupView } from '@tobyt/expo-pdf-markup';
 import type { AnnotationMode } from '@tobyt/expo-pdf-markup';
 import { Asset } from 'expo-asset';
+import { useFonts } from 'expo-font';
 import { useEffect, useRef, useState } from 'react';
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 const MODES: { label: string; mode: AnnotationMode }[] = [
@@ -32,6 +25,10 @@ const COLORS = [
 const EMPTY_ANNOTATIONS = JSON.stringify({ version: 1, annotations: [] });
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    'Montserrat-Regular': require('./assets/fonts/Montserrat-Regular.ttf'),
+    'Montserrat-Medium': require('./assets/fonts/Montserrat-Medium.ttf'),
+  });
   const [pdfPath, setPdfPath] = useState<string | null>(null);
   const [annotationMode, setAnnotationMode] = useState<AnnotationMode>('none');
   const [annotationColor, setAnnotationColor] = useState('#FF0000');
@@ -76,7 +73,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
-        {!pdfPath ? (
+        {!pdfPath || !fontsLoaded ? (
           <Text style={styles.loading}>Loading PDF...</Text>
         ) : (
           <ExpoPdfMarkupView
@@ -86,6 +83,7 @@ export default function App() {
             annotationMode={annotationMode}
             annotationColor={annotationColor}
             annotationLineWidth={3}
+            annotationFontFamily="Montserrat-Regular"
             onTextInputRequested={handleTextInputRequested}
             onLoadComplete={({ nativeEvent: { pageCount } }) =>
               console.log(`PDF loaded: ${pageCount} pages`)
@@ -106,7 +104,9 @@ export default function App() {
                 style={[styles.button, annotationMode === mode && styles.buttonActive]}
                 onPress={() => setAnnotationMode(mode)}
               >
-                <Text style={[styles.buttonText, annotationMode === mode && styles.buttonTextActive]}>
+                <Text
+                  style={[styles.buttonText, annotationMode === mode && styles.buttonTextActive]}
+                >
                   {label}
                 </Text>
               </Pressable>

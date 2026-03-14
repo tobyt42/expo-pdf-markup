@@ -118,6 +118,10 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
         pdfView.annotationLineWidth = width?.toFloat() ?: 2f
     }
 
+    fun setAnnotationFontFamily(font: String?) {
+        pdfView.annotationFontFamily = font
+    }
+
     private fun emitAnnotationsChanged() {
         val data = AnnotationsData(version = 1, annotations = pdfView.annotations)
         val json = AnnotationSerializer.serialize(data)

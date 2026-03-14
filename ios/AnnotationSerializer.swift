@@ -99,6 +99,7 @@ enum AnnotationSerializer {
       model.contents = annotation.contents
       if let font = annotation.font {
         model.fontSize = font.pointSize
+        model.fontFamily = font.fontName
       }
     default:
       break
@@ -235,7 +236,7 @@ enum AnnotationSerializer {
     guard let bounds = model.bounds else { return nil }
     let annotation = PDFAnnotation(bounds: bounds.cgRect, forType: .freeText, withProperties: nil)
     let fontSize = model.fontSize ?? 16.0
-    annotation.font = UIFont.systemFont(ofSize: fontSize)
+    annotation.font = UIFont(name: model.fontFamily ?? "", size: fontSize) ?? UIFont.systemFont(ofSize: fontSize)
     annotation.fontColor = color
     annotation.color = .clear
     annotation.contents = model.contents ?? ""

@@ -215,7 +215,7 @@ export function drawAnnotationsOnCanvas(
         const fontSize = (annotation.fontSize ?? 16) * scale;
         ctx.save();
         ctx.fillStyle = annotation.color;
-        ctx.font = `${fontSize}px sans-serif`;
+        ctx.font = `${fontSize}px ${annotation.fontFamily ?? 'sans-serif'}`;
         const canvasTop = (pdfHeight - bounds.y - bounds.height) * scale;
         ctx.fillText(text, bounds.x * scale, canvasTop + fontSize);
         ctx.restore();

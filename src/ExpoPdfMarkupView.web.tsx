@@ -7,6 +7,7 @@ import type {
   AnnotationMode,
   AnnotationPoint,
   ExpoPdfMarkupViewProps,
+  TextAnnotation,
 } from './ExpoPdfMarkup.types';
 import {
   canvasRectToPdfBounds,
@@ -162,8 +163,28 @@ function PageView({
   );
 
   React.useEffect(() => {
-    redrawAnnotations();
-  }, [redrawAnnotations]);
+    // CSS @font-face fonts (e.g. loaded via expo-font on web) may not be available to canvas
+    // until explicitly requested via document.fonts.load(). Collect the unique font families
+    // used by text annotations on this page and load them before drawing.
+    const fontFamilies = [
+      ...new Set(
+        annotations
+          .filter(
+            (a): a is TextAnnotation =>
+              a.page === pageIndex && (a.type === 'text' || a.type === 'freeText')
+          )
+          .map((a) => a.fontFamily)
+          .filter((f): f is string => Boolean(f))
+      ),
+    ];
+    if (fontFamilies.length > 0 && typeof document !== 'undefined') {
+      Promise.all(fontFamilies.map((f) => document.fonts.load(`16px ${f}`))).finally(() =>
+        redrawAnnotations()
+      );
+    } else {
+      redrawAnnotations();
+    }
+  }, [redrawAnnotations, annotations, pageIndex]);
 
   function getCanvasPoint(e: React.PointerEvent<HTMLCanvasElement>): { x: number; y: number } {
     const rect = (e.currentTarget as HTMLCanvasElement).getBoundingClientRect();
@@ -311,6 +332,7 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
     annotationMode = 'none',
     annotationColor = '#FF0000',
     annotationLineWidth = 2,
+    annotationFontFamily,
     onPageChanged,
     onLoadComplete,
     onError,
@@ -572,10 +594,11 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
         bounds,
         contents: text,
         fontSize,
+        fontFamily: annotationFontFamily,
         createdAt: Date.now(),
       });
     },
-    [annotationColor, handleAnnotationAdded, onTextInputRequested]
+    [annotationColor, annotationFontFamily, handleAnnotationAdded, onTextInputRequested]
   );
 
   const styleObj = style as React.CSSProperties | undefined;

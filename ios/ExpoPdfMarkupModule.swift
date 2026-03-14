@@ -40,6 +40,10 @@ public class ExpoPdfMarkupModule: Module {
         view.annotationLineWidth = CGFloat(width ?? 2.0)
       }
 
+      Prop("annotationFontFamily") { (view: ExpoPdfMarkupView, font: String?) in
+        view.annotationFontFamily = font
+      }
+
       Prop("useJsTextDialog") { (view: ExpoPdfMarkupView, use: Bool?) in
         view.useJsTextDialog = use ?? false
       }

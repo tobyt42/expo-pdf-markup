@@ -19,6 +19,7 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
   }
 
   var annotationLineWidth: CGFloat = 2.0
+  var annotationFontFamily: String?
   var useJsTextDialog: Bool = false
 
   private var inkPanGesture: UIPanGestureRecognizer?
@@ -506,7 +507,7 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
 
   private func addFreeTextAnnotation(text: String, at point: CGPoint, on page: PDFPage) {
     let fontSize: CGFloat = 16.0
-    let font = UIFont.systemFont(ofSize: fontSize)
+    let font = UIFont(name: annotationFontFamily ?? "", size: fontSize) ?? UIFont.systemFont(ofSize: fontSize)
     let color = AnnotationSerializer.colorFromHex(annotationColor) ?? .red
 
     // Measure text size

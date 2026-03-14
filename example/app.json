@@ -32,7 +32,16 @@
       "baseUrl": "/expo-pdf-markup/example"
     },
     "plugins": [
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/Montserrat-Regular.ttf",
+            "./assets/fonts/Montserrat-Medium.ttf"
+          ]
+        }
+      ]
     ]
   }
 }

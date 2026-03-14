@@ -76,6 +76,7 @@ object AnnotationSerializer {
             bounds = parseBounds(obj.optJSONObject("bounds")),
             contents = if (obj.has("contents")) obj.getString("contents") else null,
             fontSize = optFloat(obj, "fontSize"),
+            fontFamily = if (obj.has("fontFamily")) obj.getString("fontFamily") else null,
             createdAt = if (obj.has("createdAt")) obj.optDouble("createdAt") else null
         )
     }
@@ -122,6 +123,7 @@ object AnnotationSerializer {
         model.bounds?.let { obj.put("bounds", boundsToJson(it)) }
         model.contents?.let { obj.put("contents", it) }
         model.fontSize?.let { obj.put("fontSize", it.toDouble()) }
+        model.fontFamily?.let { obj.put("fontFamily", it) }
         model.createdAt?.let { obj.put("createdAt", it) }
         return obj
     }

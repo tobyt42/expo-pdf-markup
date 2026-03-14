@@ -1,8 +1,10 @@
 package dev.terhoeven.expopdfmarkup
 
+import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.Typeface
 
 object AnnotationRenderer {
 
@@ -12,7 +14,8 @@ object AnnotationRenderer {
         pageIndex: Int,
         pageYOffset: Float,
         renderScale: Float,
-        pageHeight: Int
+        pageHeight: Int,
+        context: Context
     ) {
         for (annotation in annotations) {
             if (annotation.page != pageIndex) continue
@@ -40,7 +43,8 @@ object AnnotationRenderer {
                     annotation,
                     pageYOffset,
                     renderScale,
-                    pageHeight
+                    pageHeight,
+                    context
                 )
             }
         }
@@ -122,17 +126,30 @@ object AnnotationRenderer {
         annotation: AnnotationModel,
         pageYOffset: Float,
         renderScale: Float,
-        pageHeight: Int
+        pageHeight: Int,
+        context: Context
     ) {
         val bounds = annotation.bounds ?: return
         val text = annotation.contents ?: return
         val paint = Paint().apply {
             color = AnnotationSerializer.colorFromHex(annotation.color)
             textSize = (annotation.fontSize ?: 16f) * renderScale
+            typeface = resolveTypeface(context, annotation.fontFamily)
             isAntiAlias = true
         }
         val left = bounds.x * renderScale
         val top = (pageHeight - bounds.y - bounds.height) * renderScale + pageYOffset
         canvas.drawText(text, left, top + paint.textSize, paint)
+    }
+
+    /** Resolve a typeface by family name. Tries app assets first (where expo-font places fonts),
+     *  then falls back to system typeface resolution. */
+    fun resolveTypeface(context: Context, fontFamily: String?): Typeface {
+        if (fontFamily == null) return Typeface.DEFAULT
+        return try {
+            Typeface.createFromAsset(context.assets, "fonts/$fontFamily.ttf")
+        } catch (_: Exception) {
+            Typeface.create(fontFamily, Typeface.NORMAL)
+        }
     }
 }

@@ -51,6 +51,7 @@ class ContinuousPdfView(context: Context) : View(context) {
     var annotationMode: String = "none"
     var annotationColor: String = "#000000"
     var annotationLineWidth: Float = 2f
+    var annotationFontFamily: String? = null
     var onAnnotationsChangedListener: (() -> Unit)? = null
 
     // Ink drawing state
@@ -132,7 +133,8 @@ class ContinuousPdfView(context: Context) : View(context) {
                     i,
                     pageYOffsets[i],
                     renderScales[i],
-                    pageHeights[i]
+                    pageHeights[i],
+                    context
                 )
             }
         }
@@ -407,16 +409,25 @@ class ContinuousPdfView(context: Context) : View(context) {
     fun addTextAnnotation(page: Int, point: AnnotationPoint, text: String) {
         val fontSize = 16f
         val padding = 4f
-        val paint = Paint().apply { textSize = fontSize }
+        val paint = Paint().apply {
+            textSize = fontSize
+            typeface = AnnotationRenderer.resolveTypeface(context, annotationFontFamily)
+        }
         val textWidth = paint.measureText(text)
         val annotation = AnnotationModel(
             id = UUID.randomUUID().toString(),
             type = "freeText",
             page = page,
             color = annotationColor,
-            bounds = AnnotationBounds(point.x, point.y - fontSize - padding, textWidth + padding * 2, fontSize * 1.2f + padding * 2),
+            bounds = AnnotationBounds(
+                point.x,
+                point.y - fontSize - padding,
+                textWidth + padding * 2,
+                fontSize * 1.2f + padding * 2
+            ),
             contents = text,
             fontSize = fontSize,
+            fontFamily = annotationFontFamily,
             createdAt = System.currentTimeMillis() / 1000.0
         )
         annotations = annotations + annotation

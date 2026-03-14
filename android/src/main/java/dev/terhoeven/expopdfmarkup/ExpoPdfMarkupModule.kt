@@ -80,6 +80,10 @@ class ExpoPdfMarkupModule : Module() {
                 view.setAnnotationLineWidth(width)
             }
 
+            Prop("annotationFontFamily") { view: ExpoPdfMarkupView, font: String? ->
+                view.setAnnotationFontFamily(font)
+            }
+
             Prop("useJsTextDialog") { view: ExpoPdfMarkupView, use: Boolean? ->
                 view.useJsTextDialog = use ?: false
             }

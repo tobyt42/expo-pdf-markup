@@ -41,6 +41,13 @@ export type TextAnnotation = {
   bounds: AnnotationBounds;
   contents?: string;
   fontSize?: number;
+  /**
+   * Font family for the text annotation. Platform-specific:
+   * - iOS: PostScript name (`"Georgia"`, `"Courier"`) or `undefined` for system font (San Francisco)
+   * - Android: family name (`"serif"`, `"monospace"`) or `undefined` for default sans-serif
+   * - Web: CSS font family (`"Georgia, serif"`) or `undefined` for `sans-serif`
+   */
+  fontFamily?: string;
   createdAt?: number;
 };
 
@@ -68,6 +75,13 @@ export type ExpoPdfMarkupViewProps = {
   annotationColor?: string;
   /** Stroke width in points applied to new ink annotations. */
   annotationLineWidth?: number;
+  /**
+   * Default font family for new text annotations. Platform-specific:
+   * - iOS: PostScript name (`"Georgia"`, `"Courier"`) or `undefined` for system font (San Francisco)
+   * - Android: family name (`"serif"`, `"monospace"`) or `undefined` for default sans-serif
+   * - Web: CSS font family (`"Georgia, serif"`) or `undefined` for `sans-serif`
+   */
+  annotationFontFamily?: string;
   /** Fired when the visible page changes. */
   onPageChanged?: (event: {
     nativeEvent: { page: number; pageCount: number; pageWidth: number; pageHeight: number };

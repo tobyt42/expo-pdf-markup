@@ -18,6 +18,7 @@ data class AnnotationModel(
     val bounds: AnnotationBounds? = null,
     val contents: String? = null,
     val fontSize: Float? = null,
+    val fontFamily: String? = null,
     val createdAt: Double? = null
 )
 
