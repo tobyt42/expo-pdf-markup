@@ -1,5 +1,11 @@
 # @tobyt/expo-pdf-markup
 
+## 0.6.1
+
+### Patch Changes
+
+- e1a942b: Fix Android custom font rendering
+
 ## 0.6.0
 
 ### Minor Changes

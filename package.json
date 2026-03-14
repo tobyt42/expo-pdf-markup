@@ -1,6 +1,6 @@
 {
   "name": "@tobyt/expo-pdf-markup",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "An Expo module for displaying and annotating PDFs",
   "main": "build/index.js",
   "types": "build/index.d.ts",
