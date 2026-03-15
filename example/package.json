@@ -9,7 +9,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "expo": "~55.0.5",
+    "expo": "~55.0.6",
     "expo-asset": "~55.0.8",
     "expo-font": "~55.0.4",
     "react": "19.2.0",
