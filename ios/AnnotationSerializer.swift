@@ -35,6 +35,64 @@ enum AnnotationSerializer {
     }
   }
 
+  // MARK: - Embedded annotation extraction
+
+  /// Extracts all non-module-managed (natively embedded) annotations from a document.
+  static func extractAllNativeAnnotations(from document: PDFDocument) -> AnnotationsData {
+    var models: [AnnotationModel] = []
+    for pageIndex in 0 ..< document.pageCount {
+      guard let page = document.page(at: pageIndex) else { continue }
+      for annotation in page.annotations {
+        guard !isModuleManaged(annotation) else { continue }
+        if let model = extractNativeAnnotation(from: annotation, pageIndex: pageIndex) {
+          models.append(model)
+        }
+      }
+    }
+    return AnnotationsData(version: 1, annotations: models)
+  }
+
+  /// Converts a single native (non-module-managed) PDFAnnotation to an AnnotationModel.
+  static func extractNativeAnnotation(from annotation: PDFAnnotation, pageIndex: Int) -> AnnotationModel? {
+    guard let type = modelType(for: annotation.type) else { return nil }
+    var model = AnnotationModel(
+      id: UUID().uuidString,
+      type: type,
+      page: pageIndex,
+      color: colorHex(for: annotation, type: type),
+      createdAt: Date().timeIntervalSince1970
+    )
+    populateModelDetails(&model, from: annotation)
+
+    // Some PDF editors non-conformingly write Ink InkList coordinates relative to the
+    // annotation's Rect origin rather than in absolute PDF page space (PDF spec §12.5.6.13
+    // requires default user space). PDFKit returns them as-is. Detect this by checking
+    // whether all extracted path points lie within [0, bounds.width] × [0, bounds.height]
+    // (i.e. annotation-local space), then offset by bounds.origin to convert to absolute
+    // page coordinates.
+    if type == "ink", let paths = model.paths {
+      let bounds = annotation.bounds
+      let ox = bounds.origin.x
+      let oy = bounds.origin.y
+      if ox != 0 || oy != 0 {
+        let margin: CGFloat = 5
+        let appearsRelative = paths.joined().allSatisfy { pt in
+          let x = pt["x"] ?? 0
+          let y = pt["y"] ?? 0
+          return x >= -margin && x <= bounds.width + margin
+            && y >= -margin && y <= bounds.height + margin
+        }
+        if appearsRelative {
+          model.paths = paths.map { path in
+            path.map { ["x": ($0["x"] ?? 0) + ox, "y": ($0["y"] ?? 0) + oy] }
+          }
+        }
+      }
+    }
+
+    return model
+  }
+
   static func toModel(from annotation: PDFAnnotation, page: Int) -> AnnotationModel? {
     guard isModuleManaged(annotation) else { return nil }
     guard let id = annotation.value(forAnnotationKey: PDFAnnotationKey(rawValue: "_id")) as? String else {

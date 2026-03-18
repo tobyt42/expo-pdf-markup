@@ -1,4 +1,4 @@
-import { ExpoPdfMarkupView } from '@tobyt/expo-pdf-markup';
+import { ExpoPdfMarkupView, getEmbeddedAnnotations } from '@tobyt/expo-pdf-markup';
 import type { AnnotationMode, TextInputRequest } from '@tobyt/expo-pdf-markup';
 import { Asset } from 'expo-asset';
 import { useFonts } from 'expo-font';
@@ -31,6 +31,7 @@ export default function App() {
     'Montserrat-Medium': require('./assets/fonts/Montserrat-Medium.ttf'),
   });
   const [pdfPath, setPdfPath] = useState<string | null>(null);
+  const [annotatedPdfUri, setAnnotatedPdfUri] = useState<string | null>(null);
   const [annotationMode, setAnnotationMode] = useState<AnnotationMode>('none');
   const [annotationColor, setAnnotationColor] = useState('#FF0000');
   const [annotations, setAnnotations] = useState(EMPTY_ANNOTATIONS);
@@ -48,9 +49,20 @@ export default function App() {
       if (asset.localUri) {
         setPdfPath(asset.localUri.replace('file://', ''));
       }
+      const annotatedAsset = Asset.fromModule(require('./assets/test-annotated.pdf'));
+      await annotatedAsset.downloadAsync();
+      if (annotatedAsset.localUri) {
+        setAnnotatedPdfUri(annotatedAsset.localUri);
+      }
     }
     preparePdf();
   }, []);
+
+  const handleImport = async () => {
+    if (!annotatedPdfUri) return;
+    const json = await getEmbeddedAnnotations(annotatedPdfUri);
+    setAnnotations(json);
+  };
 
   const handleTextInputRequested = (request: TextInputRequest): Promise<string | null> => {
     setTextRequest(request);
@@ -132,6 +144,10 @@ export default function App() {
                 <Text style={styles.colorLabel}>{label}</Text>
               </Pressable>
             ))}
+
+            <Pressable style={[styles.button, styles.importButton]} onPress={handleImport}>
+              <Text style={styles.buttonText}>Import</Text>
+            </Pressable>
 
             <Pressable
               style={[styles.button, styles.clearButton]}
@@ -237,9 +253,12 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
+  importButton: {
+    backgroundColor: '#1a6b3a',
+    marginLeft: 'auto',
+  },
   clearButton: {
     backgroundColor: '#8B0000',
-    marginLeft: 'auto',
   },
   // Modal
   modalOverlay: {
