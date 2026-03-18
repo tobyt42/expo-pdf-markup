@@ -9,6 +9,7 @@ const mockPage = {
   getViewport: jest.fn().mockReturnValue(mockViewport),
   render: jest.fn().mockReturnValue({ promise: Promise.resolve() }),
   cleanup: jest.fn(),
+  getAnnotations: jest.fn().mockResolvedValue([]),
 };
 
 const mockDoc = {

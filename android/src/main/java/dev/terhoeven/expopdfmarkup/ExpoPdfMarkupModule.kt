@@ -46,6 +46,10 @@ class ExpoPdfMarkupModule : Module() {
     override fun definition() = ModuleDefinition {
         Name("ExpoPdfMarkup")
 
+        AsyncFunction("getEmbeddedAnnotations") { _: String ->
+            AnnotationSerializer.serialize(AnnotationsData())
+        }
+
         AsyncFunction("provideTextInput") { viewTag: Int, text: String? ->
             val view = appContext.findView<ExpoPdfMarkupView>(viewTag)
             view?.provideTextInput(text)

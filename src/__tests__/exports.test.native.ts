@@ -2,7 +2,10 @@ import * as ExportedModule from '../index';
 
 jest.mock('expo', () => ({
   requireNativeView: jest.fn(() => 'MockNativeView'),
-  requireNativeModule: jest.fn(() => ({ provideTextInput: jest.fn() })),
+  requireNativeModule: jest.fn(() => ({
+    provideTextInput: jest.fn(),
+    getEmbeddedAnnotations: jest.fn().mockResolvedValue('{"version":1,"annotations":[]}'),
+  })),
 }));
 
 describe('public API surface', () => {
@@ -16,6 +19,10 @@ describe('public API surface', () => {
     const nonTypeExports = exportedKeys.filter(
       (k) => typeof (ExportedModule as any)[k] !== 'undefined'
     );
-    expect(nonTypeExports).toEqual(['ExpoPdfMarkupView', 'setPdfJsWorkerSrc']); // setPdfJsWorkerSrc is a no-op on native
+    expect(nonTypeExports).toEqual([
+      'ExpoPdfMarkupView',
+      'setPdfJsWorkerSrc',
+      'getEmbeddedAnnotations',
+    ]);
   });
 });
