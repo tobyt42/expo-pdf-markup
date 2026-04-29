@@ -9,8 +9,6 @@ An Expo module for displaying and annotating PDFs, with support for iOS, Android
 
 **[📖 API Reference](https://tobyt42.github.io/expo-pdf-markup/api/)** · **[🚀 Example App](https://tobyt42.github.io/expo-pdf-markup/example/)**
 
-> **Status:** Early development — actively tested in the [Choir](https://www.thechoirapp.com) app.
-
 ## Platform support
 
 | Platform | PDF rendering | Annotations |
@@ -151,6 +149,10 @@ npx expo start
     <td align="center"><a href="https://github.com/tobyt42"><img src="https://avatars.githubusercontent.com/u/1678364?v=4" width="100px;" alt=""/><br /><sub><b>Toby Terhoeven</b></sub></a><br /></td>
   </tr>
 </table>
+
+## Used by
+
+- [Choir](https://www.thechoirapp.com) — a choir practice app for iOS, Android and Web
 
 ## License
 
