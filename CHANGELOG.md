@@ -1,5 +1,15 @@
 # @tobyt/expo-pdf-markup
 
+## 1.0.0
+
+### Major Changes
+
+- ea50181: Stable 1.0.0 release — production-ready API for displaying and annotating PDFs on iOS, Android, and Web.
+
+### Patch Changes
+
+- 906ce89: Fix Android blank PDF and scroll position loss when navigating back to a screen containing the PDF view
+
 ## 0.6.1
 
 ### Patch Changes
