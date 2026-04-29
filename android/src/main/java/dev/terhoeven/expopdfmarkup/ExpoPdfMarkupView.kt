@@ -24,7 +24,10 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
     private var renderer: PdfRenderer? = null
     private var fileDescriptor: ParcelFileDescriptor? = null
     private var currentSource: String? = null
+    private var lastLoadedSource: String? = null
     private var pendingAnnotationsJson: String? = null
+    private var sourceToReloadOnAttach: String? = null
+    private var savedScrollState: ContinuousPdfView.ScrollState? = null
     var useJsTextDialog: Boolean = false
 
     private var pendingTextPage: Int = -1
@@ -65,6 +68,7 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
     }
 
     fun loadPdf(source: String) {
+        sourceToReloadOnAttach = null // Explicit load supersedes any pending reload-on-attach
         if (source == currentSource) return
         currentSource = source
 
@@ -79,6 +83,7 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
             fileDescriptor = fd
             val r = PdfRenderer(fd)
             renderer = r
+            lastLoadedSource = source
             onLoadComplete(mapOf("pageCount" to r.pageCount))
             if (width > 0) {
                 pdfView.loadPages(r, width)
@@ -188,7 +193,22 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
+        // Save the successfully-loaded source before close() so we can reload on re-attach.
+        // (currentSource is always null after loadPdf() because close() resets it there.)
+        sourceToReloadOnAttach = lastLoadedSource
+        lastLoadedSource = null
+        savedScrollState = pdfView.captureScrollState()
         close()
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        sourceToReloadOnAttach?.let { source ->
+            sourceToReloadOnAttach = null
+            pdfView.pendingScrollRestore = savedScrollState
+            savedScrollState = null
+            loadPdf(source)
+        }
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {

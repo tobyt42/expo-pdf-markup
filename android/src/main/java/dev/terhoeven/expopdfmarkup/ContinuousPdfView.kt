@@ -16,6 +16,14 @@ import android.widget.OverScroller
 import java.util.UUID
 
 class ContinuousPdfView(context: Context) : View(context) {
+    data class ScrollState(val panX: Float, val panY: Float, val scale: Float)
+
+    var pendingScrollRestore: ScrollState? = null
+
+    fun captureScrollState(): ScrollState? {
+        if (pageBitmaps.isEmpty()) return null
+        return ScrollState(panX, panY, currentScale)
+    }
     private val pageBitmaps = mutableListOf<Bitmap>()
     private val pageYOffsets = mutableListOf<Float>()
     private val pageWidths = mutableListOf<Int>()
@@ -131,6 +139,15 @@ class ContinuousPdfView(context: Context) : View(context) {
         panX = 0f
         panY = 0f
         lastNotifiedPage = -1
+
+        pendingScrollRestore?.let { state ->
+            currentScale = state.scale.coerceIn(minScale, maxScale)
+            panX = state.panX
+            panY = state.panY
+            constrainPan()
+            pendingScrollRestore = null
+        }
+
         invalidate()
         notifyPageChange()
     }
