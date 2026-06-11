@@ -181,7 +181,7 @@ extension ExpoPdfMarkupView {
     return documentView.convert(pdfViewRect, from: pdfView)
   }
 
-  func annotationForModel(_ model: AnnotationModel, on page: PDFPage) -> PDFAnnotation? {
+  private func annotationForModel(_ model: AnnotationModel, on page: PDFPage) -> PDFAnnotation? {
     AnnotationSerializer.toPDFAnnotation(model, pageBounds: page.bounds(for: pdfView.displayBox))
   }
 

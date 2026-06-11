@@ -11,7 +11,7 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
 
   private var currentSource: String?
   private var currentAnnotationsJSON: String?
-  var currentMode: String = "none"
+  private(set) var currentMode: String = "none"
   var annotationColor: String = "#FF0000" {
     didSet {
       inkShapeLayer?.strokeColor = (AnnotationSerializer.colorFromHex(annotationColor) ?? .red).cgColor

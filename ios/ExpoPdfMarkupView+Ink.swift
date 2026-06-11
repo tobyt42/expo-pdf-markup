@@ -135,24 +135,30 @@ class InkOverlayView: UIView {
   var onEnded: ((CGPoint) -> Void)?
   var onCancelled: (() -> Void)?
 
+  private var activeTouch: UITouch?
+
   override func touchesBegan(_ touches: Set<UITouch>, with _: UIEvent?) {
-    guard let touch = touches.first else { return }
+    guard activeTouch == nil, let touch = touches.first else { return }
+    activeTouch = touch
     onBegan?(touch.location(in: self))
   }
 
   override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-    guard let touch = touches.first else { return }
-    for t in event?.coalescedTouches(for: touch) ?? [touch] {
+    guard let active = activeTouch, touches.contains(active) else { return }
+    for t in event?.coalescedTouches(for: active) ?? [active] {
       onMoved?(t.location(in: self))
     }
   }
 
   override func touchesEnded(_ touches: Set<UITouch>, with _: UIEvent?) {
-    guard let touch = touches.first else { return }
-    onEnded?(touch.location(in: self))
+    guard let active = activeTouch, touches.contains(active) else { return }
+    onEnded?(active.location(in: self))
+    activeTouch = nil
   }
 
-  override func touchesCancelled(_: Set<UITouch>, with _: UIEvent?) {
+  override func touchesCancelled(_ touches: Set<UITouch>, with _: UIEvent?) {
+    guard let active = activeTouch, touches.contains(active) else { return }
     onCancelled?()
+    activeTouch = nil
   }
 }
