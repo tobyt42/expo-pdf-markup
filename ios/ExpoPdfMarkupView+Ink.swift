@@ -139,6 +139,8 @@ class InkOverlayView: UIView {
   override init(frame: CGRect) {
     super.init(frame: frame)
     isMultipleTouchEnabled = true
+    isOpaque = false
+    backgroundColor = .clear
   }
 
   @available(*, unavailable)

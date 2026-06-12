@@ -252,7 +252,8 @@ extension ExpoPdfMarkupView {
       }
     }
 
-    guard minX.isFinite, minY.isFinite, maxX.isFinite, maxY.isFinite else { return nil }
+    // If no points were visited the sentinels are still in place (minX > maxX).
+    guard minX <= maxX else { return nil }
 
     let padding = max(model.lineWidth ?? 2.0, 10.0)
     return AnnotationBounds(
