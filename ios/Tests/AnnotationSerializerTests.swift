@@ -73,7 +73,7 @@ final class AnnotationSerializerTests: XCTestCase {
     XCTAssertEqual(annotation?.color, .clear)
   }
 
-  func testCreateFreeTextAnnotationExpandsNarrowBoundsToFitText() {
+  func testCreateFreeTextAnnotationExpandsNarrowBoundsToFitText() throws {
     let originalBounds = AnnotationBounds(x: 100, y: 200, width: 40, height: 24)
     let model = AnnotationModel(
       id: "txt-narrow-1",
