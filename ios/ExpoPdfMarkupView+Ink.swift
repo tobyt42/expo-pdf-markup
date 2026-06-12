@@ -137,6 +137,16 @@ class InkOverlayView: UIView {
 
   private var activeTouch: UITouch?
 
+  override init(frame: CGRect) {
+    super.init(frame: frame)
+    isMultipleTouchEnabled = true
+  }
+
+  @available(*, unavailable)
+  required init?(coder _: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
   override func touchesBegan(_ touches: Set<UITouch>, with _: UIEvent?) {
     guard activeTouch == nil else { return }
     // Prefer a pencil touch over a finger so a resting palm doesn't steal the stroke.
@@ -153,8 +163,11 @@ class InkOverlayView: UIView {
     }
   }
 
-  override func touchesEnded(_ touches: Set<UITouch>, with _: UIEvent?) {
+  override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
     guard let active = activeTouch, touches.contains(active) else { return }
+    for t in event?.coalescedTouches(for: active) ?? [] {
+      onMoved?(t.location(in: self))
+    }
     onEnded?(active.location(in: self))
     activeTouch = nil
   }
