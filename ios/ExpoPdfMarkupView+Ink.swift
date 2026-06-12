@@ -39,10 +39,8 @@ extension ExpoPdfMarkupView {
       inkPoints.append(point)
       updateInkShapeLayer()
     }
-    overlay.onEnded = { [weak self] point in
+    overlay.onEnded = { [weak self] in
       guard let self else { return }
-      inkPoints.append(point)
-      updateInkShapeLayer()
       finishInkStroke()
     }
     overlay.onCancelled = { [weak self] in
@@ -132,7 +130,7 @@ extension ExpoPdfMarkupView {
 class InkOverlayView: UIView {
   var onBegan: ((CGPoint) -> Void)?
   var onMoved: ((CGPoint) -> Void)?
-  var onEnded: ((CGPoint) -> Void)?
+  var onEnded: (() -> Void)?
   var onCancelled: (() -> Void)?
 
   private var activeTouch: UITouch?
@@ -165,10 +163,12 @@ class InkOverlayView: UIView {
 
   override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
     guard let active = activeTouch, touches.contains(active) else { return }
-    for t in event?.coalescedTouches(for: active) ?? [] {
+    // coalescedTouches includes the original touch as its last element, so all
+    // final sub-frame positions (including the lift-off point) are forwarded here.
+    for t in event?.coalescedTouches(for: active) ?? [active] {
       onMoved?(t.location(in: self))
     }
-    onEnded?(active.location(in: self))
+    onEnded?()
     activeTouch = nil
   }
 
