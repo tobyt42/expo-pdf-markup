@@ -138,7 +138,10 @@ class InkOverlayView: UIView {
   private var activeTouch: UITouch?
 
   override func touchesBegan(_ touches: Set<UITouch>, with _: UIEvent?) {
-    guard activeTouch == nil, let touch = touches.first else { return }
+    guard activeTouch == nil else { return }
+    // Prefer a pencil touch over a finger so a resting palm doesn't steal the stroke.
+    let touch = touches.first(where: { $0.type == .pencil }) ?? touches.first
+    guard let touch else { return }
     activeTouch = touch
     onBegan?(touch.location(in: self))
   }

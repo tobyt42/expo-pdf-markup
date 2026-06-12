@@ -129,11 +129,17 @@ final class ExpoPdfMarkupViewTests: XCTestCase {
 
   func testInkModeAddsOverlayAndDisablesPdfGestures() throws {
     view.frame = CGRect(x: 0, y: 0, width: 320, height: 480)
+
+    // Add a known gesture so the disabled-gesture assertions are non-trivial.
+    let knownGesture = UITapGestureRecognizer()
+    view.pdfView.addGestureRecognizer(knownGesture)
+
     view.setAnnotationMode("ink")
 
     XCTAssertNotNil(view.inkOverlayView)
     XCTAssertTrue(try view.subviews.contains(XCTUnwrap(view.inkOverlayView)))
-    XCTAssertTrue(view.disabledPdfGestures.allSatisfy { !$0.isEnabled })
+    XCTAssertTrue(view.disabledPdfGestures.contains(knownGesture))
+    XCTAssertFalse(knownGesture.isEnabled)
     if let scrollView = view.pdfScrollView {
       XCTAssertFalse(scrollView.isScrollEnabled)
     }
@@ -141,11 +147,19 @@ final class ExpoPdfMarkupViewTests: XCTestCase {
 
   func testExitingInkModeRemovesOverlayAndRestoresGestures() {
     view.frame = CGRect(x: 0, y: 0, width: 320, height: 480)
+
+    // Add a known gesture so we can verify it is actually re-enabled on exit.
+    let knownGesture = UITapGestureRecognizer()
+    view.pdfView.addGestureRecognizer(knownGesture)
+
     view.setAnnotationMode("ink")
+    XCTAssertFalse(knownGesture.isEnabled)
+
     view.setAnnotationMode("none")
 
     XCTAssertNil(view.inkOverlayView)
     XCTAssertTrue(view.disabledPdfGestures.isEmpty)
+    XCTAssertTrue(knownGesture.isEnabled)
     if let scrollView = view.pdfScrollView {
       XCTAssertTrue(scrollView.isScrollEnabled)
     }

@@ -88,7 +88,7 @@ final class AnnotationSerializerTests: XCTestCase {
     let annotation = AnnotationSerializer.toPDFAnnotation(model)
     XCTAssertNotNil(annotation)
     XCTAssertGreaterThan(annotation?.bounds.width ?? 0, originalBounds.width)
-    XCTAssertEqual(annotation?.bounds.maxY, originalBounds.cgRect.maxY, accuracy: 0.01)
+    XCTAssertEqual(try XCTUnwrap(annotation).bounds.maxY, originalBounds.cgRect.maxY, accuracy: 0.01)
   }
 
   func testUnknownTypeReturnsNil() {
@@ -105,7 +105,7 @@ final class AnnotationSerializerTests: XCTestCase {
 
   // MARK: - Model extraction
 
-  func testExtractModelFromModuleManagedAnnotation() {
+  func testExtractModelFromModuleManagedAnnotation() throws {
     let model = AnnotationModel(
       id: "ext-1",
       type: "ink",
@@ -127,7 +127,7 @@ final class AnnotationSerializerTests: XCTestCase {
     XCTAssertEqual(result.color, "#FF0000")
   }
 
-  func testFreeTextColorRoundTrip() {
+  func testFreeTextColorRoundTrip() throws {
     let model = AnnotationModel(
       id: "ft-color-1",
       type: "freeText",
@@ -179,7 +179,7 @@ final class AnnotationSerializerTests: XCTestCase {
 
   // MARK: - Color helpers
 
-  func testColorFromHex() {
+  func testColorFromHex() throws {
     let red = try XCTUnwrap(AnnotationSerializer.colorFromHex("#FF0000"))
 
     var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
@@ -189,7 +189,7 @@ final class AnnotationSerializerTests: XCTestCase {
     XCTAssertEqual(b, 0.0, accuracy: 0.01)
   }
 
-  func testColorFromHexWithoutHash() {
+  func testColorFromHexWithoutHash() throws {
     let blue = try XCTUnwrap(AnnotationSerializer.colorFromHex("0000FF"))
 
     var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
