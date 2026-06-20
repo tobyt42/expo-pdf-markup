@@ -20,7 +20,7 @@ object AnnotationHitTester {
                     if (hitTestInk(point, annotation, tolerance)) return annotation
                 }
 
-                "highlight", "underline", "freeText", "text" -> {
+                "highlight", "underline", "freeText", "text", "stamp" -> {
                     val bounds = annotation.bounds ?: continue
                     if (bounds.contains(point)) return annotation
                 }

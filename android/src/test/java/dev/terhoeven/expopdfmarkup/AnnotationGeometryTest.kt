@@ -77,4 +77,82 @@ class AnnotationGeometryTest {
         assertEquals(-50f, result.x, 0.001f)
         assertEquals(30f, result.y, 0.001f)
     }
+
+    @Test
+    fun testOutlineBoundsReturnsStampBounds() {
+        val annotation = AnnotationModel(
+            id = "stamp",
+            type = "stamp",
+            page = 0,
+            color = "#000000",
+            bounds = AnnotationBounds(10f, 20f, 48f, 48f),
+            contentType = "emoji",
+            emoji = "⭐"
+        )
+
+        val result = AnnotationGeometry.outlineBounds(annotation)
+
+        assertEquals(10f, result!!.x, 0.001f)
+        assertEquals(20f, result.y, 0.001f)
+        assertEquals(48f, result.width, 0.001f)
+        assertEquals(48f, result.height, 0.001f)
+    }
+
+    @Test
+    fun testTranslateMovesStampBounds() {
+        val annotation = AnnotationModel(
+            id = "stamp",
+            type = "stamp",
+            page = 0,
+            color = "#000000",
+            bounds = AnnotationBounds(10f, 20f, 48f, 48f),
+            contentType = "emoji",
+            emoji = "⭐"
+        )
+
+        val result = AnnotationGeometry.translate(annotation, 5f, 7f)
+
+        assertEquals(15f, result.bounds!!.x, 0.001f)
+        assertEquals(27f, result.bounds!!.y, 0.001f)
+        assertEquals(48f, result.bounds!!.width, 0.001f)
+    }
+
+    // MARK: - containFitRect
+
+    @Test
+    fun testContainFitRectExactSquareFit() {
+        val dest = AnnotationBounds(0f, 0f, 100f, 100f)
+        val result = AnnotationGeometry.containFitRect(50f, 50f, dest)
+        assertEquals(0f, result.x, 0.001f)
+        assertEquals(0f, result.y, 0.001f)
+        assertEquals(100f, result.width, 0.001f)
+        assertEquals(100f, result.height, 0.001f)
+    }
+
+    @Test
+    fun testContainFitRectLetterboxesWideImage() {
+        val dest = AnnotationBounds(0f, 0f, 100f, 100f)
+        val result = AnnotationGeometry.containFitRect(200f, 100f, dest)
+        assertEquals(100f, result.width, 0.001f)
+        assertEquals(50f, result.height, 0.001f)
+        assertEquals(0f, result.x, 0.001f)
+        assertEquals(25f, result.y, 0.001f)
+    }
+
+    @Test
+    fun testContainFitRectLetterboxesTallImage() {
+        val dest = AnnotationBounds(0f, 0f, 100f, 100f)
+        val result = AnnotationGeometry.containFitRect(100f, 200f, dest)
+        assertEquals(50f, result.width, 0.001f)
+        assertEquals(100f, result.height, 0.001f)
+        assertEquals(25f, result.x, 0.001f)
+        assertEquals(0f, result.y, 0.001f)
+    }
+
+    @Test
+    fun testContainFitRectReturnsDestForZeroDimensionSource() {
+        val dest = AnnotationBounds(0f, 0f, 100f, 100f)
+        assertEquals(dest, AnnotationGeometry.containFitRect(0f, 50f, dest))
+        assertEquals(dest, AnnotationGeometry.containFitRect(50f, 0f, dest))
+    }
 }

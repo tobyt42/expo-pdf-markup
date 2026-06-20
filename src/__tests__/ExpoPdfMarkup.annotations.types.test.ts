@@ -5,6 +5,7 @@ import type {
   ExpoPdfMarkupViewProps,
   HighlightAnnotation,
   InkAnnotation,
+  StampAnnotation,
   TextAnnotation,
   UnderlineAnnotation,
 } from '../ExpoPdfMarkup.types';
@@ -86,10 +87,20 @@ it('annotation discriminated union compiles correctly', () => {
     contents: 'Note',
   };
 
-  const annotations: Annotation[] = [ink, highlight, underline, text];
+  const stamp: StampAnnotation = {
+    id: '5',
+    type: 'stamp',
+    page: 0,
+    color: '#000000',
+    bounds: { x: 0, y: 0, width: 48, height: 48 },
+    contentType: 'emoji',
+    emoji: '⭐',
+  };
+
+  const annotations: Annotation[] = [ink, highlight, underline, text, stamp];
   const data: AnnotationsData = { version: 1, annotations };
   const mode: AnnotationMode = 'move';
   expect(data.version).toBe(1);
-  expect(data.annotations).toHaveLength(4);
+  expect(data.annotations).toHaveLength(5);
   expect(mode).toBe('move');
 });

@@ -6,6 +6,7 @@ import type {
   Annotation,
   AnnotationMode,
   ExpoPdfMarkupViewProps,
+  StampAnnotation,
   TextAnnotation,
   TextInputRequest,
 } from './ExpoPdfMarkup.types';
@@ -55,6 +56,10 @@ type PageViewProps = {
   annotationMode: AnnotationMode;
   annotationColor: string;
   annotationLineWidth: number;
+  stampContentType?: 'emoji' | 'image';
+  stampEmoji?: string;
+  stampImageUri?: string;
+  stampSize: number;
   zoomLevel: number;
   onAnnotationAdded: (annotation: Annotation) => void;
   onAnnotationRemoved: (id: string) => void;
@@ -74,6 +79,10 @@ function PageView({
   annotationMode,
   annotationColor,
   annotationLineWidth,
+  stampContentType,
+  stampEmoji,
+  stampImageUri,
+  stampSize,
   zoomLevel,
   onAnnotationAdded,
   onAnnotationRemoved,
@@ -92,6 +101,7 @@ function PageView({
   const moveTargetRef = React.useRef<Annotation | null>(null);
   const moveStartPdfRef = React.useRef<{ x: number; y: number } | null>(null);
   const movePreviewRef = React.useRef<Annotation | null>(null);
+  const imageCacheRef = React.useRef<Map<string, HTMLImageElement>>(new Map());
 
   const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
   const cssWidth = meta.canvasWidth / dpr;
@@ -147,6 +157,7 @@ function PageView({
         highlightAnnotations: showEditingHighlights,
         previewAnnotationId: moveTargetRef.current?.id ?? null,
         previewAnnotation: movePreviewRef.current,
+        imageCache: imageCacheRef.current,
       });
       // Live ink preview
       if (liveInkPoints && liveInkPoints.length > 1) {
@@ -200,6 +211,38 @@ function PageView({
       redrawAnnotations();
     }
   }, [redrawAnnotations, annotations, pageIndex]);
+
+  React.useEffect(() => {
+    // Image stamps load asynchronously; cache loaded HTMLImageElements per uri and redraw once
+    // each finishes (or fails) so the canvas reflects the loaded/missing image without re-fetching.
+    const uris = [
+      ...new Set(
+        annotations
+          .filter(
+            (a): a is StampAnnotation =>
+              a.page === pageIndex &&
+              a.type === 'stamp' &&
+              a.contentType === 'image' &&
+              !!a.imageUri
+          )
+          .map((a) => a.imageUri as string)
+      ),
+    ];
+    const missing = uris.filter((uri) => !imageCacheRef.current.has(uri));
+    if (missing.length === 0) return;
+    let remaining = missing.length;
+    for (const uri of missing) {
+      const img = new Image();
+      img.onload = () => {
+        imageCacheRef.current.set(uri, img);
+        if (--remaining === 0) redrawAnnotations();
+      };
+      img.onerror = () => {
+        if (--remaining === 0) redrawAnnotations();
+      };
+      img.src = uri;
+    }
+  }, [annotations, pageIndex, redrawAnnotations]);
 
   function getCanvasPoint(e: React.PointerEvent<HTMLCanvasElement>): { x: number; y: number } {
     const rect = (e.currentTarget as HTMLCanvasElement).getBoundingClientRect();
@@ -263,7 +306,13 @@ function PageView({
   }
 
   function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
-    if (!pointerDownRef.current && annotationMode !== 'text' && annotationMode !== 'eraser') return;
+    if (
+      !pointerDownRef.current &&
+      annotationMode !== 'text' &&
+      annotationMode !== 'eraser' &&
+      annotationMode !== 'stamp'
+    )
+      return;
     pointerDownRef.current = false;
     const pt = getCanvasPoint(e);
     const { scale, pdfHeight } = meta;
@@ -342,6 +391,26 @@ function PageView({
       const pdfPoint = canvasToPdf(pt.x, pt.y, scale, pdfHeight);
       const hit = hitTestAnnotation(pdfPoint, annotations, pageIndex);
       if (hit) onAnnotationRemoved(hit.id);
+    } else if (annotationMode === 'stamp') {
+      if (!stampContentType || (!stampEmoji && !stampImageUri)) return;
+      const pdfPoint = canvasToPdf(pt.x, pt.y, scale, pdfHeight);
+      const half = stampSize / 2;
+      onAnnotationAdded({
+        id: newAnnotationId(),
+        type: 'stamp',
+        page: pageIndex,
+        color: annotationColor,
+        bounds: {
+          x: pdfPoint.x - half,
+          y: pdfPoint.y - half,
+          width: stampSize,
+          height: stampSize,
+        },
+        contentType: stampContentType,
+        emoji: stampEmoji,
+        imageUri: stampImageUri,
+        createdAt: Date.now(),
+      });
     }
   }
 
@@ -398,6 +467,10 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
     annotationColor = '#FF0000',
     annotationLineWidth = 2,
     annotationFontFamily,
+    stampContentType,
+    stampEmoji,
+    stampImageUri,
+    stampSize = 48,
     onPageChanged,
     onLoadComplete,
     onError,
@@ -726,6 +799,10 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
                 annotationMode={annotationMode}
                 annotationColor={annotationColor}
                 annotationLineWidth={annotationLineWidth}
+                stampContentType={stampContentType}
+                stampEmoji={stampEmoji}
+                stampImageUri={stampImageUri}
+                stampSize={stampSize}
                 zoomLevel={zoomLevel}
                 onAnnotationAdded={handleAnnotationAdded}
                 onAnnotationRemoved={handleAnnotationRemoved}

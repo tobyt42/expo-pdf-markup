@@ -44,6 +44,22 @@ public class ExpoPdfMarkupModule: Module {
         view.annotationFontFamily = font
       }
 
+      Prop("stampContentType") { (view: ExpoPdfMarkupView, value: String?) in
+        view.stampContentType = value
+      }
+
+      Prop("stampEmoji") { (view: ExpoPdfMarkupView, value: String?) in
+        view.stampEmoji = value
+      }
+
+      Prop("stampImageUri") { (view: ExpoPdfMarkupView, value: String?) in
+        view.stampImageUri = value
+      }
+
+      Prop("stampSize") { (view: ExpoPdfMarkupView, value: Double?) in
+        view.stampSize = CGFloat(value ?? 48.0)
+      }
+
       Prop("useJsTextDialog") { (view: ExpoPdfMarkupView, use: Bool?) in
         view.useJsTextDialog = use ?? false
       }

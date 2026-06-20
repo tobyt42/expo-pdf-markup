@@ -1,6 +1,7 @@
 import { ExpoPdfMarkupView } from '@tobyt/expo-pdf-markup';
-import type { AnnotationMode, TextInputRequest } from '@tobyt/expo-pdf-markup';
-import { useRef, useState } from 'react';
+import type { AnnotationMode, StampDefinition, TextInputRequest } from '@tobyt/expo-pdf-markup';
+import { Asset } from 'expo-asset';
+import { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -10,6 +11,7 @@ const MODES: { label: string; mode: AnnotationMode }[] = [
   { label: 'Highlight', mode: 'highlight' },
   { label: 'Underline', mode: 'underline' },
   { label: 'Text', mode: 'text' },
+  { label: 'Stamp', mode: 'stamp' },
   { label: 'Move', mode: 'move' },
   { label: 'Eraser', mode: 'eraser' },
 ];
@@ -20,6 +22,15 @@ const COLORS = [
   { label: 'Yellow', value: '#FFFF00' },
   { label: 'Green', value: '#00CC00' },
 ];
+
+// Reference example of a consumer-defined stamp set (a Choir app would swap these for its own
+// choral-domain icons/emoji). `imageUri` for the image stamp is resolved at runtime below.
+const EMOJI_STAMPS: StampDefinition[] = [
+  { id: 'crescendo', label: 'Crescendo', contentType: 'emoji', emoji: '📈' },
+  { id: 'forte', label: 'Forte', contentType: 'emoji', emoji: '🔊' },
+  { id: 'star', label: 'Good Job', contentType: 'emoji', emoji: '⭐' },
+];
+const IMAGE_STAMP_ID = 'logo';
 
 type Props = {
   pdfPath: string | null;
@@ -50,6 +61,27 @@ export default function PdfScreen({
   const [textRequest, setTextRequest] = useState<TextInputRequest | null>(null);
   const [textInput, setTextInput] = useState('');
   const resolveRef = useRef<((text: string | null) => void) | null>(null);
+
+  const [stampImageUri, setStampImageUri] = useState<string | null>(null);
+  const [armedStamp, setArmedStamp] = useState<StampDefinition | null>(null);
+
+  useEffect(() => {
+    async function prepareStampImage() {
+      const asset = Asset.fromModule(require('../assets/stamp-demo.png'));
+      await asset.downloadAsync();
+      if (asset.localUri) {
+        setStampImageUri(asset.localUri.replace('file://', ''));
+      }
+    }
+    prepareStampImage();
+  }, []);
+
+  const stamps: StampDefinition[] = stampImageUri
+    ? [
+        ...EMOJI_STAMPS,
+        { id: IMAGE_STAMP_ID, label: 'Logo', contentType: 'image', imageUri: stampImageUri },
+      ]
+    : EMOJI_STAMPS;
 
   const handleTextInputRequested = (request: TextInputRequest): Promise<string | null> => {
     setTextRequest(request);
@@ -87,6 +119,10 @@ export default function PdfScreen({
           annotationColor={annotationColor}
           annotationLineWidth={3}
           annotationFontFamily="Montserrat-Regular"
+          stampContentType={armedStamp?.contentType}
+          stampEmoji={armedStamp?.emoji}
+          stampImageUri={armedStamp?.imageUri}
+          stampSize={48}
           onTextInputRequested={handleTextInputRequested}
           onLoadComplete={({ nativeEvent: { pageCount } }) =>
             console.log(`PDF loaded: ${pageCount} pages`)
@@ -114,6 +150,27 @@ export default function PdfScreen({
           ))}
         </ScrollView>
 
+        {annotationMode === 'stamp' && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.toolbarRow}>
+            {stamps.map((stamp) => (
+              <Pressable
+                key={stamp.id}
+                style={[styles.button, armedStamp?.id === stamp.id && styles.buttonActive]}
+                onPress={() => setArmedStamp(stamp)}
+              >
+                <Text
+                  style={[
+                    styles.buttonText,
+                    armedStamp?.id === stamp.id && styles.buttonTextActive,
+                  ]}
+                >
+                  {stamp.contentType === 'emoji' ? stamp.emoji : '🖼️'} {stamp.label}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
+
         <View style={styles.toolbarRow}>
           {COLORS.map(({ label, value }) => (
             <Pressable
@@ -129,14 +186,14 @@ export default function PdfScreen({
             </Pressable>
           ))}
 
-          <Pressable
-            style={[styles.button, styles.clearButton]}
-            onPress={onClearAnnotations}
-          >
+          <Pressable style={[styles.button, styles.clearButton]} onPress={onClearAnnotations}>
             <Text style={styles.buttonText}>Clear All</Text>
           </Pressable>
 
-          <Pressable style={[styles.button, styles.annotationsButton]} onPress={onNavigateToAnnotations}>
+          <Pressable
+            style={[styles.button, styles.annotationsButton]}
+            onPress={onNavigateToAnnotations}
+          >
             <Text style={styles.buttonText}>Annotations</Text>
           </Pressable>
         </View>

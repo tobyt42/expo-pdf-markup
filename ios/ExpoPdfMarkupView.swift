@@ -21,6 +21,10 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
   var annotationLineWidth: CGFloat = 2.0
   var annotationFontFamily: String?
   var useJsTextDialog: Bool = false
+  var stampContentType: String?
+  var stampEmoji: String?
+  var stampImageUri: String?
+  var stampSize: CGFloat = 48.0
 
   var inkOverlayView: InkOverlayView?
   var disabledPdfGestures: [UIGestureRecognizer] = []
@@ -30,6 +34,7 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
   var movePanGesture: UIPanGestureRecognizer?
   var editingOverlayLayer: CAShapeLayer?
   var textTapGesture: UITapGestureRecognizer?
+  var stampTapGesture: UITapGestureRecognizer?
   private var selectionObserver: NSObjectProtocol?
   private var selectionDebounceTimer: Timer?
   private var currentMarkupType: String?
@@ -209,6 +214,7 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
       removeEraserGesture()
       removeMoveMode()
       removeTextGesture()
+      removeStampGesture()
       removeSelectionObserver()
     }
 
@@ -223,6 +229,8 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
       setupSelectionObserver(markupType: mode)
     case "text":
       setupTextGesture()
+    case "stamp":
+      setupStampGesture()
     default:
       break
     }

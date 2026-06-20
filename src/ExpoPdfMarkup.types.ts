@@ -51,7 +51,35 @@ export type TextAnnotation = {
   createdAt?: number;
 };
 
-export type Annotation = InkAnnotation | HighlightAnnotation | UnderlineAnnotation | TextAnnotation;
+export type StampAnnotation = {
+  id: string;
+  type: 'stamp';
+  page: number;
+  /**
+   * Required for cross-platform JSON decode safety (a missing field on one annotation can fail
+   * decoding of the whole annotations array on iOS), but otherwise unused — stamp rendering does
+   * not apply a colour tint.
+   */
+  color: string;
+  bounds: AnnotationBounds;
+  contentType: 'emoji' | 'image';
+  /** A single emoji/glyph to render, when `contentType` is `'emoji'`. */
+  emoji?: string;
+  /**
+   * Local file path of the image to render, when `contentType` is `'image'`. Same convention as
+   * the `source` prop — resolve your own bundled/remote asset to a local URI (e.g. via
+   * `expo-asset`) before setting this. Image content is drawn with "contain" fit inside `bounds`.
+   */
+  imageUri?: string;
+  createdAt?: number;
+};
+
+export type Annotation =
+  | InkAnnotation
+  | HighlightAnnotation
+  | UnderlineAnnotation
+  | TextAnnotation
+  | StampAnnotation;
 
 export type AnnotationsData = {
   version: 1;
@@ -64,8 +92,22 @@ export type AnnotationMode =
   | 'highlight'
   | 'underline'
   | 'text'
+  | 'stamp'
   | 'eraser'
   | 'move';
+
+/**
+ * Recommended shape for describing a consumer-defined stamp set (e.g. domain-specific emoji or
+ * icons). Purely a convenience type for organizing your own stamp picker UI — never sent to
+ * native; extract `contentType`/`emoji`/`imageUri` to set as the `stamp*` props before placement.
+ */
+export type StampDefinition = {
+  id: string;
+  label: string;
+  contentType: 'emoji' | 'image';
+  emoji?: string;
+  imageUri?: string;
+};
 
 export type TextInputRequest = {
   mode: 'create' | 'edit';
@@ -96,6 +138,14 @@ export type ExpoPdfMarkupViewProps = {
    * - Web: CSS font family (`"Georgia, serif"`) or `undefined` for `sans-serif`
    */
   annotationFontFamily?: string;
+  /** Content type of the next stamp to place. Required (along with `stampEmoji`/`stampImageUri`) for the `'stamp'` tool to place anything on tap. */
+  stampContentType?: 'emoji' | 'image';
+  /** Emoji/glyph for the next stamp to place, when `stampContentType` is `'emoji'`. */
+  stampEmoji?: string;
+  /** Local file path for the next stamp to place, when `stampContentType` is `'image'`. */
+  stampImageUri?: string;
+  /** Side length, in PDF points, of the square bounding box for newly placed stamps. Defaults to 48. */
+  stampSize?: number;
   /** Fired when the visible page changes. */
   onPageChanged?: (event: {
     nativeEvent: { page: number; pageCount: number; pageWidth: number; pageHeight: number };

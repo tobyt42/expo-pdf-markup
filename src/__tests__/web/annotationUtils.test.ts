@@ -1,9 +1,11 @@
-import type { Annotation, AnnotationPoint } from '../../ExpoPdfMarkup.types';
+import type { Annotation, AnnotationPoint, StampAnnotation } from '../../ExpoPdfMarkup.types';
 import {
   clampAnnotationTranslation,
   canvasToPdf,
   canvasRectToPdfBounds,
+  computeContainFitRect,
   distanceToSegment,
+  drawAnnotationsOnCanvas,
   getAnnotationOutlineBounds,
   hitTestAnnotation,
   parseAnnotations,
@@ -161,6 +163,16 @@ const highlightAnnotation: Annotation = {
   bounds: { x: 50, y: 50, width: 100, height: 20 },
 };
 
+const stampAnnotation: StampAnnotation = {
+  id: 'st1',
+  type: 'stamp',
+  page: 0,
+  color: '#000000',
+  bounds: { x: 50, y: 50, width: 48, height: 48 },
+  contentType: 'emoji',
+  emoji: '⭐',
+};
+
 describe('hitTestAnnotation', () => {
   it('hits ink annotation within tolerance', () => {
     const result = hitTestAnnotation({ x: 50, y: 5 }, [inkAnnotation], 0);
@@ -198,6 +210,16 @@ describe('hitTestAnnotation', () => {
     const result = hitTestAnnotation({ x: 100, y: 60 }, [highlightAnnotation, hl2], 0);
     expect(result?.id).toBe('hl2');
   });
+
+  it('hits stamp annotation inside its bounds (generic bounds handling)', () => {
+    const result = hitTestAnnotation({ x: 60, y: 60 }, [stampAnnotation], 0);
+    expect(result?.id).toBe('st1');
+  });
+
+  it('misses stamp annotation outside its bounds', () => {
+    const result = hitTestAnnotation({ x: 200, y: 200 }, [stampAnnotation], 0);
+    expect(result).toBeNull();
+  });
 });
 
 describe('getAnnotationOutlineBounds', () => {
@@ -212,6 +234,10 @@ describe('getAnnotationOutlineBounds', () => {
       width: 120,
       height: 20,
     });
+  });
+
+  it('returns stored bounds for stamp annotations', () => {
+    expect(getAnnotationOutlineBounds(stampAnnotation)).toEqual(stampAnnotation.bounds);
   });
 });
 
@@ -230,6 +256,12 @@ describe('translateAnnotation', () => {
           { x: 105, y: 7 },
         ],
       ],
+    });
+  });
+
+  it('translates stamp annotations like other bounds-based annotations', () => {
+    expect(translateAnnotation(stampAnnotation, 12, -8)).toMatchObject({
+      bounds: { x: 62, y: 42, width: 48, height: 48 },
     });
   });
 });
@@ -283,5 +315,115 @@ describe('parseAnnotations', () => {
     const result = parseAnnotations(data);
     expect(result.annotations).toHaveLength(1);
     expect(result.annotations[0].color).toBe('#00FF00');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeContainFitRect
+// ---------------------------------------------------------------------------
+
+describe('computeContainFitRect', () => {
+  const square = { x: 0, y: 0, width: 100, height: 100 };
+
+  it('fits a square image exactly into a square box', () => {
+    expect(computeContainFitRect(50, 50, square)).toEqual({ x: 0, y: 0, width: 100, height: 100 });
+  });
+
+  it('letterboxes a wide image top/bottom within a square box', () => {
+    const result = computeContainFitRect(200, 100, square);
+    expect(result.width).toBe(100);
+    expect(result.height).toBe(50);
+    expect(result.x).toBe(0);
+    expect(result.y).toBe(25);
+  });
+
+  it('letterboxes a tall image left/right within a square box', () => {
+    const result = computeContainFitRect(100, 200, square);
+    expect(result.width).toBe(50);
+    expect(result.height).toBe(100);
+    expect(result.x).toBe(25);
+    expect(result.y).toBe(0);
+  });
+
+  it('returns destRect unchanged for zero-dimension input', () => {
+    expect(computeContainFitRect(0, 50, square)).toEqual(square);
+    expect(computeContainFitRect(50, 0, square)).toEqual(square);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// drawAnnotationsOnCanvas — stamp rendering
+// ---------------------------------------------------------------------------
+
+function createMockContext() {
+  return {
+    save: jest.fn(),
+    restore: jest.fn(),
+    beginPath: jest.fn(),
+    moveTo: jest.fn(),
+    lineTo: jest.fn(),
+    stroke: jest.fn(),
+    fillRect: jest.fn(),
+    fillText: jest.fn(),
+    drawImage: jest.fn(),
+    strokeRect: jest.fn(),
+    setLineDash: jest.fn(),
+    set strokeStyle(_v: string) {},
+    set fillStyle(_v: string) {},
+    set lineWidth(_v: number) {},
+    set lineCap(_v: string) {},
+    set lineJoin(_v: string) {},
+    set globalAlpha(_v: number) {},
+    set font(_v: string) {},
+    set textAlign(_v: string) {},
+    set textBaseline(_v: string) {},
+  } as unknown as CanvasRenderingContext2D;
+}
+
+describe('drawAnnotationsOnCanvas — stamp', () => {
+  const meta = { pdfWidth: 200, pdfHeight: 200, scale: 1, canvasWidth: 200, canvasHeight: 200 };
+
+  it('draws emoji stamps via fillText', () => {
+    const ctx = createMockContext();
+    drawAnnotationsOnCanvas(ctx, [stampAnnotation], 0, meta);
+    expect(ctx.fillText).toHaveBeenCalledWith(
+      stampAnnotation.emoji,
+      expect.any(Number),
+      expect.any(Number)
+    );
+  });
+
+  it('draws cached image stamps via drawImage with contain-fit geometry', () => {
+    const imageStamp: StampAnnotation = {
+      ...stampAnnotation,
+      id: 'st2',
+      contentType: 'image',
+      emoji: undefined,
+      imageUri: 'file:///stamp.png',
+    };
+    const img = { naturalWidth: 200, naturalHeight: 100 } as unknown as HTMLImageElement;
+    const ctx = createMockContext();
+    const imageCache = new Map([['file:///stamp.png', img]]);
+    drawAnnotationsOnCanvas(ctx, [imageStamp], 0, meta, { imageCache });
+    expect(ctx.drawImage).toHaveBeenCalledWith(
+      img,
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Number)
+    );
+  });
+
+  it('skips drawing an image stamp when not yet cached', () => {
+    const imageStamp: StampAnnotation = {
+      ...stampAnnotation,
+      id: 'st3',
+      contentType: 'image',
+      emoji: undefined,
+      imageUri: 'file:///missing.png',
+    };
+    const ctx = createMockContext();
+    drawAnnotationsOnCanvas(ctx, [imageStamp], 0, meta, { imageCache: new Map() });
+    expect(ctx.drawImage).not.toHaveBeenCalled();
   });
 });

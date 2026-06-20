@@ -110,6 +110,52 @@ class AnnotationSerializerTest {
         assertEquals(16f, a.fontSize)
     }
 
+    @Test
+    fun testStampEmojiRoundTrip() {
+        val model = AnnotationModel(
+            id = "st-1",
+            type = "stamp",
+            page = 0,
+            color = "#000000",
+            bounds = AnnotationBounds(10f, 20f, 48f, 48f),
+            contentType = "emoji",
+            emoji = "⭐"
+        )
+        val data = AnnotationsData(annotations = listOf(model))
+        val json = AnnotationSerializer.serialize(data)
+        val result = AnnotationSerializer.deserialize(json)
+
+        assertNotNull(result)
+        val a = result!!.annotations[0]
+        assertEquals("stamp", a.type)
+        assertEquals("emoji", a.contentType)
+        assertEquals("⭐", a.emoji)
+        assertNull(a.imageUri)
+        assertEquals(48f, a.bounds!!.width)
+    }
+
+    @Test
+    fun testStampImageRoundTrip() {
+        val model = AnnotationModel(
+            id = "st-2",
+            type = "stamp",
+            page = 0,
+            color = "#000000",
+            bounds = AnnotationBounds(10f, 20f, 48f, 48f),
+            contentType = "image",
+            imageUri = "/tmp/stamp.png"
+        )
+        val data = AnnotationsData(annotations = listOf(model))
+        val json = AnnotationSerializer.serialize(data)
+        val result = AnnotationSerializer.deserialize(json)
+
+        assertNotNull(result)
+        val a = result!!.annotations[0]
+        assertEquals("image", a.contentType)
+        assertEquals("/tmp/stamp.png", a.imageUri)
+        assertNull(a.emoji)
+    }
+
     // MARK: - Edge cases
 
     @Test

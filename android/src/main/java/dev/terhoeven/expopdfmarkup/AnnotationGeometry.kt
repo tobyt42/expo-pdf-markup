@@ -2,9 +2,33 @@ package dev.terhoeven.expopdfmarkup
 
 object AnnotationGeometry {
 
+    /**
+     * Scale a srcWidth/srcHeight rect to fit inside dest, preserving aspect ratio, centered.
+     * Deliberately uses the plain-Kotlin [AnnotationBounds] (not android.graphics.RectF) so this
+     * stays testable in pure JUnit without Robolectric.
+     */
+    fun containFitRect(
+        srcWidth: Float,
+        srcHeight: Float,
+        dest: AnnotationBounds
+    ): AnnotationBounds {
+        if (srcWidth <= 0f || srcHeight <= 0f || dest.width <= 0f || dest.height <= 0f) {
+            return dest
+        }
+        val scale = minOf(dest.width / srcWidth, dest.height / srcHeight)
+        val width = srcWidth * scale
+        val height = srcHeight * scale
+        return AnnotationBounds(
+            x = dest.x + (dest.width - width) / 2f,
+            y = dest.y + (dest.height - height) / 2f,
+            width = width,
+            height = height
+        )
+    }
+
     fun outlineBounds(annotation: AnnotationModel): AnnotationBounds? = when (annotation.type) {
         "ink" -> outlineBoundsForInk(annotation)
-        "highlight", "underline", "freeText", "text" -> annotation.bounds
+        "highlight", "underline", "freeText", "text", "stamp" -> annotation.bounds
         else -> null
     }
 
@@ -39,7 +63,7 @@ object AnnotationGeometry {
                         }
                 )
 
-            "highlight", "underline", "freeText", "text" -> {
+            "highlight", "underline", "freeText", "text", "stamp" -> {
                 val bounds = annotation.bounds ?: return annotation
                 annotation.copy(
                     bounds =

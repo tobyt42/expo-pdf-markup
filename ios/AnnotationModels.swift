@@ -45,6 +45,9 @@ struct AnnotationModel: Codable, Equatable {
   var fontSize: CGFloat?
   var fontFamily: String?
   var createdAt: Double?
+  var contentType: String?
+  var emoji: String?
+  var imageUri: String?
 
   var decodedPaths: [[AnnotationPoint]] {
     guard let paths else { return [] }
