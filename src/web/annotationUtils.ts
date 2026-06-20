@@ -327,6 +327,7 @@ export function drawAnnotationsOnCanvas(
         if (!bounds || !annotation.text) break;
         const rect = pdfBoundsToCanvas(bounds, scale, pdfHeight);
         ctx.save();
+        ctx.fillStyle = annotation.color;
         ctx.font = `${rect.height * 0.7}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';

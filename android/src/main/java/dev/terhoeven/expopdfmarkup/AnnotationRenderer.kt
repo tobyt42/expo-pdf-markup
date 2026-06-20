@@ -197,6 +197,7 @@ object AnnotationRenderer {
         val rect = RectF(left, top, right, bottom)
 
         val paint = Paint().apply {
+            color = AnnotationSerializer.colorFromHex(annotation.color)
             textSize = rect.height() * 0.7f
             textAlign = Paint.Align.CENTER
             isAntiAlias = true

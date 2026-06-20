@@ -321,6 +321,7 @@ describe('parseAnnotations', () => {
 // ---------------------------------------------------------------------------
 
 function createMockContext() {
+  let fillStyleValue = '';
   return {
     save: jest.fn(),
     restore: jest.fn(),
@@ -333,7 +334,12 @@ function createMockContext() {
     strokeRect: jest.fn(),
     setLineDash: jest.fn(),
     set strokeStyle(_v: string) {},
-    set fillStyle(_v: string) {},
+    set fillStyle(v: string) {
+      fillStyleValue = v;
+    },
+    get fillStyle() {
+      return fillStyleValue;
+    },
     set lineWidth(_v: number) {},
     set lineCap(_v: string) {},
     set lineJoin(_v: string) {},
@@ -355,5 +361,12 @@ describe('drawAnnotationsOnCanvas — stamp', () => {
       expect.any(Number),
       expect.any(Number)
     );
+  });
+
+  it('applies the annotation color to the text fill style', () => {
+    const ctx = createMockContext();
+    const redStamp: StampAnnotation = { ...stampAnnotation, color: '#FF0000' };
+    drawAnnotationsOnCanvas(ctx, [redStamp], 0, meta);
+    expect(ctx.fillStyle).toBe('#FF0000');
   });
 });

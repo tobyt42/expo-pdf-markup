@@ -3,9 +3,11 @@ import UIKit
 
 /// Renders a text glyph (e.g. an emoji, or a plain character like `"f"`) as a PDFKit annotation.
 /// Data (`text`) round-trips via `setValue(forAnnotationKey:)`, matching the `_id`/`_color`
-/// convention in `AnnotationSerializer`, so this subclass stays a pure rendering concern.
+/// convention in `AnnotationSerializer`, so this subclass stays a pure rendering concern. The
+/// `_color` key (already tagged by `tagAsModuleManaged`) is reused here as the glyph's fill color.
 final class StampPDFAnnotation: PDFAnnotation {
   private static let textKey = PDFAnnotationKey(rawValue: "_stampText")
+  private static let colorKey = PDFAnnotationKey(rawValue: "_color")
 
   private static var textImageCache: [String: CGImage] = [:]
 
@@ -26,7 +28,9 @@ final class StampPDFAnnotation: PDFAnnotation {
   }
 
   override func draw(with _: PDFDisplayBox, in context: CGContext) {
-    guard let text = stampText, let cgImage = Self.image(forText: text) else { return }
+    guard let text = stampText else { return }
+    let colorHex = (value(forAnnotationKey: Self.colorKey) as? String) ?? "#000000"
+    guard let cgImage = Self.image(forText: text, colorHex: colorHex) else { return }
 
     context.saveGState()
     // PDFKit hands draw(with:in:) a raw CGContext already in PDF page space (bottom-up). The
@@ -38,21 +42,23 @@ final class StampPDFAnnotation: PDFAnnotation {
     context.restoreGState()
   }
 
-  private static func image(forText text: String) -> CGImage? {
-    if let cached = textImageCache[text] {
+  private static func image(forText text: String, colorHex: String) -> CGImage? {
+    let cacheKey = "\(text)|\(colorHex)"
+    if let cached = textImageCache[cacheKey] {
       return cached
     }
+    let color = AnnotationSerializer.colorFromHex(colorHex) ?? .black
     let size = CGSize(width: 256, height: 256)
     let renderer = UIGraphicsImageRenderer(size: size)
     let rendered = renderer.image { _ in
       let font = UIFont.systemFont(ofSize: size.height * 0.8)
-      let attrs: [NSAttributedString.Key: Any] = [.font: font]
+      let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
       let textSize = (text as NSString).size(withAttributes: attrs)
       let origin = CGPoint(x: (size.width - textSize.width) / 2, y: (size.height - textSize.height) / 2)
       (text as NSString).draw(at: origin, withAttributes: attrs)
     }
     guard let cgImage = rendered.cgImage else { return nil }
-    textImageCache[text] = cgImage
+    textImageCache[cacheKey] = cgImage
     return cgImage
   }
 }
@@ -86,7 +92,7 @@ extension ExpoPdfMarkupView {
       id: UUID().uuidString,
       type: "stamp",
       page: 0,
-      color: "#000000",
+      color: annotationColor,
       createdAt: Date().timeIntervalSince1970
     )
     model.bounds = AnnotationBounds(

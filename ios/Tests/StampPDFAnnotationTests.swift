@@ -14,6 +14,21 @@ final class StampPDFAnnotationTests: XCTestCase {
     XCTAssertTrue(hasNonTransparentPixel(context: context, size: bounds.size))
   }
 
+  func testDrawAppliesAnnotationColor() throws {
+    let bounds = CGRect(x: 0, y: 0, width: 48, height: 48)
+    let annotation = StampPDFAnnotation(bounds: bounds, forType: .stamp, withProperties: nil)
+    annotation.setStampText("█")
+    annotation.setValue("#FF0000", forAnnotationKey: PDFAnnotationKey(rawValue: "_color"))
+
+    let context = try XCTUnwrap(makeContext(size: bounds.size))
+    annotation.draw(with: .mediaBox, in: context)
+
+    let pixel = try XCTUnwrap(centerPixel(context: context, size: bounds.size))
+    XCTAssertGreaterThan(pixel.r, 200)
+    XCTAssertLessThan(pixel.g, 50)
+    XCTAssertLessThan(pixel.b, 50)
+  }
+
   func testDrawWithoutTextDoesNothing() throws {
     let bounds = CGRect(x: 0, y: 0, width: 48, height: 48)
     let annotation = StampPDFAnnotation(bounds: bounds, forType: .stamp, withProperties: nil)
@@ -48,5 +63,15 @@ final class StampPDFAnnotationTests: XCTestCase {
       if alpha > 0 { return true }
     }
     return false
+  }
+
+  private func centerPixel(context: CGContext, size: CGSize) -> (r: UInt8, g: UInt8, b: UInt8)? {
+    guard let data = context.data else { return nil }
+    let width = Int(size.width)
+    let height = Int(size.height)
+    let byteCount = width * height * 4
+    let buffer = data.bindMemory(to: UInt8.self, capacity: byteCount)
+    let pixelIndex = ((height / 2) * width + width / 2) * 4
+    return (r: buffer[pixelIndex], g: buffer[pixelIndex + 1], b: buffer[pixelIndex + 2])
   }
 }

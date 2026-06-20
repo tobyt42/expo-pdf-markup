@@ -55,11 +55,7 @@ export type StampAnnotation = {
   id: string;
   type: 'stamp';
   page: number;
-  /**
-   * Required for cross-platform JSON decode safety (a missing field on one annotation can fail
-   * decoding of the whole annotations array on iOS), but otherwise unused — stamp rendering does
-   * not apply a colour tint.
-   */
+  /** Colour applied to the text glyph, as a CSS colour string (e.g. `'#FF0000'`). Has no visible effect on full-colour emoji. */
   color: string;
   bounds: AnnotationBounds;
   /** A glyph or short string to render (e.g. an emoji, or a plain character like `'f'`). */
