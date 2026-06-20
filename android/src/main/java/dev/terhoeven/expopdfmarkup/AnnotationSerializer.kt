@@ -79,7 +79,7 @@ object AnnotationSerializer {
             fontFamily = if (obj.has("fontFamily")) obj.getString("fontFamily") else null,
             createdAt = if (obj.has("createdAt")) obj.optDouble("createdAt") else null,
             contentType = if (obj.has("contentType")) obj.getString("contentType") else null,
-            emoji = if (obj.has("emoji")) obj.getString("emoji") else null,
+            text = if (obj.has("text")) obj.getString("text") else null,
             imageUri = if (obj.has("imageUri")) obj.getString("imageUri") else null
         )
     }
@@ -129,7 +129,7 @@ object AnnotationSerializer {
         model.fontFamily?.let { obj.put("fontFamily", it) }
         model.createdAt?.let { obj.put("createdAt", it) }
         model.contentType?.let { obj.put("contentType", it) }
-        model.emoji?.let { obj.put("emoji", it) }
+        model.text?.let { obj.put("text", it) }
         model.imageUri?.let { obj.put("imageUri", it) }
         return obj
     }

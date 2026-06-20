@@ -91,15 +91,15 @@ final class AnnotationSerializerTests: XCTestCase {
     XCTAssertEqual(try XCTUnwrap(annotation).bounds.maxY, originalBounds.cgRect.maxY, accuracy: 0.01)
   }
 
-  func testCreateStampAnnotationWithEmoji() throws {
+  func testCreateStampAnnotationWithText() throws {
     let model = AnnotationModel(
       id: "st-1",
       type: "stamp",
       page: 0,
       color: "#000000",
       bounds: AnnotationBounds(x: 10, y: 20, width: 48, height: 48),
-      contentType: "emoji",
-      emoji: "⭐"
+      contentType: "text",
+      text: "⭐"
     )
 
     let annotation = AnnotationSerializer.toPDFAnnotation(model)
@@ -132,8 +132,8 @@ final class AnnotationSerializerTests: XCTestCase {
       type: "stamp",
       page: 0,
       color: "#000000",
-      contentType: "emoji",
-      emoji: "⭐"
+      contentType: "text",
+      text: "⭐"
     )
 
     let annotation = AnnotationSerializer.toPDFAnnotation(model)
@@ -216,8 +216,8 @@ final class AnnotationSerializerTests: XCTestCase {
       page: 0,
       color: "#123456",
       bounds: AnnotationBounds(x: 10, y: 20, width: 48, height: 48),
-      contentType: "emoji",
-      emoji: "⭐"
+      contentType: "text",
+      text: "⭐"
     )
 
     let pdfAnnotation = try XCTUnwrap(AnnotationSerializer.toPDFAnnotation(model))
@@ -225,8 +225,8 @@ final class AnnotationSerializerTests: XCTestCase {
 
     let result = try XCTUnwrap(extracted)
     XCTAssertEqual(result.type, "stamp")
-    XCTAssertEqual(result.contentType, "emoji")
-    XCTAssertEqual(result.emoji, "⭐")
+    XCTAssertEqual(result.contentType, "text")
+    XCTAssertEqual(result.text, "⭐")
     XCTAssertNil(result.imageUri)
     XCTAssertEqual(result.color, "#123456")
     XCTAssertEqual(result.bounds?.cgRect, CGRect(x: 10, y: 20, width: 48, height: 48))

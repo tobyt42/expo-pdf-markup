@@ -3,11 +3,11 @@ import PDFKit
 import XCTest
 
 final class StampPDFAnnotationTests: XCTestCase {
-  func testDrawWithEmojiContentDoesNotThrowAndPaintsPixels() throws {
+  func testDrawWithTextContentDoesNotThrowAndPaintsPixels() throws {
     let bounds = CGRect(x: 0, y: 0, width: 48, height: 48)
     let annotation = StampPDFAnnotation(bounds: bounds, forType: .stamp, withProperties: nil)
-    annotation.setStampContentType("emoji")
-    annotation.setStampEmoji("⭐")
+    annotation.setStampContentType("text")
+    annotation.setStampText("⭐")
 
     let context = try XCTUnwrap(makeContext(size: bounds.size))
     annotation.draw(with: .mediaBox, in: context)

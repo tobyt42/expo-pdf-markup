@@ -202,8 +202,8 @@ object AnnotationRenderer {
         val rect = RectF(left, top, right, bottom)
 
         when (annotation.contentType) {
-            "emoji" -> {
-                val emoji = annotation.emoji ?: return
+            "text" -> {
+                val text = annotation.text ?: return
                 val paint = Paint().apply {
                     textSize = rect.height() * 0.7f
                     textAlign = Paint.Align.CENTER
@@ -212,7 +212,7 @@ object AnnotationRenderer {
                 // Paint has no built-in middle-baseline; offset by (ascent + descent) / 2 to
                 // vertically center the glyph within rect.
                 val baselineY = rect.centerY() - (paint.descent() + paint.ascent()) / 2f
-                canvas.drawText(emoji, rect.centerX(), baselineY, paint)
+                canvas.drawText(text, rect.centerX(), baselineY, paint)
             }
 
             "image" -> {

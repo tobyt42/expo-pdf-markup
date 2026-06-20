@@ -62,9 +62,9 @@ export type StampAnnotation = {
    */
   color: string;
   bounds: AnnotationBounds;
-  contentType: 'emoji' | 'image';
-  /** A single emoji/glyph to render, when `contentType` is `'emoji'`. */
-  emoji?: string;
+  contentType: 'text' | 'image';
+  /** A glyph or short string to render (e.g. an emoji, or a plain character like `'f'`), when `contentType` is `'text'`. */
+  text?: string;
   /**
    * Local file path of the image to render, when `contentType` is `'image'`. Same convention as
    * the `source` prop — resolve your own bundled/remote asset to a local URI (e.g. via
@@ -97,15 +97,15 @@ export type AnnotationMode =
   | 'move';
 
 /**
- * Recommended shape for describing a consumer-defined stamp set (e.g. domain-specific emoji or
+ * Recommended shape for describing a consumer-defined stamp set (e.g. domain-specific glyphs or
  * icons). Purely a convenience type for organizing your own stamp picker UI — never sent to
- * native; extract `contentType`/`emoji`/`imageUri` to set as the `stamp*` props before placement.
+ * native; extract `contentType`/`text`/`imageUri` to set as the `stamp*` props before placement.
  */
 export type StampDefinition = {
   id: string;
   label: string;
-  contentType: 'emoji' | 'image';
-  emoji?: string;
+  contentType: 'text' | 'image';
+  text?: string;
   imageUri?: string;
 };
 
@@ -138,10 +138,10 @@ export type ExpoPdfMarkupViewProps = {
    * - Web: CSS font family (`"Georgia, serif"`) or `undefined` for `sans-serif`
    */
   annotationFontFamily?: string;
-  /** Content type of the next stamp to place. Required (along with `stampEmoji`/`stampImageUri`) for the `'stamp'` tool to place anything on tap. */
-  stampContentType?: 'emoji' | 'image';
-  /** Emoji/glyph for the next stamp to place, when `stampContentType` is `'emoji'`. */
-  stampEmoji?: string;
+  /** Content type of the next stamp to place. Required (along with `stampText`/`stampImageUri`) for the `'stamp'` tool to place anything on tap. */
+  stampContentType?: 'text' | 'image';
+  /** Glyph or short string for the next stamp to place, when `stampContentType` is `'text'`. */
+  stampText?: string;
   /** Local file path for the next stamp to place, when `stampContentType` is `'image'`. */
   stampImageUri?: string;
   /** Side length, in PDF points, of the square bounding box for newly placed stamps. Defaults to 48. */

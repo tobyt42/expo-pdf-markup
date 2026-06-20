@@ -56,8 +56,8 @@ type PageViewProps = {
   annotationMode: AnnotationMode;
   annotationColor: string;
   annotationLineWidth: number;
-  stampContentType?: 'emoji' | 'image';
-  stampEmoji?: string;
+  stampContentType?: 'text' | 'image';
+  stampText?: string;
   stampImageUri?: string;
   stampSize: number;
   zoomLevel: number;
@@ -80,7 +80,7 @@ function PageView({
   annotationColor,
   annotationLineWidth,
   stampContentType,
-  stampEmoji,
+  stampText,
   stampImageUri,
   stampSize,
   zoomLevel,
@@ -392,7 +392,7 @@ function PageView({
       const hit = hitTestAnnotation(pdfPoint, annotations, pageIndex);
       if (hit) onAnnotationRemoved(hit.id);
     } else if (annotationMode === 'stamp') {
-      if (!stampContentType || (!stampEmoji && !stampImageUri)) return;
+      if (!stampContentType || (!stampText && !stampImageUri)) return;
       const pdfPoint = canvasToPdf(pt.x, pt.y, scale, pdfHeight);
       const half = stampSize / 2;
       onAnnotationAdded({
@@ -407,7 +407,7 @@ function PageView({
           height: stampSize,
         },
         contentType: stampContentType,
-        emoji: stampEmoji,
+        text: stampText,
         imageUri: stampImageUri,
         createdAt: Date.now(),
       });
@@ -416,7 +416,13 @@ function PageView({
 
   const pointerEvents = annotationMode === 'none' ? 'none' : 'auto';
   const cursor =
-    annotationMode === 'move' ? 'grab' : annotationMode === 'eraser' ? 'not-allowed' : 'crosshair';
+    annotationMode === 'move'
+      ? 'grab'
+      : annotationMode === 'eraser'
+      ? 'not-allowed'
+      : annotationMode === 'stamp'
+      ? 'copy'
+      : 'crosshair';
 
   return (
     <div
@@ -468,7 +474,7 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
     annotationLineWidth = 2,
     annotationFontFamily,
     stampContentType,
-    stampEmoji,
+    stampText,
     stampImageUri,
     stampSize = 48,
     onPageChanged,
@@ -800,7 +806,7 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
                 annotationColor={annotationColor}
                 annotationLineWidth={annotationLineWidth}
                 stampContentType={stampContentType}
-                stampEmoji={stampEmoji}
+                stampText={stampText}
                 stampImageUri={stampImageUri}
                 stampSize={stampSize}
                 zoomLevel={zoomLevel}

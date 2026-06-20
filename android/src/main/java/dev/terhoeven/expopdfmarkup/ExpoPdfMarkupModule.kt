@@ -88,8 +88,8 @@ class ExpoPdfMarkupModule : Module() {
                 view.setStampContentType(value)
             }
 
-            Prop("stampEmoji") { view: ExpoPdfMarkupView, value: String? ->
-                view.setStampEmoji(value)
+            Prop("stampText") { view: ExpoPdfMarkupView, value: String? ->
+                view.setStampText(value)
             }
 
             Prop("stampImageUri") { view: ExpoPdfMarkupView, value: String? ->

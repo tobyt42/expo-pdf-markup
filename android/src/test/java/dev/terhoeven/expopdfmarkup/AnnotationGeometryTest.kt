@@ -86,8 +86,8 @@ class AnnotationGeometryTest {
             page = 0,
             color = "#000000",
             bounds = AnnotationBounds(10f, 20f, 48f, 48f),
-            contentType = "emoji",
-            emoji = "⭐"
+            contentType = "text",
+            text = "⭐"
         )
 
         val result = AnnotationGeometry.outlineBounds(annotation)
@@ -106,8 +106,8 @@ class AnnotationGeometryTest {
             page = 0,
             color = "#000000",
             bounds = AnnotationBounds(10f, 20f, 48f, 48f),
-            contentType = "emoji",
-            emoji = "⭐"
+            contentType = "text",
+            text = "⭐"
         )
 
         val result = AnnotationGeometry.translate(annotation, 5f, 7f)

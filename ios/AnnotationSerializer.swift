@@ -118,7 +118,7 @@ enum AnnotationSerializer {
       model.bounds = AnnotationBounds(annotation.bounds)
       if let stamp = annotation as? StampPDFAnnotation {
         model.contentType = stamp.stampContentType
-        model.emoji = stamp.stampEmoji
+        model.text = stamp.stampText
         model.imageUri = stamp.stampImageUri
       }
     default:
@@ -275,8 +275,8 @@ enum AnnotationSerializer {
 
     let annotation = StampPDFAnnotation(bounds: bounds.cgRect, forType: .stamp, withProperties: nil)
     annotation.setStampContentType(contentType)
-    if let emoji = model.emoji {
-      annotation.setStampEmoji(emoji)
+    if let text = model.text {
+      annotation.setStampText(text)
     }
     if let imageUri = model.imageUri {
       annotation.setStampImageUri(imageUri)

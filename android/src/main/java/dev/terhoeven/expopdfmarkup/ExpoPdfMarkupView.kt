@@ -139,8 +139,8 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
         pdfView.stampContentType = value
     }
 
-    fun setStampEmoji(value: String?) {
-        pdfView.stampEmoji = value
+    fun setStampText(value: String?) {
+        pdfView.stampText = value
     }
 
     fun setStampImageUri(value: String?) {

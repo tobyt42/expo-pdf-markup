@@ -22,7 +22,7 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
   var annotationFontFamily: String?
   var useJsTextDialog: Bool = false
   var stampContentType: String?
-  var stampEmoji: String?
+  var stampText: String?
   var stampImageUri: String?
   var stampSize: CGFloat = 48.0
 

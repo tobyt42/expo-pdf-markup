@@ -23,12 +23,13 @@ const COLORS = [
   { label: 'Green', value: '#00CC00' },
 ];
 
-// Reference example of a consumer-defined stamp set (a Choir app would swap these for its own
-// choral-domain icons/emoji). `imageUri` for the image stamp is resolved at runtime below.
-const EMOJI_STAMPS: StampDefinition[] = [
-  { id: 'crescendo', label: 'Crescendo', contentType: 'emoji', emoji: '📈' },
-  { id: 'forte', label: 'Forte', contentType: 'emoji', emoji: '🔊' },
-  { id: 'star', label: 'Good Job', contentType: 'emoji', emoji: '⭐' },
+// Reference example of a consumer-defined stamp set — choral rehearsal marks, the kind a Choir
+// app would swap in for its own domain. `imageUri` for the image stamp is resolved at runtime below.
+const TEXT_STAMPS: StampDefinition[] = [
+  { id: 'breath', label: 'Breath Mark', contentType: 'text', text: '’' },
+  { id: 'note', label: 'Note', contentType: 'text', text: '♪' },
+  { id: 'forte', label: 'Forte', contentType: 'text', text: 'f' },
+  { id: 'crescendo', label: 'Crescendo', contentType: 'text', text: '<' },
 ];
 const IMAGE_STAMP_ID = 'logo';
 
@@ -78,10 +79,10 @@ export default function PdfScreen({
 
   const stamps: StampDefinition[] = stampImageUri
     ? [
-        ...EMOJI_STAMPS,
+        ...TEXT_STAMPS,
         { id: IMAGE_STAMP_ID, label: 'Logo', contentType: 'image', imageUri: stampImageUri },
       ]
-    : EMOJI_STAMPS;
+    : TEXT_STAMPS;
 
   const handleTextInputRequested = (request: TextInputRequest): Promise<string | null> => {
     setTextRequest(request);
@@ -120,7 +121,7 @@ export default function PdfScreen({
           annotationLineWidth={3}
           annotationFontFamily="Montserrat-Regular"
           stampContentType={armedStamp?.contentType}
-          stampEmoji={armedStamp?.emoji}
+          stampText={armedStamp?.text}
           stampImageUri={armedStamp?.imageUri}
           stampSize={48}
           onTextInputRequested={handleTextInputRequested}
@@ -164,7 +165,7 @@ export default function PdfScreen({
                     armedStamp?.id === stamp.id && styles.buttonTextActive,
                   ]}
                 >
-                  {stamp.contentType === 'emoji' ? stamp.emoji : '🖼️'} {stamp.label}
+                  {stamp.contentType === 'text' ? stamp.text : '🖼️'} {stamp.label}
                 </Text>
               </Pressable>
             ))}

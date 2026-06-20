@@ -93,8 +93,8 @@ it('annotation discriminated union compiles correctly', () => {
     page: 0,
     color: '#000000',
     bounds: { x: 0, y: 0, width: 48, height: 48 },
-    contentType: 'emoji',
-    emoji: '⭐',
+    contentType: 'text',
+    text: '⭐',
   };
 
   const annotations: Annotation[] = [ink, highlight, underline, text, stamp];

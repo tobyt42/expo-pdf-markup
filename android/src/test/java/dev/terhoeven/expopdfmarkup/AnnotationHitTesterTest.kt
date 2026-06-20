@@ -101,8 +101,8 @@ class AnnotationHitTesterTest {
             page = 0,
             color = "#000000",
             bounds = AnnotationBounds(100f, 200f, 48f, 48f),
-            contentType = "emoji",
-            emoji = "⭐"
+            contentType = "text",
+            text = "⭐"
         )
         val result = AnnotationHitTester.hitTest(AnnotationPoint(120f, 220f), listOf(stamp), 0)
         assertNotNull(result)
@@ -117,8 +117,8 @@ class AnnotationHitTesterTest {
             page = 0,
             color = "#000000",
             bounds = AnnotationBounds(100f, 200f, 48f, 48f),
-            contentType = "emoji",
-            emoji = "⭐"
+            contentType = "text",
+            text = "⭐"
         )
         val result = AnnotationHitTester.hitTest(AnnotationPoint(0f, 0f), listOf(stamp), 0)
         assertNull(result)

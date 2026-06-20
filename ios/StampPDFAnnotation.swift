@@ -1,15 +1,16 @@
 import PDFKit
 import UIKit
 
-/// Renders an emoji glyph or a local image file as a PDFKit annotation. Data (`contentType`,
-/// `emoji`, `imageUri`) round-trips via `setValue(forAnnotationKey:)`, matching the `_id`/`_color`
-/// convention in `AnnotationSerializer`, so this subclass stays a pure rendering concern.
+/// Renders a text glyph (e.g. an emoji, or a plain character like `"f"`) or a local image file as
+/// a PDFKit annotation. Data (`contentType`, `text`, `imageUri`) round-trips via
+/// `setValue(forAnnotationKey:)`, matching the `_id`/`_color` convention in `AnnotationSerializer`,
+/// so this subclass stays a pure rendering concern.
 final class StampPDFAnnotation: PDFAnnotation {
   private static let contentTypeKey = PDFAnnotationKey(rawValue: "_stampContentType")
-  private static let emojiKey = PDFAnnotationKey(rawValue: "_stampEmoji")
+  private static let textKey = PDFAnnotationKey(rawValue: "_stampText")
   private static let imageUriKey = PDFAnnotationKey(rawValue: "_stampImageUri")
 
-  private static var emojiImageCache: [String: CGImage] = [:]
+  private static var textImageCache: [String: CGImage] = [:]
   private static var fileImageCache: [String: CGImage] = [:]
   private static var failedFilePaths: Set<String> = []
 
@@ -25,8 +26,8 @@ final class StampPDFAnnotation: PDFAnnotation {
     setValue(contentType, forAnnotationKey: Self.contentTypeKey)
   }
 
-  func setStampEmoji(_ emoji: String) {
-    setValue(emoji, forAnnotationKey: Self.emojiKey)
+  func setStampText(_ text: String) {
+    setValue(text, forAnnotationKey: Self.textKey)
   }
 
   func setStampImageUri(_ uri: String) {
@@ -37,8 +38,8 @@ final class StampPDFAnnotation: PDFAnnotation {
     value(forAnnotationKey: Self.contentTypeKey) as? String
   }
 
-  var stampEmoji: String? {
-    value(forAnnotationKey: Self.emojiKey) as? String
+  var stampText: String? {
+    value(forAnnotationKey: Self.textKey) as? String
   }
 
   var stampImageUri: String? {
@@ -60,9 +61,9 @@ final class StampPDFAnnotation: PDFAnnotation {
 
   private func resolveImage() -> CGImage? {
     switch stampContentType {
-    case "emoji":
-      guard let emoji = stampEmoji else { return nil }
-      return Self.image(forEmoji: emoji)
+    case "text":
+      guard let text = stampText else { return nil }
+      return Self.image(forText: text)
     case "image":
       guard let uri = stampImageUri else { return nil }
       return Self.image(contentsOfFile: uri)
@@ -71,8 +72,8 @@ final class StampPDFAnnotation: PDFAnnotation {
     }
   }
 
-  private static func image(forEmoji emoji: String) -> CGImage? {
-    if let cached = emojiImageCache[emoji] {
+  private static func image(forText text: String) -> CGImage? {
+    if let cached = textImageCache[text] {
       return cached
     }
     let size = CGSize(width: 256, height: 256)
@@ -80,12 +81,12 @@ final class StampPDFAnnotation: PDFAnnotation {
     let rendered = renderer.image { _ in
       let font = UIFont.systemFont(ofSize: size.height * 0.8)
       let attrs: [NSAttributedString.Key: Any] = [.font: font]
-      let textSize = (emoji as NSString).size(withAttributes: attrs)
+      let textSize = (text as NSString).size(withAttributes: attrs)
       let origin = CGPoint(x: (size.width - textSize.width) / 2, y: (size.height - textSize.height) / 2)
-      (emoji as NSString).draw(at: origin, withAttributes: attrs)
+      (text as NSString).draw(at: origin, withAttributes: attrs)
     }
     guard let cgImage = rendered.cgImage else { return nil }
-    emojiImageCache[emoji] = cgImage
+    textImageCache[text] = cgImage
     return cgImage
   }
 
@@ -124,7 +125,7 @@ extension ExpoPdfMarkupView {
   }
 
   @objc func handleStampTap(_ gesture: UITapGestureRecognizer) {
-    guard let contentType = stampContentType, stampEmoji != nil || stampImageUri != nil else { return }
+    guard let contentType = stampContentType, stampText != nil || stampImageUri != nil else { return }
     let location = gesture.location(in: pdfView)
     guard let page = pdfView.page(for: location, nearest: true) else { return }
     let pdfPoint = pdfView.convert(location, to: page)
@@ -141,7 +142,7 @@ extension ExpoPdfMarkupView {
       CGRect(x: pdfPoint.x - half, y: pdfPoint.y - half, width: stampSize, height: stampSize)
     )
     model.contentType = contentType
-    model.emoji = stampEmoji
+    model.text = stampText
     model.imageUri = stampImageUri
 
     guard let annotation = AnnotationSerializer.toPDFAnnotation(model) else { return }

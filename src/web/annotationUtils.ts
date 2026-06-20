@@ -351,12 +351,12 @@ export function drawAnnotationsOnCanvas(
         const bounds = annotation.bounds;
         if (!bounds) break;
         const rect = pdfBoundsToCanvas(bounds, scale, pdfHeight);
-        if (annotation.contentType === 'emoji' && annotation.emoji) {
+        if (annotation.contentType === 'text' && annotation.text) {
           ctx.save();
           ctx.font = `${rect.height * 0.7}px sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(annotation.emoji, rect.x + rect.width / 2, rect.y + rect.height / 2);
+          ctx.fillText(annotation.text, rect.x + rect.width / 2, rect.y + rect.height / 2);
           ctx.restore();
         } else if (annotation.contentType === 'image' && annotation.imageUri) {
           const img = options.imageCache?.get(annotation.imageUri);

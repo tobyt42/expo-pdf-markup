@@ -21,7 +21,7 @@ data class AnnotationModel(
     val fontFamily: String? = null,
     val createdAt: Double? = null,
     val contentType: String? = null,
-    val emoji: String? = null,
+    val text: String? = null,
     val imageUri: String? = null
 )
 

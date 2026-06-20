@@ -169,8 +169,8 @@ const stampAnnotation: StampAnnotation = {
   page: 0,
   color: '#000000',
   bounds: { x: 50, y: 50, width: 48, height: 48 },
-  contentType: 'emoji',
-  emoji: '⭐',
+  contentType: 'text',
+  text: '⭐',
 };
 
 describe('hitTestAnnotation', () => {
@@ -383,11 +383,11 @@ function createMockContext() {
 describe('drawAnnotationsOnCanvas — stamp', () => {
   const meta = { pdfWidth: 200, pdfHeight: 200, scale: 1, canvasWidth: 200, canvasHeight: 200 };
 
-  it('draws emoji stamps via fillText', () => {
+  it('draws text stamps via fillText', () => {
     const ctx = createMockContext();
     drawAnnotationsOnCanvas(ctx, [stampAnnotation], 0, meta);
     expect(ctx.fillText).toHaveBeenCalledWith(
-      stampAnnotation.emoji,
+      stampAnnotation.text,
       expect.any(Number),
       expect.any(Number)
     );
@@ -398,7 +398,7 @@ describe('drawAnnotationsOnCanvas — stamp', () => {
       ...stampAnnotation,
       id: 'st2',
       contentType: 'image',
-      emoji: undefined,
+      text: undefined,
       imageUri: 'file:///stamp.png',
     };
     const img = { naturalWidth: 200, naturalHeight: 100 } as unknown as HTMLImageElement;
@@ -419,7 +419,7 @@ describe('drawAnnotationsOnCanvas — stamp', () => {
       ...stampAnnotation,
       id: 'st3',
       contentType: 'image',
-      emoji: undefined,
+      text: undefined,
       imageUri: 'file:///missing.png',
     };
     const ctx = createMockContext();

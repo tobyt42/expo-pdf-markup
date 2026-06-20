@@ -46,7 +46,7 @@ struct AnnotationModel: Codable, Equatable {
   var fontFamily: String?
   var createdAt: Double?
   var contentType: String?
-  var emoji: String?
+  var text: String?
   var imageUri: String?
 
   var decodedPaths: [[AnnotationPoint]] {
