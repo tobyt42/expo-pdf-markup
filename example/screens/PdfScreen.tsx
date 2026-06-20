@@ -1,7 +1,6 @@
 import { ExpoPdfMarkupView } from '@tobyt/expo-pdf-markup';
 import type { AnnotationMode, StampDefinition, TextInputRequest } from '@tobyt/expo-pdf-markup';
-import { Asset } from 'expo-asset';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -24,14 +23,13 @@ const COLORS = [
 ];
 
 // Reference example of a consumer-defined stamp set — choral rehearsal marks, the kind a Choir
-// app would swap in for its own domain. `imageUri` for the image stamp is resolved at runtime below.
-const TEXT_STAMPS: StampDefinition[] = [
-  { id: 'breath', label: 'Breath Mark', contentType: 'text', text: '’' },
-  { id: 'note', label: 'Note', contentType: 'text', text: '♪' },
-  { id: 'forte', label: 'Forte', contentType: 'text', text: 'f' },
-  { id: 'crescendo', label: 'Crescendo', contentType: 'text', text: '<' },
+// app would swap in for its own domain.
+const STAMPS: StampDefinition[] = [
+  { id: 'breath', label: 'Breath Mark', text: '’' },
+  { id: 'note', label: 'Note', text: '♪' },
+  { id: 'forte', label: 'Forte', text: 'f' },
+  { id: 'crescendo', label: 'Crescendo', text: '<' },
 ];
-const IMAGE_STAMP_ID = 'logo';
 
 type Props = {
   pdfPath: string | null;
@@ -63,26 +61,7 @@ export default function PdfScreen({
   const [textInput, setTextInput] = useState('');
   const resolveRef = useRef<((text: string | null) => void) | null>(null);
 
-  const [stampImageUri, setStampImageUri] = useState<string | null>(null);
   const [armedStamp, setArmedStamp] = useState<StampDefinition | null>(null);
-
-  useEffect(() => {
-    async function prepareStampImage() {
-      const asset = Asset.fromModule(require('../assets/stamp-demo.png'));
-      await asset.downloadAsync();
-      if (asset.localUri) {
-        setStampImageUri(asset.localUri.replace('file://', ''));
-      }
-    }
-    prepareStampImage();
-  }, []);
-
-  const stamps: StampDefinition[] = stampImageUri
-    ? [
-        ...TEXT_STAMPS,
-        { id: IMAGE_STAMP_ID, label: 'Logo', contentType: 'image', imageUri: stampImageUri },
-      ]
-    : TEXT_STAMPS;
 
   const handleTextInputRequested = (request: TextInputRequest): Promise<string | null> => {
     setTextRequest(request);
@@ -120,9 +99,7 @@ export default function PdfScreen({
           annotationColor={annotationColor}
           annotationLineWidth={3}
           annotationFontFamily="Montserrat-Regular"
-          stampContentType={armedStamp?.contentType}
           stampText={armedStamp?.text}
-          stampImageUri={armedStamp?.imageUri}
           stampSize={48}
           onTextInputRequested={handleTextInputRequested}
           onLoadComplete={({ nativeEvent: { pageCount } }) =>
@@ -153,7 +130,7 @@ export default function PdfScreen({
 
         {annotationMode === 'stamp' && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.toolbarRow}>
-            {stamps.map((stamp) => (
+            {STAMPS.map((stamp) => (
               <Pressable
                 key={stamp.id}
                 style={[styles.button, armedStamp?.id === stamp.id && styles.buttonActive]}
@@ -165,7 +142,7 @@ export default function PdfScreen({
                     armedStamp?.id === stamp.id && styles.buttonTextActive,
                   ]}
                 >
-                  {stamp.contentType === 'text' ? stamp.text : '🖼️'} {stamp.label}
+                  {stamp.text} {stamp.label}
                 </Text>
               </Pressable>
             ))}

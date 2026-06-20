@@ -3,7 +3,6 @@ import {
   clampAnnotationTranslation,
   canvasToPdf,
   canvasRectToPdfBounds,
-  computeContainFitRect,
   distanceToSegment,
   drawAnnotationsOnCanvas,
   getAnnotationOutlineBounds,
@@ -169,7 +168,6 @@ const stampAnnotation: StampAnnotation = {
   page: 0,
   color: '#000000',
   bounds: { x: 50, y: 50, width: 48, height: 48 },
-  contentType: 'text',
   text: '⭐',
 };
 
@@ -319,39 +317,6 @@ describe('parseAnnotations', () => {
 });
 
 // ---------------------------------------------------------------------------
-// computeContainFitRect
-// ---------------------------------------------------------------------------
-
-describe('computeContainFitRect', () => {
-  const square = { x: 0, y: 0, width: 100, height: 100 };
-
-  it('fits a square image exactly into a square box', () => {
-    expect(computeContainFitRect(50, 50, square)).toEqual({ x: 0, y: 0, width: 100, height: 100 });
-  });
-
-  it('letterboxes a wide image top/bottom within a square box', () => {
-    const result = computeContainFitRect(200, 100, square);
-    expect(result.width).toBe(100);
-    expect(result.height).toBe(50);
-    expect(result.x).toBe(0);
-    expect(result.y).toBe(25);
-  });
-
-  it('letterboxes a tall image left/right within a square box', () => {
-    const result = computeContainFitRect(100, 200, square);
-    expect(result.width).toBe(50);
-    expect(result.height).toBe(100);
-    expect(result.x).toBe(25);
-    expect(result.y).toBe(0);
-  });
-
-  it('returns destRect unchanged for zero-dimension input', () => {
-    expect(computeContainFitRect(0, 50, square)).toEqual(square);
-    expect(computeContainFitRect(50, 0, square)).toEqual(square);
-  });
-});
-
-// ---------------------------------------------------------------------------
 // drawAnnotationsOnCanvas — stamp rendering
 // ---------------------------------------------------------------------------
 
@@ -365,7 +330,6 @@ function createMockContext() {
     stroke: jest.fn(),
     fillRect: jest.fn(),
     fillText: jest.fn(),
-    drawImage: jest.fn(),
     strokeRect: jest.fn(),
     setLineDash: jest.fn(),
     set strokeStyle(_v: string) {},
@@ -391,39 +355,5 @@ describe('drawAnnotationsOnCanvas — stamp', () => {
       expect.any(Number),
       expect.any(Number)
     );
-  });
-
-  it('draws cached image stamps via drawImage with contain-fit geometry', () => {
-    const imageStamp: StampAnnotation = {
-      ...stampAnnotation,
-      id: 'st2',
-      contentType: 'image',
-      text: undefined,
-      imageUri: 'file:///stamp.png',
-    };
-    const img = { naturalWidth: 200, naturalHeight: 100 } as unknown as HTMLImageElement;
-    const ctx = createMockContext();
-    const imageCache = new Map([['file:///stamp.png', img]]);
-    drawAnnotationsOnCanvas(ctx, [imageStamp], 0, meta, { imageCache });
-    expect(ctx.drawImage).toHaveBeenCalledWith(
-      img,
-      expect.any(Number),
-      expect.any(Number),
-      expect.any(Number),
-      expect.any(Number)
-    );
-  });
-
-  it('skips drawing an image stamp when not yet cached', () => {
-    const imageStamp: StampAnnotation = {
-      ...stampAnnotation,
-      id: 'st3',
-      contentType: 'image',
-      text: undefined,
-      imageUri: 'file:///missing.png',
-    };
-    const ctx = createMockContext();
-    drawAnnotationsOnCanvas(ctx, [imageStamp], 0, meta, { imageCache: new Map() });
-    expect(ctx.drawImage).not.toHaveBeenCalled();
   });
 });

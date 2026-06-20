@@ -135,16 +135,8 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
         pdfView.annotationFontFamily = font
     }
 
-    fun setStampContentType(value: String?) {
-        pdfView.stampContentType = value
-    }
-
     fun setStampText(value: String?) {
         pdfView.stampText = value
-    }
-
-    fun setStampImageUri(value: String?) {
-        pdfView.stampImageUri = value
     }
 
     fun setStampSize(value: Double?) {

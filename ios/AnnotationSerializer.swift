@@ -117,9 +117,7 @@ enum AnnotationSerializer {
     case "stamp":
       model.bounds = AnnotationBounds(annotation.bounds)
       if let stamp = annotation as? StampPDFAnnotation {
-        model.contentType = stamp.stampContentType
         model.text = stamp.stampText
-        model.imageUri = stamp.stampImageUri
       }
     default:
       break
@@ -271,16 +269,10 @@ enum AnnotationSerializer {
   }
 
   private static func createStampAnnotation(model: AnnotationModel) -> PDFAnnotation? {
-    guard let bounds = model.bounds, let contentType = model.contentType else { return nil }
+    guard let bounds = model.bounds, let text = model.text else { return nil }
 
     let annotation = StampPDFAnnotation(bounds: bounds.cgRect, forType: .stamp, withProperties: nil)
-    annotation.setStampContentType(contentType)
-    if let text = model.text {
-      annotation.setStampText(text)
-    }
-    if let imageUri = model.imageUri {
-      annotation.setStampImageUri(imageUri)
-    }
+    annotation.setStampText(text)
 
     let createdAt = model.createdAt ?? Date().timeIntervalSince1970
     tagAsModuleManaged(annotation, id: model.id, createdAt: createdAt, colorHex: model.color)

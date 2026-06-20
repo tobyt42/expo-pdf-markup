@@ -20,9 +20,7 @@ data class AnnotationModel(
     val fontSize: Float? = null,
     val fontFamily: String? = null,
     val createdAt: Double? = null,
-    val contentType: String? = null,
-    val text: String? = null,
-    val imageUri: String? = null
+    val text: String? = null
 )
 
 data class AnnotationsData(

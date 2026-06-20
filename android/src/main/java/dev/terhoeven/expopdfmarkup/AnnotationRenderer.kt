@@ -2,8 +2,6 @@ package dev.terhoeven.expopdfmarkup
 
 import android.content.Context
 import android.content.res.AssetManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.DashPathEffect
 import android.graphics.Paint
@@ -12,10 +10,6 @@ import android.graphics.RectF
 import android.graphics.Typeface
 
 object AnnotationRenderer {
-
-    // Cache decoded stamp bitmaps by imageUri — onDraw can fire on every scroll/zoom tick, and
-    // a null entry means "decode previously failed" so we don't retry a bad path every frame.
-    private val stampBitmapCache = mutableMapOf<String, Bitmap?>()
 
     fun drawAnnotations(
         canvas: Canvas,
@@ -195,47 +189,22 @@ object AnnotationRenderer {
         pageHeight: Int
     ) {
         val bounds = annotation.bounds ?: return
+        val text = annotation.text ?: return
         val left = bounds.x * renderScale
         val top = (pageHeight - bounds.y - bounds.height) * renderScale + pageYOffset
         val right = left + bounds.width * renderScale
         val bottom = top + bounds.height * renderScale
         val rect = RectF(left, top, right, bottom)
 
-        when (annotation.contentType) {
-            "text" -> {
-                val text = annotation.text ?: return
-                val paint = Paint().apply {
-                    textSize = rect.height() * 0.7f
-                    textAlign = Paint.Align.CENTER
-                    isAntiAlias = true
-                }
-                // Paint has no built-in middle-baseline; offset by (ascent + descent) / 2 to
-                // vertically center the glyph within rect.
-                val baselineY = rect.centerY() - (paint.descent() + paint.ascent()) / 2f
-                canvas.drawText(text, rect.centerX(), baselineY, paint)
-            }
-
-            "image" -> {
-                val uri = annotation.imageUri ?: return
-                val bitmap = stampBitmapCache.getOrElse(uri) {
-                    val decoded =
-                        try {
-                            BitmapFactory.decodeFile(uri)
-                        } catch (_: Exception) {
-                            null
-                        }
-                    stampBitmapCache[uri] = decoded
-                    decoded
-                } ?: return
-                val fit = AnnotationGeometry.containFitRect(
-                    bitmap.width.toFloat(),
-                    bitmap.height.toFloat(),
-                    AnnotationBounds(rect.left, rect.top, rect.width(), rect.height())
-                )
-                val destRect = RectF(fit.x, fit.y, fit.x + fit.width, fit.y + fit.height)
-                canvas.drawBitmap(bitmap, null, destRect, null)
-            }
+        val paint = Paint().apply {
+            textSize = rect.height() * 0.7f
+            textAlign = Paint.Align.CENTER
+            isAntiAlias = true
         }
+        // Paint has no built-in middle-baseline; offset by (ascent + descent) / 2 to
+        // vertically center the glyph within rect.
+        val baselineY = rect.centerY() - (paint.descent() + paint.ascent()) / 2f
+        canvas.drawText(text, rect.centerX(), baselineY, paint)
     }
 
     /** Resolve a typeface the same way React Native text does when available, so

@@ -44,16 +44,8 @@ public class ExpoPdfMarkupModule: Module {
         view.annotationFontFamily = font
       }
 
-      Prop("stampContentType") { (view: ExpoPdfMarkupView, value: String?) in
-        view.stampContentType = value
-      }
-
       Prop("stampText") { (view: ExpoPdfMarkupView, value: String?) in
         view.stampText = value
-      }
-
-      Prop("stampImageUri") { (view: ExpoPdfMarkupView, value: String?) in
-        view.stampImageUri = value
       }
 
       Prop("stampSize") { (view: ExpoPdfMarkupView, value: Double?) in

@@ -228,30 +228,6 @@ export function hitTestAnnotation(
 }
 
 // ---------------------------------------------------------------------------
-// Contain-fit geometry
-// ---------------------------------------------------------------------------
-
-/** Scale srcWidth/srcHeight to fit inside destRect, preserving aspect ratio, centered (no crop/stretch). */
-export function computeContainFitRect(
-  srcWidth: number,
-  srcHeight: number,
-  destRect: { x: number; y: number; width: number; height: number }
-): { x: number; y: number; width: number; height: number } {
-  if (srcWidth <= 0 || srcHeight <= 0 || destRect.width <= 0 || destRect.height <= 0) {
-    return destRect;
-  }
-  const scale = Math.min(destRect.width / srcWidth, destRect.height / srcHeight);
-  const width = srcWidth * scale;
-  const height = srcHeight * scale;
-  return {
-    x: destRect.x + (destRect.width - width) / 2,
-    y: destRect.y + (destRect.height - height) / 2,
-    width,
-    height,
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Canvas drawing (mirrors AnnotationRenderer.kt)
 // ---------------------------------------------------------------------------
 
@@ -270,7 +246,6 @@ export function drawAnnotationsOnCanvas(
     highlightColor?: string;
     previewAnnotationId?: string | null;
     previewAnnotation?: Annotation | null;
-    imageCache?: Map<string, HTMLImageElement>;
   } = {}
 ): void {
   const { scale, pdfHeight } = meta;
@@ -349,22 +324,14 @@ export function drawAnnotationsOnCanvas(
       }
       case 'stamp': {
         const bounds = annotation.bounds;
-        if (!bounds) break;
+        if (!bounds || !annotation.text) break;
         const rect = pdfBoundsToCanvas(bounds, scale, pdfHeight);
-        if (annotation.contentType === 'text' && annotation.text) {
-          ctx.save();
-          ctx.font = `${rect.height * 0.7}px sans-serif`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(annotation.text, rect.x + rect.width / 2, rect.y + rect.height / 2);
-          ctx.restore();
-        } else if (annotation.contentType === 'image' && annotation.imageUri) {
-          const img = options.imageCache?.get(annotation.imageUri);
-          if (img) {
-            const fit = computeContainFitRect(img.naturalWidth, img.naturalHeight, rect);
-            ctx.drawImage(img, fit.x, fit.y, fit.width, fit.height);
-          }
-        }
+        ctx.save();
+        ctx.font = `${rect.height * 0.7}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(annotation.text, rect.x + rect.width / 2, rect.y + rect.height / 2);
+        ctx.restore();
         break;
       }
     }

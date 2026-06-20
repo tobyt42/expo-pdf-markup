@@ -98,7 +98,6 @@ final class AnnotationSerializerTests: XCTestCase {
       page: 0,
       color: "#000000",
       bounds: AnnotationBounds(x: 10, y: 20, width: 48, height: 48),
-      contentType: "text",
       text: "⭐"
     )
 
@@ -109,30 +108,12 @@ final class AnnotationSerializerTests: XCTestCase {
     XCTAssertTrue(try AnnotationSerializer.isModuleManaged(XCTUnwrap(annotation)))
   }
 
-  func testCreateStampAnnotationWithImage() {
-    let model = AnnotationModel(
-      id: "st-2",
-      type: "stamp",
-      page: 0,
-      color: "#000000",
-      bounds: AnnotationBounds(x: 10, y: 20, width: 48, height: 48),
-      contentType: "image",
-      imageUri: "/tmp/does-not-exist.png"
-    )
-
-    let annotation = AnnotationSerializer.toPDFAnnotation(model)
-    XCTAssertNotNil(annotation)
-    XCTAssertEqual(annotation?.type, "Stamp")
-    XCTAssertTrue(annotation is StampPDFAnnotation)
-  }
-
   func testStampMissingBoundsReturnsNil() {
     let model = AnnotationModel(
       id: "st-3",
       type: "stamp",
       page: 0,
       color: "#000000",
-      contentType: "text",
       text: "⭐"
     )
 
@@ -140,7 +121,7 @@ final class AnnotationSerializerTests: XCTestCase {
     XCTAssertNil(annotation)
   }
 
-  func testStampMissingContentTypeReturnsNil() {
+  func testStampMissingTextReturnsNil() {
     let model = AnnotationModel(
       id: "st-4",
       type: "stamp",
@@ -216,7 +197,6 @@ final class AnnotationSerializerTests: XCTestCase {
       page: 0,
       color: "#123456",
       bounds: AnnotationBounds(x: 10, y: 20, width: 48, height: 48),
-      contentType: "text",
       text: "⭐"
     )
 
@@ -225,9 +205,7 @@ final class AnnotationSerializerTests: XCTestCase {
 
     let result = try XCTUnwrap(extracted)
     XCTAssertEqual(result.type, "stamp")
-    XCTAssertEqual(result.contentType, "text")
     XCTAssertEqual(result.text, "⭐")
-    XCTAssertNil(result.imageUri)
     XCTAssertEqual(result.color, "#123456")
     XCTAssertEqual(result.bounds?.cgRect, CGRect(x: 10, y: 20, width: 48, height: 48))
   }

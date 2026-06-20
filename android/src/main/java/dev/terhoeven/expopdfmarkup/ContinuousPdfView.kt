@@ -78,9 +78,7 @@ class ContinuousPdfView(context: Context) : View(context) {
     var annotationColor: String = "#000000"
     var annotationLineWidth: Float = 2f
     var annotationFontFamily: String? = null
-    var stampContentType: String? = null
     var stampText: String? = null
-    var stampImageUri: String? = null
     var stampSize: Float = 48f
     var onAnnotationsChangedListener: (() -> Unit)? = null
 
@@ -589,8 +587,7 @@ class ContinuousPdfView(context: Context) : View(context) {
     // --- Stamp mode ---
 
     private fun handleStampTap(event: MotionEvent) {
-        val contentType = stampContentType ?: return
-        if (stampText == null && stampImageUri == null) return
+        val text = stampText ?: return
         val pdfTouch = screenToPdfPoint(event.x, event.y) ?: return
         val half = stampSize / 2f
         val annotation = AnnotationModel(
@@ -604,9 +601,7 @@ class ContinuousPdfView(context: Context) : View(context) {
                 stampSize,
                 stampSize
             ),
-            contentType = contentType,
-            text = stampText,
-            imageUri = stampImageUri,
+            text = text,
             createdAt = System.currentTimeMillis() / 1000.0
         )
         annotations = annotations + annotation
