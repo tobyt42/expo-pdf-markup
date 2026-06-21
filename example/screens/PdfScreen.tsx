@@ -22,8 +22,6 @@ const COLORS = [
   { label: 'Green', value: '#00CC00' },
 ];
 
-// Reference example of a consumer-defined stamp set — choral rehearsal marks, the kind a Choir
-// app would swap in for its own domain.
 const STAMPS: StampDefinition[] = [
   { id: 'breath', label: 'Breath Mark', text: '’' },
   { id: 'note', label: 'Note', text: '♪' },
