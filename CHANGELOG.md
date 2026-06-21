@@ -1,5 +1,16 @@
 # @tobyt/expo-pdf-markup
 
+## 1.1.0
+
+### Minor Changes
+
+- 24c58b8: Add `stamp` annotations for placing consumer-defined text glyphs (e.g. emoji) onto a PDF. New `StampAnnotation` type, `'stamp'` annotation mode, and `stampText`/`stampSize` props let apps arm a stamp (from their own picker UI) and tap to place it; stamps support move and eraser like other bounds-based annotations. A new `StampDefinition` type is exported as a convenience shape for organizing a custom stamp set. Image-backed stamps were intentionally left out — a stored local file path can go stale (app reinstall, cache eviction) and silently break previously-placed stamps, so this stays text-only for now.
+
+### Patch Changes
+
+- 850b4f9: Routine dependency maintenance: upgrade to the latest Expo SDK 55 patch release. Bumps `expo` (55.0.5 → 55.0.26) and `react-native` (0.83.2 → 0.83.6) in the module, and `expo`, `expo-asset`, `expo-font`, `react-native`, `react`, `react-dom` to their SDK 55.0.26-compatible versions in the example app. No runtime behavior changes.
+- 95b8c0d: Routine dependency maintenance: patch/minor bumps for transitive and dev dependencies (`@babel/plugin-transform-modules-systemjs`, `@xmldom/xmldom`, `lodash`, `node-forge`, `flatted`, `picomatch`, `yaml`, `brace-expansion`, `shell-quote`, `markdown-it`, `linkify-it`, `form-data`, `hasown`, `ws`), example app `react`/`react-dom`/`@types/react`, and CI Actions (`checkout`, `setup-node`, `upload-pages-artifact`, `deploy-pages`). No runtime behavior changes.
+
 ## 1.0.1
 
 ### Patch Changes
