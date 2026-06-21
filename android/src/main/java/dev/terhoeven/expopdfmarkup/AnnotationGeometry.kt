@@ -4,7 +4,7 @@ object AnnotationGeometry {
 
     fun outlineBounds(annotation: AnnotationModel): AnnotationBounds? = when (annotation.type) {
         "ink" -> outlineBoundsForInk(annotation)
-        "highlight", "underline", "freeText", "text" -> annotation.bounds
+        "highlight", "underline", "freeText", "text", "stamp" -> annotation.bounds
         else -> null
     }
 
@@ -39,7 +39,7 @@ object AnnotationGeometry {
                         }
                 )
 
-            "highlight", "underline", "freeText", "text" -> {
+            "highlight", "underline", "freeText", "text", "stamp" -> {
                 val bounds = annotation.bounds ?: return annotation
                 annotation.copy(
                     bounds =

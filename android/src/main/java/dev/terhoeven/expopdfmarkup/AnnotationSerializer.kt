@@ -77,7 +77,8 @@ object AnnotationSerializer {
             contents = if (obj.has("contents")) obj.getString("contents") else null,
             fontSize = optFloat(obj, "fontSize"),
             fontFamily = if (obj.has("fontFamily")) obj.getString("fontFamily") else null,
-            createdAt = if (obj.has("createdAt")) obj.optDouble("createdAt") else null
+            createdAt = if (obj.has("createdAt")) obj.optDouble("createdAt") else null,
+            text = if (obj.has("text")) obj.getString("text") else null
         )
     }
 
@@ -125,6 +126,7 @@ object AnnotationSerializer {
         model.fontSize?.let { obj.put("fontSize", it.toDouble()) }
         model.fontFamily?.let { obj.put("fontFamily", it) }
         model.createdAt?.let { obj.put("createdAt", it) }
+        model.text?.let { obj.put("text", it) }
         return obj
     }
 

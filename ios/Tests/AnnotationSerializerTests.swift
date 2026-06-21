@@ -91,6 +91,49 @@ final class AnnotationSerializerTests: XCTestCase {
     XCTAssertEqual(try XCTUnwrap(annotation).bounds.maxY, originalBounds.cgRect.maxY, accuracy: 0.01)
   }
 
+  func testCreateStampAnnotationWithText() throws {
+    let model = AnnotationModel(
+      id: "st-1",
+      type: "stamp",
+      page: 0,
+      color: "#000000",
+      bounds: AnnotationBounds(x: 10, y: 20, width: 48, height: 48),
+      text: "⭐"
+    )
+
+    let annotation = AnnotationSerializer.toPDFAnnotation(model)
+    XCTAssertNotNil(annotation)
+    XCTAssertEqual(annotation?.type, "Stamp")
+    XCTAssertTrue(annotation is StampPDFAnnotation)
+    XCTAssertTrue(try AnnotationSerializer.isModuleManaged(XCTUnwrap(annotation)))
+  }
+
+  func testStampMissingBoundsReturnsNil() {
+    let model = AnnotationModel(
+      id: "st-3",
+      type: "stamp",
+      page: 0,
+      color: "#000000",
+      text: "⭐"
+    )
+
+    let annotation = AnnotationSerializer.toPDFAnnotation(model)
+    XCTAssertNil(annotation)
+  }
+
+  func testStampMissingTextReturnsNil() {
+    let model = AnnotationModel(
+      id: "st-4",
+      type: "stamp",
+      page: 0,
+      color: "#000000",
+      bounds: AnnotationBounds(x: 10, y: 20, width: 48, height: 48)
+    )
+
+    let annotation = AnnotationSerializer.toPDFAnnotation(model)
+    XCTAssertNil(annotation)
+  }
+
   func testUnknownTypeReturnsNil() {
     let model = AnnotationModel(
       id: "bad-1",
@@ -145,6 +188,26 @@ final class AnnotationSerializerTests: XCTestCase {
     XCTAssertNotNil(extracted)
     let result = try XCTUnwrap(extracted)
     XCTAssertEqual(result.color, "#FF0000", "freeText color must survive a serialisation round-trip")
+  }
+
+  func testExtractStampModelRoundTrip() throws {
+    let model = AnnotationModel(
+      id: "st-rt-1",
+      type: "stamp",
+      page: 0,
+      color: "#123456",
+      bounds: AnnotationBounds(x: 10, y: 20, width: 48, height: 48),
+      text: "⭐"
+    )
+
+    let pdfAnnotation = try XCTUnwrap(AnnotationSerializer.toPDFAnnotation(model))
+    let extracted = AnnotationSerializer.toModel(from: pdfAnnotation, page: 0)
+
+    let result = try XCTUnwrap(extracted)
+    XCTAssertEqual(result.type, "stamp")
+    XCTAssertEqual(result.text, "⭐")
+    XCTAssertEqual(result.color, "#123456")
+    XCTAssertEqual(result.bounds?.cgRect, CGRect(x: 10, y: 20, width: 48, height: 48))
   }
 
   func testExtractModelFromNonManagedAnnotationReturnsNil() {

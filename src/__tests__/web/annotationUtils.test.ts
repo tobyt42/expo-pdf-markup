@@ -1,9 +1,10 @@
-import type { Annotation, AnnotationPoint } from '../../ExpoPdfMarkup.types';
+import type { Annotation, AnnotationPoint, StampAnnotation } from '../../ExpoPdfMarkup.types';
 import {
   clampAnnotationTranslation,
   canvasToPdf,
   canvasRectToPdfBounds,
   distanceToSegment,
+  drawAnnotationsOnCanvas,
   getAnnotationOutlineBounds,
   hitTestAnnotation,
   parseAnnotations,
@@ -161,6 +162,15 @@ const highlightAnnotation: Annotation = {
   bounds: { x: 50, y: 50, width: 100, height: 20 },
 };
 
+const stampAnnotation: StampAnnotation = {
+  id: 'st1',
+  type: 'stamp',
+  page: 0,
+  color: '#000000',
+  bounds: { x: 50, y: 50, width: 48, height: 48 },
+  text: '⭐',
+};
+
 describe('hitTestAnnotation', () => {
   it('hits ink annotation within tolerance', () => {
     const result = hitTestAnnotation({ x: 50, y: 5 }, [inkAnnotation], 0);
@@ -198,6 +208,16 @@ describe('hitTestAnnotation', () => {
     const result = hitTestAnnotation({ x: 100, y: 60 }, [highlightAnnotation, hl2], 0);
     expect(result?.id).toBe('hl2');
   });
+
+  it('hits stamp annotation inside its bounds (generic bounds handling)', () => {
+    const result = hitTestAnnotation({ x: 60, y: 60 }, [stampAnnotation], 0);
+    expect(result?.id).toBe('st1');
+  });
+
+  it('misses stamp annotation outside its bounds', () => {
+    const result = hitTestAnnotation({ x: 200, y: 200 }, [stampAnnotation], 0);
+    expect(result).toBeNull();
+  });
 });
 
 describe('getAnnotationOutlineBounds', () => {
@@ -212,6 +232,10 @@ describe('getAnnotationOutlineBounds', () => {
       width: 120,
       height: 20,
     });
+  });
+
+  it('returns stored bounds for stamp annotations', () => {
+    expect(getAnnotationOutlineBounds(stampAnnotation)).toEqual(stampAnnotation.bounds);
   });
 });
 
@@ -230,6 +254,12 @@ describe('translateAnnotation', () => {
           { x: 105, y: 7 },
         ],
       ],
+    });
+  });
+
+  it('translates stamp annotations like other bounds-based annotations', () => {
+    expect(translateAnnotation(stampAnnotation, 12, -8)).toMatchObject({
+      bounds: { x: 62, y: 42, width: 48, height: 48 },
     });
   });
 });
@@ -283,5 +313,60 @@ describe('parseAnnotations', () => {
     const result = parseAnnotations(data);
     expect(result.annotations).toHaveLength(1);
     expect(result.annotations[0].color).toBe('#00FF00');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// drawAnnotationsOnCanvas — stamp rendering
+// ---------------------------------------------------------------------------
+
+function createMockContext() {
+  let fillStyleValue = '';
+  return {
+    save: jest.fn(),
+    restore: jest.fn(),
+    beginPath: jest.fn(),
+    moveTo: jest.fn(),
+    lineTo: jest.fn(),
+    stroke: jest.fn(),
+    fillRect: jest.fn(),
+    fillText: jest.fn(),
+    strokeRect: jest.fn(),
+    setLineDash: jest.fn(),
+    set strokeStyle(_v: string) {},
+    set fillStyle(v: string) {
+      fillStyleValue = v;
+    },
+    get fillStyle() {
+      return fillStyleValue;
+    },
+    set lineWidth(_v: number) {},
+    set lineCap(_v: string) {},
+    set lineJoin(_v: string) {},
+    set globalAlpha(_v: number) {},
+    set font(_v: string) {},
+    set textAlign(_v: string) {},
+    set textBaseline(_v: string) {},
+  } as unknown as CanvasRenderingContext2D;
+}
+
+describe('drawAnnotationsOnCanvas — stamp', () => {
+  const meta = { pdfWidth: 200, pdfHeight: 200, scale: 1, canvasWidth: 200, canvasHeight: 200 };
+
+  it('draws text stamps via fillText', () => {
+    const ctx = createMockContext();
+    drawAnnotationsOnCanvas(ctx, [stampAnnotation], 0, meta);
+    expect(ctx.fillText).toHaveBeenCalledWith(
+      stampAnnotation.text,
+      expect.any(Number),
+      expect.any(Number)
+    );
+  });
+
+  it('applies the annotation color to the text fill style', () => {
+    const ctx = createMockContext();
+    const redStamp: StampAnnotation = { ...stampAnnotation, color: '#FF0000' };
+    drawAnnotationsOnCanvas(ctx, [redStamp], 0, meta);
+    expect(ctx.fillStyle).toBe('#FF0000');
   });
 });

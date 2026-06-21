@@ -93,6 +93,35 @@ class AnnotationHitTesterTest {
         assertNull(result)
     }
 
+    @Test
+    fun testHitInsideStampBounds() {
+        val stamp = AnnotationModel(
+            id = "st-1",
+            type = "stamp",
+            page = 0,
+            color = "#000000",
+            bounds = AnnotationBounds(100f, 200f, 48f, 48f),
+            text = "⭐"
+        )
+        val result = AnnotationHitTester.hitTest(AnnotationPoint(120f, 220f), listOf(stamp), 0)
+        assertNotNull(result)
+        assertEquals("st-1", result!!.id)
+    }
+
+    @Test
+    fun testMissOutsideStampBounds() {
+        val stamp = AnnotationModel(
+            id = "st-1",
+            type = "stamp",
+            page = 0,
+            color = "#000000",
+            bounds = AnnotationBounds(100f, 200f, 48f, 48f),
+            text = "⭐"
+        )
+        val result = AnnotationHitTester.hitTest(AnnotationPoint(0f, 0f), listOf(stamp), 0)
+        assertNull(result)
+    }
+
     // MARK: - Page filtering
 
     @Test

@@ -55,6 +55,8 @@ type PageViewProps = {
   annotationMode: AnnotationMode;
   annotationColor: string;
   annotationLineWidth: number;
+  stampText?: string;
+  stampSize: number;
   zoomLevel: number;
   onAnnotationAdded: (annotation: Annotation) => void;
   onAnnotationRemoved: (id: string) => void;
@@ -74,6 +76,8 @@ function PageView({
   annotationMode,
   annotationColor,
   annotationLineWidth,
+  stampText,
+  stampSize,
   zoomLevel,
   onAnnotationAdded,
   onAnnotationRemoved,
@@ -263,7 +267,13 @@ function PageView({
   }
 
   function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
-    if (!pointerDownRef.current && annotationMode !== 'text' && annotationMode !== 'eraser') return;
+    if (
+      !pointerDownRef.current &&
+      annotationMode !== 'text' &&
+      annotationMode !== 'eraser' &&
+      annotationMode !== 'stamp'
+    )
+      return;
     pointerDownRef.current = false;
     const pt = getCanvasPoint(e);
     const { scale, pdfHeight } = meta;
@@ -342,12 +352,36 @@ function PageView({
       const pdfPoint = canvasToPdf(pt.x, pt.y, scale, pdfHeight);
       const hit = hitTestAnnotation(pdfPoint, annotations, pageIndex);
       if (hit) onAnnotationRemoved(hit.id);
+    } else if (annotationMode === 'stamp') {
+      if (!stampText) return;
+      const pdfPoint = canvasToPdf(pt.x, pt.y, scale, pdfHeight);
+      const half = stampSize / 2;
+      onAnnotationAdded({
+        id: newAnnotationId(),
+        type: 'stamp',
+        page: pageIndex,
+        color: annotationColor,
+        bounds: {
+          x: pdfPoint.x - half,
+          y: pdfPoint.y - half,
+          width: stampSize,
+          height: stampSize,
+        },
+        text: stampText,
+        createdAt: Date.now(),
+      });
     }
   }
 
   const pointerEvents = annotationMode === 'none' ? 'none' : 'auto';
   const cursor =
-    annotationMode === 'move' ? 'grab' : annotationMode === 'eraser' ? 'not-allowed' : 'crosshair';
+    annotationMode === 'move'
+      ? 'grab'
+      : annotationMode === 'eraser'
+      ? 'not-allowed'
+      : annotationMode === 'stamp'
+      ? 'copy'
+      : 'crosshair';
 
   return (
     <div
@@ -398,6 +432,8 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
     annotationColor = '#FF0000',
     annotationLineWidth = 2,
     annotationFontFamily,
+    stampText,
+    stampSize = 48,
     onPageChanged,
     onLoadComplete,
     onError,
@@ -726,6 +762,8 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
                 annotationMode={annotationMode}
                 annotationColor={annotationColor}
                 annotationLineWidth={annotationLineWidth}
+                stampText={stampText}
+                stampSize={stampSize}
                 zoomLevel={zoomLevel}
                 onAnnotationAdded={handleAnnotationAdded}
                 onAnnotationRemoved={handleAnnotationRemoved}

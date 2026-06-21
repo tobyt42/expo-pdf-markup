@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RectF
 import android.graphics.Typeface
 
 object AnnotationRenderer {
@@ -47,6 +48,14 @@ object AnnotationRenderer {
                     renderScale,
                     pageHeight,
                     context
+                )
+
+                "stamp" -> drawStamp(
+                    canvas,
+                    annotation,
+                    pageYOffset,
+                    renderScale,
+                    pageHeight
                 )
             }
         }
@@ -170,6 +179,33 @@ object AnnotationRenderer {
         val left = bounds.x * renderScale
         val top = (pageHeight - bounds.y - bounds.height) * renderScale + pageYOffset
         canvas.drawText(text, left, top + paint.textSize, paint)
+    }
+
+    private fun drawStamp(
+        canvas: Canvas,
+        annotation: AnnotationModel,
+        pageYOffset: Float,
+        renderScale: Float,
+        pageHeight: Int
+    ) {
+        val bounds = annotation.bounds ?: return
+        val text = annotation.text ?: return
+        val left = bounds.x * renderScale
+        val top = (pageHeight - bounds.y - bounds.height) * renderScale + pageYOffset
+        val right = left + bounds.width * renderScale
+        val bottom = top + bounds.height * renderScale
+        val rect = RectF(left, top, right, bottom)
+
+        val paint = Paint().apply {
+            color = AnnotationSerializer.colorFromHex(annotation.color)
+            textSize = rect.height() * 0.7f
+            textAlign = Paint.Align.CENTER
+            isAntiAlias = true
+        }
+        // Paint has no built-in middle-baseline; offset by (ascent + descent) / 2 to
+        // vertically center the glyph within rect.
+        val baselineY = rect.centerY() - (paint.descent() + paint.ascent()) / 2f
+        canvas.drawText(text, rect.centerX(), baselineY, paint)
     }
 
     /** Resolve a typeface the same way React Native text does when available, so

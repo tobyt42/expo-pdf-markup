@@ -51,7 +51,24 @@ export type TextAnnotation = {
   createdAt?: number;
 };
 
-export type Annotation = InkAnnotation | HighlightAnnotation | UnderlineAnnotation | TextAnnotation;
+export type StampAnnotation = {
+  id: string;
+  type: 'stamp';
+  page: number;
+  /** Colour applied to the text glyph, as a CSS colour string (e.g. `'#FF0000'`). Has no visible effect on full-colour emoji. */
+  color: string;
+  bounds: AnnotationBounds;
+  /** A glyph or short string to render (e.g. an emoji, or a plain character like `'f'`). */
+  text: string;
+  createdAt?: number;
+};
+
+export type Annotation =
+  | InkAnnotation
+  | HighlightAnnotation
+  | UnderlineAnnotation
+  | TextAnnotation
+  | StampAnnotation;
 
 export type AnnotationsData = {
   version: 1;
@@ -64,8 +81,20 @@ export type AnnotationMode =
   | 'highlight'
   | 'underline'
   | 'text'
+  | 'stamp'
   | 'eraser'
   | 'move';
+
+/**
+ * Recommended shape for describing a consumer-defined stamp set (e.g. domain-specific glyphs).
+ * Purely a convenience type for organizing your own stamp picker UI — never sent to native;
+ * extract `text` to set as the `stampText` prop before placement.
+ */
+export type StampDefinition = {
+  id: string;
+  label: string;
+  text: string;
+};
 
 export type TextInputRequest = {
   mode: 'create' | 'edit';
@@ -96,6 +125,10 @@ export type ExpoPdfMarkupViewProps = {
    * - Web: CSS font family (`"Georgia, serif"`) or `undefined` for `sans-serif`
    */
   annotationFontFamily?: string;
+  /** Glyph or short string for the next stamp to place. Required for the `'stamp'` tool to place anything on tap. */
+  stampText?: string;
+  /** Side length, in PDF points, of the square bounding box for newly placed stamps. Defaults to 48. */
+  stampSize?: number;
   /** Fired when the visible page changes. */
   onPageChanged?: (event: {
     nativeEvent: { page: number; pageCount: number; pageWidth: number; pageHeight: number };

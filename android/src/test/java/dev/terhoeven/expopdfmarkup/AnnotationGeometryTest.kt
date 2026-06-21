@@ -77,4 +77,41 @@ class AnnotationGeometryTest {
         assertEquals(-50f, result.x, 0.001f)
         assertEquals(30f, result.y, 0.001f)
     }
+
+    @Test
+    fun testOutlineBoundsReturnsStampBounds() {
+        val annotation = AnnotationModel(
+            id = "stamp",
+            type = "stamp",
+            page = 0,
+            color = "#000000",
+            bounds = AnnotationBounds(10f, 20f, 48f, 48f),
+            text = "⭐"
+        )
+
+        val result = AnnotationGeometry.outlineBounds(annotation)
+
+        assertEquals(10f, result!!.x, 0.001f)
+        assertEquals(20f, result.y, 0.001f)
+        assertEquals(48f, result.width, 0.001f)
+        assertEquals(48f, result.height, 0.001f)
+    }
+
+    @Test
+    fun testTranslateMovesStampBounds() {
+        val annotation = AnnotationModel(
+            id = "stamp",
+            type = "stamp",
+            page = 0,
+            color = "#000000",
+            bounds = AnnotationBounds(10f, 20f, 48f, 48f),
+            text = "⭐"
+        )
+
+        val result = AnnotationGeometry.translate(annotation, 5f, 7f)
+
+        assertEquals(15f, result.bounds!!.x, 0.001f)
+        assertEquals(27f, result.bounds!!.y, 0.001f)
+        assertEquals(48f, result.bounds!!.width, 0.001f)
+    }
 }

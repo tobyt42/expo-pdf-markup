@@ -135,6 +135,14 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
         pdfView.annotationFontFamily = font
     }
 
+    fun setStampText(value: String?) {
+        pdfView.stampText = value
+    }
+
+    fun setStampSize(value: Double?) {
+        pdfView.stampSize = value?.toFloat() ?: 48f
+    }
+
     private fun emitAnnotationsChanged() {
         val data = AnnotationsData(version = 1, annotations = pdfView.annotations)
         val json = AnnotationSerializer.serialize(data)

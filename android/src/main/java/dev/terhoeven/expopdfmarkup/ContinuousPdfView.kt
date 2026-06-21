@@ -78,6 +78,8 @@ class ContinuousPdfView(context: Context) : View(context) {
     var annotationColor: String = "#000000"
     var annotationLineWidth: Float = 2f
     var annotationFontFamily: String? = null
+    var stampText: String? = null
+    var stampSize: Float = 48f
     var onAnnotationsChangedListener: (() -> Unit)? = null
 
     // Ink drawing state
@@ -285,6 +287,14 @@ class ContinuousPdfView(context: Context) : View(context) {
             "text" -> {
                 if (event.action == MotionEvent.ACTION_UP && event.pointerCount == 1) {
                     handleTextTap(event)
+                }
+                gestureDetector.onTouchEvent(event)
+                return true
+            }
+
+            "stamp" -> {
+                if (event.action == MotionEvent.ACTION_UP && event.pointerCount == 1) {
+                    handleStampTap(event)
                 }
                 gestureDetector.onTouchEvent(event)
                 return true
@@ -572,6 +582,30 @@ class ContinuousPdfView(context: Context) : View(context) {
             fontFamily = existing?.fontFamily ?: annotationFontFamily,
             createdAt = existing?.createdAt ?: System.currentTimeMillis() / 1000.0
         )
+    }
+
+    // --- Stamp mode ---
+
+    private fun handleStampTap(event: MotionEvent) {
+        val text = stampText ?: return
+        val pdfTouch = screenToPdfPoint(event.x, event.y) ?: return
+        val half = stampSize / 2f
+        val annotation = AnnotationModel(
+            id = UUID.randomUUID().toString(),
+            type = "stamp",
+            page = pdfTouch.pageIndex,
+            color = annotationColor,
+            bounds = AnnotationBounds(
+                pdfTouch.point.x - half,
+                pdfTouch.point.y - half,
+                stampSize,
+                stampSize
+            ),
+            text = text,
+            createdAt = System.currentTimeMillis() / 1000.0
+        )
+        annotations = annotations + annotation
+        onAnnotationsChangedListener?.invoke()
     }
 
     // --- Helpers ---

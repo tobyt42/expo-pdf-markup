@@ -198,7 +198,7 @@ extension ExpoPdfMarkupView {
         }
       }
       updated.paths = updated.encodedPaths(from: translatedPaths)
-    case "highlight", "underline", "text", "freeText":
+    case "highlight", "underline", "text", "freeText", "stamp":
       if let bounds = model.bounds {
         updated.bounds = AnnotationBounds(
           x: bounds.x + dx,

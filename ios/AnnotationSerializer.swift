@@ -30,6 +30,8 @@ enum AnnotationSerializer {
       return createMarkupAnnotation(model: model, color: color, subtype: .underline)
     case "text", "freeText":
       return createFreeTextAnnotation(model: model, color: color)
+    case "stamp":
+      return createStampAnnotation(model: model)
     default:
       return nil
     }
@@ -70,6 +72,8 @@ enum AnnotationSerializer {
       "text"
     case "FreeText":
       "freeText"
+    case "Stamp":
+      "stamp"
     default:
       nil
     }
@@ -109,6 +113,11 @@ enum AnnotationSerializer {
       if let font = annotation.font {
         model.fontSize = font.pointSize
         model.fontFamily = font.fontName
+      }
+    case "stamp":
+      model.bounds = AnnotationBounds(annotation.bounds)
+      if let stamp = annotation as? StampPDFAnnotation {
+        model.text = stamp.stampText
       }
     default:
       break
@@ -253,6 +262,17 @@ enum AnnotationSerializer {
     annotation.fontColor = color
     annotation.color = .clear
     annotation.contents = contents
+
+    let createdAt = model.createdAt ?? Date().timeIntervalSince1970
+    tagAsModuleManaged(annotation, id: model.id, createdAt: createdAt, colorHex: model.color)
+    return annotation
+  }
+
+  private static func createStampAnnotation(model: AnnotationModel) -> PDFAnnotation? {
+    guard let bounds = model.bounds, let text = model.text else { return nil }
+
+    let annotation = StampPDFAnnotation(bounds: bounds.cgRect, forType: .stamp, withProperties: nil)
+    annotation.setStampText(text)
 
     let createdAt = model.createdAt ?? Date().timeIntervalSince1970
     tagAsModuleManaged(annotation, id: model.id, createdAt: createdAt, colorHex: model.color)
