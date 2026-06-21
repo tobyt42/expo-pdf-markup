@@ -32,14 +32,7 @@ final class StampPDFAnnotation: PDFAnnotation {
     let colorHex = (value(forAnnotationKey: Self.colorKey) as? String) ?? "#000000"
     guard let cgImage = Self.image(forText: text, colorHex: colorHex) else { return }
 
-    context.saveGState()
-    // PDFKit hands draw(with:in:) a raw CGContext already in PDF page space (bottom-up). The
-    // rasterized text image here is top-down, so without this flip the stamp would render
-    // upside down.
-    context.translateBy(x: bounds.minX, y: bounds.maxY)
-    context.scaleBy(x: 1, y: -1)
-    context.draw(cgImage, in: CGRect(origin: .zero, size: bounds.size))
-    context.restoreGState()
+    context.draw(cgImage, in: bounds)
   }
 
   private static func image(forText text: String, colorHex: String) -> CGImage? {

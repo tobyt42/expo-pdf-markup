@@ -39,6 +39,57 @@ final class StampPDFAnnotationTests: XCTestCase {
     XCTAssertFalse(hasNonTransparentPixel(context: context, size: bounds.size))
   }
 
+  /// "L" is asymmetric top-to-bottom: a wide horizontal foot at the bottom of the glyph and
+  /// a narrow vertical stroke at the top. A bitmap context backing draw(with:in:) stores rows
+  /// top-down while PDF space is bottom-up, so an unflipped (or wrongly-flipped) draw flips the
+  /// glyph vertically. Assert the foot lands near the low-y (bottom) edge of bounds, matching
+  /// normal reading orientation when the page is viewed right-side up.
+  func testDrawRendersTextInUprightOrientation() throws {
+    let bounds = CGRect(x: 0, y: 0, width: 64, height: 64)
+    let width = Int(bounds.width)
+    let height = Int(bounds.height)
+    let context = try XCTUnwrap(makeContext(size: bounds.size))
+
+    let annotation = StampPDFAnnotation(bounds: bounds, forType: .stamp, withProperties: nil)
+    annotation.setStampText("L")
+    annotation.setValue("#000000", forAnnotationKey: PDFAnnotationKey(rawValue: "_color"))
+    annotation.draw(with: .mediaBox, in: context)
+
+    let data = try XCTUnwrap(context.data)
+    let buffer = data.bindMemory(to: UInt8.self, capacity: width * height * 4)
+
+    func inkSpan(row: Int) -> Int {
+      var minX = -1
+      var maxX = -1
+      for x in 0 ..< width {
+        let idx = (row * width + x) * 4
+        if buffer[idx + 3] > 10 {
+          if minX == -1 { minX = x }
+          maxX = x
+        }
+      }
+      return minX == -1 ? 0 : (maxX - minX)
+    }
+
+    var minInkRow = -1
+    var maxInkRow = -1
+    for row in 0 ..< height where inkSpan(row: row) > 0 {
+      if minInkRow == -1 { minInkRow = row }
+      maxInkRow = row
+    }
+    let minInkRowUnwrapped = try XCTUnwrap(minInkRow == -1 ? nil : minInkRow)
+    let maxInkRowUnwrapped = try XCTUnwrap(maxInkRow == -1 ? nil : maxInkRow)
+
+    // Buffer row 0 is the top of the bitmap (PDF-space maxY); the last row is the bottom
+    // (PDF-space minY, where the page's "down" is).
+    let spanNearBufferTop = inkSpan(row: minInkRowUnwrapped + 2)
+    let spanNearBufferBottom = inkSpan(row: maxInkRowUnwrapped - 2)
+    XCTAssertGreaterThan(
+      spanNearBufferBottom, spanNearBufferTop,
+      "expected the wide foot of \"L\" near the bottom of the page (low PDF y), not the top"
+    )
+  }
+
   // MARK: - Helpers
 
   private func makeContext(size: CGSize) -> CGContext? {
