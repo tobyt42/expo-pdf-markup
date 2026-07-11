@@ -201,6 +201,7 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
+        pdfView.cancelActiveGestures()
         // Save the successfully-loaded source before close() so we can reload on re-attach.
         // (currentSource is always null after loadPdf() because close() resets it there.)
         sourceToReloadOnAttach = lastLoadedSource
