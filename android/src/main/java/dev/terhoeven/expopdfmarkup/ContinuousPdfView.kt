@@ -248,6 +248,13 @@ class ContinuousPdfView(context: Context) : View(context) {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        // Hold off parent interception (e.g. gesture-handler root, scroll
+        // containers) for the duration of each gesture only; leaving it set
+        // permanently can strand ancestors shared with sibling screens.
+        TouchInterceptPolicy.disallowInterceptFor(event.actionMasked)?.let {
+            parent?.requestDisallowInterceptTouchEvent(it)
+        }
+
         // Always let scale detector handle pinch zoom
         scaleDetector.onTouchEvent(event)
 
@@ -306,8 +313,38 @@ class ContinuousPdfView(context: Context) : View(context) {
             }
         }
 
-        parent?.requestDisallowInterceptTouchEvent(true)
         return true
+    }
+
+    /**
+     * Cancels any in-progress gesture (ink stroke, drag, move, fling) and
+     * releases the parent touch-intercept hold. Needed when the gesture is
+     * interrupted without a final ACTION_UP/ACTION_CANCEL — device lock
+     * (window focus loss) or view teardown — so that no stale touch state
+     * survives on this view or its ancestors. An interrupted ink stroke is
+     * discarded rather than committed.
+     */
+    fun cancelActiveGestures() {
+        isDrawingInk = false
+        currentInkPoints.clear()
+        inkScreenPath.reset()
+        isDragging = false
+        dragStartPoint = null
+        dragCurrentPoint = null
+        clearMovePreview()
+        scroller.forceFinished(true)
+        parent?.requestDisallowInterceptTouchEvent(false)
+        invalidate()
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        if (!hasWindowFocus) cancelActiveGestures()
+    }
+
+    override fun onDetachedFromWindow() {
+        cancelActiveGestures()
+        super.onDetachedFromWindow()
     }
 
     // --- Ink mode ---
@@ -321,7 +358,6 @@ class ContinuousPdfView(context: Context) : View(context) {
                 val pt = AnnotationPoint(event.x, event.y)
                 currentInkPoints.add(pt)
                 inkScreenPath.moveTo(event.x, event.y)
-                parent?.requestDisallowInterceptTouchEvent(true)
             }
 
             MotionEvent.ACTION_MOVE -> {
@@ -385,7 +421,6 @@ class ContinuousPdfView(context: Context) : View(context) {
                 isDragging = true
                 dragStartPoint = AnnotationPoint(event.x, event.y)
                 dragCurrentPoint = dragStartPoint
-                parent?.requestDisallowInterceptTouchEvent(true)
             }
 
             MotionEvent.ACTION_MOVE -> {
@@ -477,7 +512,6 @@ class ContinuousPdfView(context: Context) : View(context) {
                     movingAnnotation = hit
                     movingPreviewAnnotation = hit
                     moveStartPdfPoint = pdfTouch.point
-                    parent?.requestDisallowInterceptTouchEvent(true)
                     invalidate()
                 }
             }
