@@ -162,6 +162,7 @@ function PageView({
         ctx.beginPath();
         for (let i = 0; i < liveInkPoints.length; i++) {
           const pt = liveInkPoints[i];
+          if (!pt) continue;
           if (i === 0) ctx.moveTo(pt.x, pt.y);
           else ctx.lineTo(pt.x, pt.y);
         }
@@ -378,10 +379,10 @@ function PageView({
     annotationMode === 'move'
       ? 'grab'
       : annotationMode === 'eraser'
-      ? 'not-allowed'
-      : annotationMode === 'stamp'
-      ? 'copy'
-      : 'crosshair';
+        ? 'not-allowed'
+        : annotationMode === 'stamp'
+          ? 'copy'
+          : 'crosshair';
 
   return (
     <div
@@ -512,8 +513,8 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
     let pinchStart: { dist: number; zoom: number; midX: number; midY: number } | null = null;
 
     function getTouchDist(touches: TouchList): number {
-      const dx = touches[0].clientX - touches[1].clientX;
-      const dy = touches[0].clientY - touches[1].clientY;
+      const dx = touches[0]!.clientX - touches[1]!.clientX;
+      const dy = touches[0]!.clientY - touches[1]!.clientY;
       return Math.sqrt(dx * dx + dy * dy);
     }
 
@@ -523,8 +524,8 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
       pinchStart = {
         dist: getTouchDist(e.touches),
         zoom: zoomRef.current,
-        midX: (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left,
-        midY: (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top,
+        midX: (e.touches[0]!.clientX + e.touches[1]!.clientX) / 2 - rect.left,
+        midY: (e.touches[0]!.clientY + e.touches[1]!.clientY) / 2 - rect.top,
       };
     }
 

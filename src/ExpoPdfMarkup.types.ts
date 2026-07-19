@@ -64,11 +64,7 @@ export type StampAnnotation = {
 };
 
 export type Annotation =
-  | InkAnnotation
-  | HighlightAnnotation
-  | UnderlineAnnotation
-  | TextAnnotation
-  | StampAnnotation;
+  InkAnnotation | HighlightAnnotation | UnderlineAnnotation | TextAnnotation | StampAnnotation;
 
 export type AnnotationsData = {
   version: 1;
@@ -76,14 +72,7 @@ export type AnnotationsData = {
 };
 
 export type AnnotationMode =
-  | 'none'
-  | 'ink'
-  | 'highlight'
-  | 'underline'
-  | 'text'
-  | 'stamp'
-  | 'eraser'
-  | 'move';
+  'none' | 'ink' | 'highlight' | 'underline' | 'text' | 'stamp' | 'eraser' | 'move';
 
 /**
  * Recommended shape for describing a consumer-defined stamp set (e.g. domain-specific glyphs).
