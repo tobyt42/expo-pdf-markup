@@ -2,7 +2,7 @@ import { requireNativeModule, requireNativeView } from 'expo';
 import * as React from 'react';
 import { findNodeHandle } from 'react-native';
 
-import { ExpoPdfMarkupViewProps, TextInputRequest } from './ExpoPdfMarkup.types';
+import type { ExpoPdfMarkupViewProps, TextInputRequest } from './ExpoPdfMarkup.types';
 
 type NativeViewProps = Omit<ExpoPdfMarkupViewProps, 'onTextInputRequested'> & {
   useJsTextDialog?: boolean;

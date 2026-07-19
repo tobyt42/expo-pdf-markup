@@ -204,17 +204,21 @@ export function hitTestAnnotation(
   const onPage = annotations.filter((a) => a.page === pageIndex);
   for (let i = onPage.length - 1; i >= 0; i--) {
     const annotation = onPage[i];
+    if (!annotation) continue;
     if (annotation.type === 'ink') {
       const tolerance = Math.max(annotation.lineWidth ?? 2, 10);
       const paths = annotation.paths ?? [];
       for (const stroke of paths) {
-        if (stroke.length === 1) {
-          const dx = pdfPoint.x - stroke[0].x;
-          const dy = pdfPoint.y - stroke[0].y;
+        const first = stroke[0];
+        if (stroke.length === 1 && first) {
+          const dx = pdfPoint.x - first.x;
+          const dy = pdfPoint.y - first.y;
           if (Math.sqrt(dx * dx + dy * dy) <= tolerance) return annotation;
         }
         for (let j = 0; j < stroke.length - 1; j++) {
-          if (distanceToSegment(pdfPoint, stroke[j], stroke[j + 1]) <= tolerance) {
+          const from = stroke[j];
+          const to = stroke[j + 1];
+          if (from && to && distanceToSegment(pdfPoint, from, to) <= tolerance) {
             return annotation;
           }
         }
@@ -271,7 +275,9 @@ export function drawAnnotationsOnCanvas(
           if (stroke.length === 0) continue;
           ctx.beginPath();
           for (let i = 0; i < stroke.length; i++) {
-            const { x, y } = pdfToCanvas(stroke[i].x, stroke[i].y, scale, pdfHeight);
+            const point = stroke[i];
+            if (!point) continue;
+            const { x, y } = pdfToCanvas(point.x, point.y, scale, pdfHeight);
             if (i === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
           }
