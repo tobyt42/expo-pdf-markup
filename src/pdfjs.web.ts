@@ -1,1 +1,1 @@
-export { setPdfJsWorkerSrc } from './ExpoPdfMarkupView.web';
+export { setPdfJsWorkerSrc, setPdfJsWasmUrl } from './ExpoPdfMarkupView.web';

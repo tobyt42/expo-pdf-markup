@@ -2,3 +2,7 @@
 export function setPdfJsWorkerSrc(_url: string): void {
   // no-op on native
 }
+
+export function setPdfJsWasmUrl(_url: string): void {
+  // no-op on native
+}

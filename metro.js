@@ -60,29 +60,55 @@ module.exports.withPdfMarkup = function withPdfMarkup(config) {
   // 1. Swap in this file as the babel transformer so import.meta is patched.
   config.transformer.babelTransformerPath = require.resolve('./metro.js');
 
+  const projectRoot = config.projectRoot ?? process.cwd();
+  const publicDir = path.join(projectRoot, 'public');
+
+  // Locate the installed pdfjs-dist so we can copy its runtime assets.
+  let pdfjsDir;
+  try {
+    pdfjsDir = path.dirname(require.resolve('pdfjs-dist/package.json'));
+  } catch {
+    console.warn(
+      '[expo-pdf-markup] Could not find pdfjs-dist. ' +
+        'Install it as a dependency to enable web PDF rendering.'
+    );
+    return config;
+  }
+
   // 2. Copy the pdfjs worker to <projectRoot>/public/ so it is served at
   //    /pdf.worker.min.mjs (same-origin). Only copies if not already present,
   //    so repeated Metro restarts are fast.
-  const projectRoot = config.projectRoot ?? process.cwd();
-  const publicDir = path.join(projectRoot, 'public');
-  const dest = path.join(publicDir, 'pdf.worker.min.mjs');
-
-  if (!fs.existsSync(dest)) {
-    let workerSrc;
-    try {
-      workerSrc = require.resolve('pdfjs-dist/build/pdf.worker.min.mjs');
-    } catch {
-      console.warn(
-        '[expo-pdf-markup] Could not find pdfjs-dist. ' +
-          'Install it as a dependency to enable web PDF rendering.'
-      );
-      return config;
-    }
+  const workerDest = path.join(publicDir, 'pdf.worker.min.mjs');
+  if (!fs.existsSync(workerDest)) {
     if (!fs.existsSync(publicDir)) {
       fs.mkdirSync(publicDir, { recursive: true });
     }
-    fs.copyFileSync(workerSrc, dest);
-    console.log('[expo-pdf-markup] Copied pdfjs worker → ' + dest);
+    fs.copyFileSync(path.join(pdfjsDir, 'build', 'pdf.worker.min.mjs'), workerDest);
+    console.log('[expo-pdf-markup] Copied pdfjs worker → ' + workerDest);
+  }
+
+  // 3. Copy the pdfjs WebAssembly assets to <projectRoot>/public/wasm/ so they
+  //    are served at /wasm/ (same-origin). pdfjs-dist v6 decodes JBIG2/CCITT
+  //    fax, JPEG2000 and ICC data in WebAssembly and fetches these files at
+  //    runtime; without them such image data (e.g. scanned pages, some music
+  //    notation) renders blank. Copies any files not already present.
+  const wasmSrcDir = path.join(pdfjsDir, 'wasm');
+  const wasmDestDir = path.join(publicDir, 'wasm');
+  if (fs.existsSync(wasmSrcDir)) {
+    let copied = 0;
+    for (const file of fs.readdirSync(wasmSrcDir)) {
+      const dest = path.join(wasmDestDir, file);
+      if (!fs.existsSync(dest)) {
+        if (!fs.existsSync(wasmDestDir)) {
+          fs.mkdirSync(wasmDestDir, { recursive: true });
+        }
+        fs.copyFileSync(path.join(wasmSrcDir, file), dest);
+        copied++;
+      }
+    }
+    if (copied > 0) {
+      console.log('[expo-pdf-markup] Copied ' + copied + ' pdfjs wasm file(s) → ' + wasmDestDir);
+    }
   }
 
   return config;
