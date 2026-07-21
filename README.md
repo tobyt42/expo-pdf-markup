@@ -49,7 +49,7 @@ module.exports = withPdfMarkup(config);
 
 `withPdfMarkup` does two things automatically:
 
-1. **Patches `import.meta`** in pdfjs-dist so Metro can bundle it (pdfjs-dist v4 uses ESM syntax in a Node.js-only code path that is otherwise unreachable in a browser).
+1. **Patches `import.meta`** in pdfjs-dist so Metro can bundle it (pdfjs-dist uses ESM syntax in a Node.js-only code path that is otherwise unreachable in a browser).
 2. **Copies the pdfjs worker** to `public/pdf.worker.min.mjs` in your project root so it is served alongside your app (same-origin, no CORS issues). The default worker URL is `./pdf.worker.min.mjs` (relative to the page), so it works whether your app is hosted at the root or a sub-path.
 
 The `public/pdf.worker.min.mjs` file is regenerated on each Metro start if missing, so you can add it to `.gitignore`:

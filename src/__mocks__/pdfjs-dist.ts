@@ -14,10 +14,11 @@ const mockPage = {
 const mockDoc = {
   numPages: 2,
   getPage: jest.fn().mockResolvedValue(mockPage),
-  destroy: jest.fn(),
+  // v6 removed PDFDocumentProxy.destroy(); destruction goes through loadingTask.
+  loadingTask: { destroy: jest.fn() },
 };
 
-export const version = '4.10.38';
+export const version = '6.1.200';
 
 export const GlobalWorkerOptions = {
   workerSrc: '',

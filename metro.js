@@ -10,7 +10,7 @@
  *
  * This does two things:
  *  1. Patches `import.meta` in pdfjs-dist source before Babel/hermes-parser
- *     sees it (pdfjs-dist v4 uses it in a Node.js-only code path that is dead
+ *     sees it (pdfjs-dist uses it in a Node.js-only code path that is dead
  *     code in the browser, but Metro bundles as a non-module script so the
  *     browser's JS engine refuses to parse the bundle).
  *  2. Copies the pdfjs worker file to <projectRoot>/public/pdf.worker.min.mjs
@@ -43,8 +43,9 @@ function upstream(projectRoot) {
 
 module.exports.transform = function transform({ filename, src, options, plugins }) {
   // Replace `import.meta` with `({})` in pdfjs-dist files before any parser
-  // sees the source. `({}).url` → undefined, which is harmless: the method
-  // that uses it (NodeCanvasFactory._createCanvas) is Node.js-only dead code.
+  // sees the source. `({}).url` → undefined, which is harmless: the only use
+  // (NodeCanvasFactory._createCanvas → createRequire(import.meta.url)) is
+  // Node.js-only dead code that never runs in the browser.
   if (filename.includes('pdfjs-dist') && src.includes('import.meta')) {
     src = src.replace(/import\.meta/g, '({})');
   }
