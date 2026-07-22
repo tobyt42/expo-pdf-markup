@@ -1,3 +1,3 @@
 export { default as ExpoPdfMarkupView } from './ExpoPdfMarkupView';
-export { setPdfJsWorkerSrc } from './pdfjs';
+export { setPdfJsWorkerSrc, setPdfJsWasmUrl } from './pdfjs';
 export * from './ExpoPdfMarkup.types';

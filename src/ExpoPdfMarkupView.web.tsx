@@ -36,6 +36,18 @@ export function setPdfJsWorkerSrc(url: string): void {
   pdfjs.GlobalWorkerOptions.workerSrc = url;
 }
 
+// pdfjs-dist v6 decodes image data (JBIG2/CCITT fax, JPEG2000, ICC) in
+// WebAssembly and must be told where the .wasm files live. withPdfMarkup() in
+// metro.js copies them to public/wasm/. Relative URL so the worker resolves it
+// regardless of the sub-path the app is hosted at. Override with
+// setPdfJsWasmUrl() for a different bundler or CDN.
+let wasmUrl = './wasm/';
+
+/** Allow consumers to override the pdfjs WebAssembly directory URL before mounting the view. */
+export function setPdfJsWasmUrl(url: string): void {
+  wasmUrl = url;
+}
+
 // ---------------------------------------------------------------------------
 // Zoom constants
 // ---------------------------------------------------------------------------
@@ -122,7 +134,7 @@ function PageView({
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       const viewport = page.getViewport({ scale: meta.scale * dpr });
-      const task = page.render({ canvasContext: ctx, viewport });
+      const task = page.render({ canvas: null, canvasContext: ctx, viewport });
       renderTaskRef.current = task;
       try {
         await task.promise;
@@ -562,10 +574,10 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
 
     async function load() {
       try {
-        const task = pdfjs.getDocument(source);
+        const task = pdfjs.getDocument({ url: source, wasmUrl });
         const loadedDoc = await task.promise;
         if (cancelled || loadingSourceRef.current !== source) {
-          loadedDoc.destroy();
+          loadedDoc.loadingTask.destroy();
           return;
         }
         const metas: PdfPageMeta[] = [];
@@ -574,7 +586,7 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
           const pg = await loadedDoc.getPage(i);
           if (cancelled) {
             pg.cleanup();
-            loadedDoc.destroy();
+            loadedDoc.loadingTask.destroy();
             return;
           }
           const viewport = pg.getViewport({ scale: 1 });
@@ -589,7 +601,7 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
           });
           pg.cleanup();
         }
-        docRef.current?.destroy();
+        docRef.current?.loadingTask.destroy();
         docRef.current = loadedDoc;
         setDoc(loadedDoc);
         setPageMetas(metas);

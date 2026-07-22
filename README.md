@@ -47,25 +47,28 @@ const config = getDefaultConfig(__dirname);
 module.exports = withPdfMarkup(config);
 ```
 
-`withPdfMarkup` does two things automatically:
+`withPdfMarkup` does three things automatically:
 
-1. **Patches `import.meta`** in pdfjs-dist so Metro can bundle it (pdfjs-dist v4 uses ESM syntax in a Node.js-only code path that is otherwise unreachable in a browser).
+1. **Patches `import.meta`** in pdfjs-dist so Metro can bundle it (pdfjs-dist uses ESM syntax in a Node.js-only code path that is otherwise unreachable in a browser).
 2. **Copies the pdfjs worker** to `public/pdf.worker.min.mjs` in your project root so it is served alongside your app (same-origin, no CORS issues). The default worker URL is `./pdf.worker.min.mjs` (relative to the page), so it works whether your app is hosted at the root or a sub-path.
+3. **Copies the pdfjs WebAssembly files** to `public/wasm/` in your project root. pdfjs-dist v6 decodes some image data (JBIG2/CCITT fax, JPEG2000, ICC colour) in WebAssembly and fetches these files at runtime; without them such content — scanned pages, some music notation — renders blank. The default WASM URL is `./wasm/` (relative to the page).
 
-The `public/pdf.worker.min.mjs` file is regenerated on each Metro start if missing, so you can add it to `.gitignore`:
+Both are regenerated on each Metro start if missing, so you can add them to `.gitignore`:
 
 ```
 public/pdf.worker.min.mjs
+public/wasm/
 ```
 
-#### Using a different worker URL
+#### Using a different worker or WASM URL
 
-If you are not using Metro (e.g. Webpack or a custom CDN), set the worker URL before mounting the view:
+If you are not using Metro (e.g. Webpack or a custom CDN), set the URLs before mounting the view:
 
 ```ts
-import { setPdfJsWorkerSrc } from '@tobyt/expo-pdf-markup';
+import { setPdfJsWorkerSrc, setPdfJsWasmUrl } from '@tobyt/expo-pdf-markup';
 
 setPdfJsWorkerSrc('https://your-cdn.example.com/pdf.worker.min.mjs');
+setPdfJsWasmUrl('https://your-cdn.example.com/wasm/');
 ```
 
 #### Asset loading on web
