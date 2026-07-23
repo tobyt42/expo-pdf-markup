@@ -34,6 +34,11 @@ jobs:
       - run: npm ci
         working-directory: example
 
+      # Build the module into build/ (gitignored, and `npm ci` does not run the
+      # `prepare` build on the runner). The example resolves @tobyt/expo-pdf-markup
+      # to build/index.js via its file:.. symlink, so this must exist before export.
+      - run: npm run build
+
       # Export example app as a static web bundle into site/example/
       - run: npx expo export --platform web --output-dir ../site/example
         working-directory: example
