@@ -10,6 +10,7 @@
     "postinstall": "patch-package"
   },
   "dependencies": {
+    "@tobyt/expo-pdf-markup": "file:..",
     "expo": "~57.0.7",
     "expo-asset": "~57.0.6",
     "expo-font": "~57.0.1",

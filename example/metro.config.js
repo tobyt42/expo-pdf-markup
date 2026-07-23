@@ -1,8 +1,12 @@
 // Learn more https://docs.expo.io/guides/customizing-metro
 const { getDefaultConfig } = require('expo/metro-config');
-// Use a direct path here — @tobyt/expo-pdf-markup is mapped by extraNodeModules
-// inside Metro, but metro.config.js itself runs in plain Node.js before Metro starts.
-// Real consumers use: require('@tobyt/expo-pdf-markup/metro')
+// @tobyt/expo-pdf-markup is resolved through node_modules: example/package.json
+// depends on it via "file:..", so npm symlinks the repo root into
+// example/node_modules/@tobyt/expo-pdf-markup. That lets Metro resolve the built
+// entry (build/index.js) — and its platform-specific .web files — exactly like a
+// real consumer would. metro.config.js itself runs in plain Node.js before Metro
+// starts, so it requires the plugin by relative path; real consumers use
+// require('@tobyt/expo-pdf-markup/metro').
 const { withPdfMarkup } = require('../metro');
 const path = require('path');
 
@@ -23,10 +27,8 @@ config.resolver.nodeModulesPaths = [
   path.resolve(__dirname, '../node_modules'),
 ];
 
-config.resolver.extraNodeModules = {
-  '@tobyt/expo-pdf-markup': '..',
-};
-
+// Watch the repo root so Metro can hash the package's built files, which the
+// example/node_modules/@tobyt/expo-pdf-markup symlink resolves to.
 config.watchFolders = [path.resolve(__dirname, '..')];
 
 config.transformer.getTransformOptions = async () => ({
