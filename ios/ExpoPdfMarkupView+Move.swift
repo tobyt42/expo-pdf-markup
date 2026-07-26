@@ -166,10 +166,11 @@ extension ExpoPdfMarkupView {
     in documentView: UIView
   ) -> CGRect? {
     let pdfRect: CGRect
-    if let paths = annotation.paths, !paths.isEmpty {
+    if let inkAnnotation = annotation as? InkPDFAnnotation, !inkAnnotation.strokes.isEmpty {
       var combinedBounds = CGRect.null
-      for path in paths {
-        combinedBounds = combinedBounds.union(path.cgPath.boundingBoxOfPath)
+      for stroke in inkAnnotation.strokes {
+        guard let cgPath = InkPDFAnnotation.cgPath(for: stroke) else { continue }
+        combinedBounds = combinedBounds.union(cgPath.boundingBoxOfPath)
       }
       guard !combinedBounds.isNull else { return nil }
       let padding = max(annotation.border?.lineWidth ?? 2.0, 10.0)
