@@ -272,10 +272,11 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
     for annotation in page.annotations.reversed() {
       guard AnnotationSerializer.isModuleManaged(annotation) else { continue }
 
-      if let paths = annotation.paths {
+      if let inkAnnotation = annotation as? InkPDFAnnotation {
         let tolerance = max(annotation.border?.lineWidth ?? 2.0, 10.0)
-        for path in paths {
-          let hitPath = path.cgPath.copy(
+        for stroke in inkAnnotation.strokes {
+          guard let cgPath = InkPDFAnnotation.cgPath(for: stroke) else { continue }
+          let hitPath = cgPath.copy(
             strokingWithWidth: tolerance,
             lineCap: .round,
             lineJoin: .round,
