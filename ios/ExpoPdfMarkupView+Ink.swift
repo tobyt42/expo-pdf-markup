@@ -94,14 +94,22 @@ extension ExpoPdfMarkupView {
     // and tight bounds calculations are fragile with coordinate transforms.
     let annotationBounds = page.bounds(for: pdfView.displayBox)
 
-    let annotation = InkPDFAnnotation(bounds: annotationBounds, forType: .ink, withProperties: nil)
+    let annotation = PDFAnnotation(bounds: annotationBounds, forType: .ink, withProperties: nil)
     annotation.color = AnnotationSerializer.colorFromHex(annotationColor) ?? .red
 
     let border = PDFBorder()
     border.lineWidth = annotationLineWidth
     annotation.border = border
 
-    annotation.strokes = [pdfPoints]
+    let bezierPath = UIBezierPath()
+    for (index, point) in pdfPoints.enumerated() {
+      if index == 0 {
+        bezierPath.move(to: point)
+      } else {
+        bezierPath.addLine(to: point)
+      }
+    }
+    annotation.add(bezierPath)
 
     let id = UUID().uuidString
     AnnotationSerializer.tagAsModuleManaged(annotation, id: id, createdAt: Date().timeIntervalSince1970)
