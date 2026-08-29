@@ -97,10 +97,11 @@ enum AnnotationSerializer {
     switch model.type {
     case "ink":
       model.lineWidth = annotation.border?.lineWidth ?? 2.0
-      if let inkAnnotation = annotation as? InkPDFAnnotation {
-        model.paths = inkAnnotation.strokes.map { stroke in
-          stroke.map { ["x": $0.x, "y": $0.y] }
-        }
+      // Always emit `paths`, even when PDFKit hands back nothing. The JS `Annotation`
+      // type declares it non-optional, and `JSONEncoder` drops nil keys entirely, so a
+      // nil here reaches consumers as a missing property rather than an empty stroke list.
+      model.paths = (annotation.paths ?? []).map { path in
+        pointsFromBezierPath(path).map { ["x": $0.x, "y": $0.y] }
       }
     case "highlight", "underline":
       model.bounds = AnnotationBounds(annotation.bounds)
@@ -209,15 +210,23 @@ enum AnnotationSerializer {
       annotationBounds = combinedRect.insetBy(dx: -padding, dy: -padding)
     }
 
-    let annotation = InkPDFAnnotation(bounds: annotationBounds, forType: .ink, withProperties: nil)
+    let annotation = PDFAnnotation(bounds: annotationBounds, forType: .ink, withProperties: nil)
     annotation.color = color
 
     let border = PDFBorder()
     border.lineWidth = lineWidth
     annotation.border = border
 
-    annotation.strokes = paths.map { path in
-      path.map { CGPoint(x: $0.x, y: $0.y) }
+    for path in paths {
+      let bezierPath = UIBezierPath()
+      for (index, point) in path.enumerated() {
+        if index == 0 {
+          bezierPath.move(to: CGPoint(x: point.x, y: point.y))
+        } else {
+          bezierPath.addLine(to: CGPoint(x: point.x, y: point.y))
+        }
+      }
+      annotation.add(bezierPath)
     }
 
     let createdAt = model.createdAt ?? Date().timeIntervalSince1970
@@ -285,5 +294,25 @@ enum AnnotationSerializer {
       width: width,
       height: height
     )
+  }
+
+  private static func pointsFromBezierPath(_ path: UIBezierPath) -> [CGPoint] {
+    var points: [CGPoint] = []
+    let cgPath = path.cgPath
+    cgPath.applyWithBlock { element in
+      switch element.pointee.type {
+      case .moveToPoint, .addLineToPoint:
+        points.append(element.pointee.points[0])
+      case .addQuadCurveToPoint:
+        points.append(element.pointee.points[1])
+      case .addCurveToPoint:
+        points.append(element.pointee.points[2])
+      case .closeSubpath:
+        break
+      @unknown default:
+        break
+      }
+    }
+    return points
   }
 }

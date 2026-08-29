@@ -120,7 +120,13 @@ object AnnotationSerializer {
         obj.put("color", model.color)
         model.lineWidth?.let { obj.put("lineWidth", it.toDouble()) }
         model.alpha?.let { obj.put("alpha", it.toDouble()) }
-        model.paths?.let { obj.put("paths", pathsToJson(it)) }
+        // Ink annotations always carry `paths`, even when empty: the JS `Annotation` type
+        // declares it non-optional, so omitting the key crashes consumers that dereference it.
+        if (model.type == "ink") {
+            obj.put("paths", pathsToJson(model.paths ?: emptyList()))
+        } else {
+            model.paths?.let { obj.put("paths", pathsToJson(it)) }
+        }
         model.bounds?.let { obj.put("bounds", boundsToJson(it)) }
         model.contents?.let { obj.put("contents", it) }
         model.fontSize?.let { obj.put("fontSize", it.toDouble()) }

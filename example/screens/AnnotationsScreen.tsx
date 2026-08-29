@@ -11,8 +11,12 @@ type Props = {
 
 function annotationSummary(annotation: Annotation): string {
   switch (annotation.type) {
-    case 'ink':
-      return `${annotation.paths.length} path${annotation.paths.length !== 1 ? 's' : ''}`;
+    case 'ink': {
+      // Defensive: a native platform that fails to decode stroke geometry can leave
+      // `paths` absent despite the type, and this screen should degrade rather than throw.
+      const count = annotation.paths?.length ?? 0;
+      return `${count} path${count !== 1 ? 's' : ''}`;
+    }
     case 'highlight':
     case 'underline':
       return `(${Math.round(annotation.bounds.x)}, ${Math.round(annotation.bounds.y)})`;

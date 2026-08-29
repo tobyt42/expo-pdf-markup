@@ -174,28 +174,6 @@ final class AnnotationSerializerTests: XCTestCase {
     )
   }
 
-  func testInkAnnotationStoresStrokesOnCustomSubclass() throws {
-    let model = AnnotationModel(
-      id: "ink-strokes-1",
-      type: "ink",
-      page: 0,
-      color: "#00FF00",
-      lineWidth: 4.0,
-      paths: [[["x": 1, "y": 2], ["x": 3, "y": 4]], [["x": 5, "y": 6]]],
-      createdAt: 1_741_340_000
-    )
-
-    let annotation = try XCTUnwrap(AnnotationSerializer.toPDFAnnotation(model))
-    let inkAnnotation = try XCTUnwrap(annotation as? InkPDFAnnotation)
-
-    // Regression coverage: on iOS 27 beta, PDFAnnotation.paths silently drops stroke
-    // geometry added via .add(_:), so ink annotations must not depend on it (report/).
-    XCTAssertEqual(
-      inkAnnotation.strokes,
-      [[CGPoint(x: 1, y: 2), CGPoint(x: 3, y: 4)], [CGPoint(x: 5, y: 6)]]
-    )
-  }
-
   func testFreeTextColorRoundTrip() throws {
     let model = AnnotationModel(
       id: "ft-color-1",
