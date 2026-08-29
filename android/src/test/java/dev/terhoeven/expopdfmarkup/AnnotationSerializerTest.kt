@@ -47,6 +47,30 @@ class AnnotationSerializerTest {
     }
 
     @Test
+    fun testInkAlwaysSerializesPathsKey() {
+        // The JS `Annotation` type declares `paths` non-optional, so an ink annotation
+        // must always carry the key -- consumers dereference it directly.
+        val model = AnnotationModel(
+            id = "ink-no-paths",
+            type = "ink",
+            page = 0,
+            color = "#FF0000",
+            lineWidth = 3f,
+            paths = null,
+            createdAt = 1700000000.0
+        )
+        val json = AnnotationSerializer.serialize(
+            AnnotationsData(version = 1, annotations = listOf(model))
+        )
+
+        assertTrue(json.contains("\"paths\""))
+
+        val result = AnnotationSerializer.deserialize(json)
+        assertNotNull(result)
+        assertEquals(0, result!!.annotations[0].paths!!.size)
+    }
+
+    @Test
     fun testHighlightRoundTrip() {
         val model = AnnotationModel(
             id = "hl-1",

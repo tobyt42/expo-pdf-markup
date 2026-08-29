@@ -97,10 +97,11 @@ enum AnnotationSerializer {
     switch model.type {
     case "ink":
       model.lineWidth = annotation.border?.lineWidth ?? 2.0
-      if let bezierPaths = annotation.paths {
-        model.paths = bezierPaths.map { path in
-          pointsFromBezierPath(path).map { ["x": $0.x, "y": $0.y] }
-        }
+      // Always emit `paths`, even when PDFKit hands back nothing. The JS `Annotation`
+      // type declares it non-optional, and `JSONEncoder` drops nil keys entirely, so a
+      // nil here reaches consumers as a missing property rather than an empty stroke list.
+      model.paths = (annotation.paths ?? []).map { path in
+        pointsFromBezierPath(path).map { ["x": $0.x, "y": $0.y] }
       }
     case "highlight", "underline":
       model.bounds = AnnotationBounds(annotation.bounds)
