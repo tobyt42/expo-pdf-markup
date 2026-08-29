@@ -1,5 +1,13 @@
 # @tobyt/expo-pdf-markup
 
+## 1.1.4
+
+### Patch Changes
+
+- 63fdb1c: Always serialise `paths` on ink annotations, even when the platform returns no stroke geometry. The `Annotation` type declares `paths` as non-optional, but iOS and Android both omitted the key when geometry was missing, so consumers dereferencing `annotation.paths` crashed with a `TypeError` instead of seeing an empty stroke list.
+- 2463b24: Fix `withPdfMarkup` leaving a stale pdfjs worker in `public/` after a pdfjs-dist upgrade. The Metro plugin copied `pdf.worker.min.mjs` and the `wasm/` assets only when they were absent, so once a project had them the copies were pinned to whichever pdfjs-dist version was installed first. Upgrading pdfjs-dist then broke web rendering with `The API version "x" does not match the Worker version "y"`, and silently stale wasm assets could mis-decode JBIG2/CCITT fax, JPEG2000 and ICC colour data. The plugin now compares each file against the installed pdfjs-dist and re-copies whenever it differs, so upgrades and downgrades both self-correct while unchanged files stay a no-op on Metro restart.
+- 3aeeae8: Revert the iOS 27 beta workaround for the PDFKit ink annotation regression. Ink annotations use PDFKit's built-in ink storage again now that `PDFAnnotation.add(_:)`/`.paths` behaves correctly, restoring the standard rendering and serialisation behaviour.
+
 ## 1.1.3
 
 ### Patch Changes
