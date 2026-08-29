@@ -23,6 +23,10 @@ function annotationSummary(annotation: Annotation): string {
     case 'text':
     case 'freeText':
       return annotation.contents ? `"${annotation.contents}"` : '(empty)';
+    case 'stamp':
+      return `${annotation.text} (${Math.round(annotation.bounds.x)}, ${Math.round(
+        annotation.bounds.y
+      )})`;
   }
 }
 
@@ -32,6 +36,7 @@ const TYPE_COLORS: Record<string, string> = {
   underline: '#30D158',
   text: '#FF9F0A',
   freeText: '#FF9F0A',
+  stamp: '#BF5AF2',
 };
 
 export default function AnnotationsScreen({ annotations, onClearAnnotations, onGoBack }: Props) {
