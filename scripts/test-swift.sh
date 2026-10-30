@@ -6,19 +6,23 @@ cd "$(dirname "$0")/.."
 destination="${IOS_TEST_DESTINATION:-}"
 if [[ -z "$destination" ]]; then
   devices=$(xcrun simctl list devices available --json)
+  sdk_version=$(xcrun --sdk iphonesimulator --show-sdk-version)
   device_id=$(node -e '
     const { devices } = JSON.parse(process.argv[1]);
+    const sdkMajor = Number(process.argv[2].split(".")[0]);
     const candidates = Object.entries(devices)
-      .filter(([runtime]) => runtime.includes(".iOS-"))
+      .filter(([runtime]) => runtime.includes(".iOS-") &&
+        Number(runtime.split(".iOS-")[1].split("-")[0]) <= sdkMajor)
       .sort(([a], [b]) => b.localeCompare(a, undefined, { numeric: true }))
       .flatMap(([, devices]) => devices)
-      .filter(device => device.isAvailable && device.name.startsWith("iPhone"));
+      .filter(device => device.isAvailable &&
+        (device.deviceTypeIdentifier?.includes(".iPhone-") || device.name.startsWith("iPhone")));
     if (!candidates.length) {
       console.error("No available iPhone simulator; install an iOS runtime or set IOS_TEST_DESTINATION.");
       process.exit(1);
     }
     console.log((candidates.find(device => device.state === "Booted") || candidates[0]).udid);
-  ' "$devices")
+  ' "$devices" "$sdk_version")
   destination="platform=iOS Simulator,id=$device_id"
 fi
 
