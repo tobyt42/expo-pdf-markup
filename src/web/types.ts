@@ -10,3 +10,6 @@ export type PdfPageMeta = {
   /** Canvas backing height in physical pixels (CSS height × devicePixelRatio) */
   canvasHeight: number;
 };
+
+/** A page's size in PDF user-space points, as read from the document before any layout. */
+export type PageSize = Pick<PdfPageMeta, 'pdfWidth' | 'pdfHeight'>;

@@ -29,12 +29,12 @@ import {
   canGestureTurn,
   classifySwipe,
   classifyTap,
-  computePageMetas,
   resolveTurn,
-  type PageSize,
+  slideOffsetFor,
   type TurnDirection,
 } from './web/bookMode';
-import type { PdfPageMeta } from './web/types';
+import { computePageMetas } from './web/layout';
+import type { PageSize, PdfPageMeta } from './web/types';
 
 // Configure pdfjs worker once at module level (consumers can override before mounting)
 if (!pdfjs.GlobalWorkerOptions.workerSrc) {
@@ -754,7 +754,7 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
     (direction: TurnDirection) => {
       clearTurnTimer();
       if (slideOffsetRef.current === 0) {
-        setSlideOffset(direction === 'next' ? -BOUNCE_PX : BOUNCE_PX, true);
+        setSlideOffset(slideOffsetFor(direction, BOUNCE_PX), true);
         turnTimerRef.current = setTimeout(() => {
           setSlideOffset(0, true);
           turnTimerRef.current = null;
@@ -785,7 +785,7 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
       pendingTurnRef.current = target;
       const slideAway = () => {
         turnFrameRef.current = null;
-        setSlideOffset(direction === 'next' ? -containerWidth : containerWidth, true);
+        setSlideOffset(slideOffsetFor(direction, containerWidth), true);
         turnTimerRef.current = setTimeout(() => showBookPage(target), TURN_DURATION_MS);
       };
       if (!wasZoomed) {
@@ -910,7 +910,7 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
       return;
     }
     if (e.button !== 0 || annotationMode !== 'none') return;
-    const kind = canGestureTurn(displayMode, annotationMode, zoomRef.current) ? 'turn' : 'pan';
+    const kind = canGestureTurn(annotationMode, zoomRef.current) ? 'turn' : 'pan';
     if (kind === 'turn') finishPendingTurn();
     gestureRef.current = {
       startX: e.clientX,
@@ -1085,24 +1085,14 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
       ref={scrollContainerRef}
       data-display-mode={displayMode}
       data-page={isBook ? currentPage : undefined}
-      style={
-        isBook
-          ? {
-              overflow: zoomed ? 'auto' : 'hidden',
-              backgroundColor,
-              height: '100%',
-              touchAction: 'none',
-              userSelect: 'none',
-              ...styleObj,
-            }
-          : {
-              overflowY: 'scroll',
-              overflowX: 'auto',
-              backgroundColor,
-              height: '100%',
-              ...styleObj,
-            }
-      }
+      style={{
+        backgroundColor,
+        height: '100%',
+        ...(isBook
+          ? { overflow: zoomed ? 'auto' : 'hidden', touchAction: 'none', userSelect: 'none' }
+          : { overflowY: 'scroll', overflowX: 'auto' }),
+        ...styleObj,
+      }}
       onPointerDown={isBook ? handleBookPointerDown : undefined}
       onPointerMove={isBook ? handleBookPointerMove : undefined}
       onPointerUp={isBook ? handleBookPointerUp : undefined}

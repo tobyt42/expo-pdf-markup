@@ -1,10 +1,7 @@
-import type { AnnotationMode, DisplayMode } from '../ExpoPdfMarkup.types';
-import type { PdfPageMeta } from './types';
+import type { AnnotationMode } from '../ExpoPdfMarkup.types';
 
 /** Which way a turn goes. `'next'` is always forward in the document, whatever the layout direction. */
 export type TurnDirection = 'next' | 'previous';
-
-export type PageSize = { pdfWidth: number; pdfHeight: number };
 
 /** Minimum width of an edge tap zone, in CSS px. */
 export const MIN_EDGE_ZONE_PX = 44;
@@ -22,15 +19,11 @@ export const EDGE_RESISTANCE = 0.3;
 export const BOUNCE_PX = 40;
 
 /**
- * Turn policy for swipes and edge taps: they turn the page only in book mode, with no markup
- * tool active, and when the page isn't zoomed in beyond fit. Hardware keys don't go through this.
+ * Turn policy for book mode swipes and edge taps: they turn the page only with no markup tool
+ * active, and when the page isn't zoomed in beyond fit. Hardware keys don't go through this.
  */
-export function canGestureTurn(
-  displayMode: DisplayMode,
-  annotationMode: AnnotationMode,
-  zoom: number
-): boolean {
-  return displayMode === 'book' && annotationMode === 'none' && zoom <= 1;
+export function canGestureTurn(annotationMode: AnnotationMode, zoom: number): boolean {
+  return annotationMode === 'none' && zoom <= 1;
 }
 
 const KEY_TURNS: Record<string, TurnDirection> = {
@@ -78,6 +71,14 @@ export function isTextEntry(el: Element | null): boolean {
 }
 
 /**
+ * Where the page strip moves to slide `distance` px in `direction`: left (negative) for next,
+ * right for previous, so the page that comes in enters from the side the turn heads towards.
+ */
+export function slideOffsetFor(direction: TurnDirection, distance: number): number {
+  return direction === 'next' ? -distance : distance;
+}
+
+/**
  * The page a turn lands on, or `null` when it would go before the first page or past the last.
  * Nothing wraps round.
  */
@@ -109,32 +110,4 @@ export function classifySwipe(dx: number, dy: number, viewWidth: number): TurnDi
   if (Math.abs(dx) < threshold || Math.abs(dx) < Math.abs(dy)) return null;
   // Swipe left (finger moves towards smaller x) always means next.
   return dx < 0 ? 'next' : 'previous';
-}
-
-/**
- * Layout for every page. Continuous mode fits each page to the view's width. Book mode fits the
- * whole page into the view, falling back to width when the height isn't known yet.
- */
-export function computePageMetas(
-  sizes: PageSize[],
-  viewWidth: number,
-  viewHeight: number,
-  displayMode: DisplayMode,
-  dpr: number
-): PdfPageMeta[] {
-  if (viewWidth <= 0) return [];
-  return sizes.map(({ pdfWidth, pdfHeight }) => {
-    const widthScale = viewWidth / pdfWidth;
-    const scale =
-      displayMode === 'book' && viewHeight > 0
-        ? Math.min(widthScale, viewHeight / pdfHeight)
-        : widthScale;
-    return {
-      pdfWidth,
-      pdfHeight,
-      scale,
-      canvasWidth: Math.round(pdfWidth * scale * dpr),
-      canvasHeight: Math.round(pdfHeight * scale * dpr),
-    };
-  });
 }
