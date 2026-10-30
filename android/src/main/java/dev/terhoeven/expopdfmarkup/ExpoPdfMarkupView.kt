@@ -85,10 +85,10 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
             renderer = r
             lastLoadedSource = source
             onLoadComplete(mapOf("pageCount" to r.pageCount))
-            if (width > 0) {
-                pdfView.loadPages(r, width)
+            if (width > 0 && (height > 0 || !pdfView.isBookMode)) {
+                pdfView.loadPages(r, width, height)
             } else {
-                post { renderer?.let { pdfView.loadPages(it, width) } }
+                post { renderer?.let { pdfView.loadPages(it, width, height) } }
             }
             // Re-apply pending annotations after load
             pendingAnnotationsJson?.let { loadAnnotations(it) }
@@ -119,13 +119,25 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
         pdfView.annotations = deduped
     }
 
-    /** `"continuous"` (default) or `"book"`. Book mode currently still renders continuously. */
+    /** `"continuous"` (default) or `"book"`: one page at a time, turned sideways. */
     var displayMode: String = "continuous"
         private set
 
+    /** Switches display mode, keeping the reader on the page they were on. */
     fun setDisplayMode(mode: String?) {
-        displayMode = if (mode == "book") "book" else "continuous"
+        val newMode = if (mode == "book") "book" else "continuous"
+        if (newMode == displayMode) return
+        displayMode = newMode
+        val page = pdfView.currentPage
+        pdfView.isBookMode = newMode == "book"
+        renderer?.let { pdfView.loadPages(it, width, height, startPage = page) }
     }
+
+    /**
+     * Turns one page in book mode, with the same slide, bounce and single
+     * onPageChanged as a swipe or edge tap. No-op in continuous mode.
+     */
+    fun turnPage(direction: BookTurnPolicy.Direction): Boolean = pdfView.turnPage(direction)
 
     fun setAnnotationMode(mode: String?) {
         pdfView.annotationMode = mode ?: "none"
@@ -230,8 +242,14 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        if (w > 0 && w != oldw) {
-            renderer?.let { pdfView.loadPages(it, w) }
+        val r = renderer ?: return
+        if (pdfView.isBookMode) {
+            // Rotation or resize: re-fit the page in view and stay on it.
+            if (w > 0 && h > 0 && (w != oldw || h != oldh)) {
+                pdfView.loadPages(r, w, h, startPage = pdfView.currentPage)
+            }
+        } else if (w > 0 && w != oldw) {
+            pdfView.loadPages(r, w, h)
         }
     }
 }
