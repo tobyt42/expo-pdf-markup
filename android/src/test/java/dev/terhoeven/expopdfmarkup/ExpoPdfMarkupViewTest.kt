@@ -121,6 +121,148 @@ class ExpoPdfMarkupViewTest {
         assertFalse(3 in validRange)
     }
 
+    // MARK: - Book mode page turning
+
+    private class RecordingPager(pageCount: Int, page: Int = 0) {
+        val changes = mutableListOf<Int>()
+        val pager = BookPager { changes.add(it) }.apply { reset(pageCount, page) }
+    }
+
+    @Test
+    fun testBookModeTurnSlidesToNextPageAndReportsItOnce() {
+        val r = RecordingPager(pageCount = 5)
+
+        val turn = r.pager.turn(BookTurnPolicy.Direction.NEXT)
+
+        assertEquals(BookPager.Turn.Slide(from = 0, to = 1, BookTurnPolicy.Direction.NEXT), turn)
+        assertEquals("page changes only when the slide completes", emptyList<Int>(), r.changes)
+        r.pager.finishSlide()
+        assertEquals(1, r.pager.currentPage)
+        assertEquals(listOf(1), r.changes)
+    }
+
+    @Test
+    fun testBookModeTurnPreviousSlidesBack() {
+        val r = RecordingPager(pageCount = 5, page = 3)
+
+        assertEquals(
+            BookPager.Turn.Slide(from = 3, to = 2, BookTurnPolicy.Direction.PREVIOUS),
+            r.pager.turn(BookTurnPolicy.Direction.PREVIOUS)
+        )
+        r.pager.finishSlide()
+        assertEquals(listOf(2), r.changes)
+    }
+
+    @Test
+    fun testBookModeBouncesBeforeTheFirstPage() {
+        val r = RecordingPager(pageCount = 5, page = 0)
+
+        val turn = r.pager.turn(BookTurnPolicy.Direction.PREVIOUS)
+        r.pager.finishSlide()
+
+        assertEquals(BookPager.Turn.Bounce(BookTurnPolicy.Direction.PREVIOUS), turn)
+        assertEquals(0, r.pager.currentPage)
+        assertEquals(emptyList<Int>(), r.changes)
+    }
+
+    @Test
+    fun testBookModeBouncesPastTheLastPageAndDoesNotWrap() {
+        val r = RecordingPager(pageCount = 5, page = 4)
+
+        val turn = r.pager.turn(BookTurnPolicy.Direction.NEXT)
+        r.pager.finishSlide()
+
+        assertEquals(BookPager.Turn.Bounce(BookTurnPolicy.Direction.NEXT), turn)
+        assertEquals(4, r.pager.currentPage)
+        assertEquals(emptyList<Int>(), r.changes)
+    }
+
+    @Test
+    fun testBookModeOnePagePdfNeverTurns() {
+        val r = RecordingPager(pageCount = 1)
+
+        assertEquals(
+            BookPager.Turn.Bounce(BookTurnPolicy.Direction.NEXT),
+            r.pager.turn(BookTurnPolicy.Direction.NEXT)
+        )
+        assertEquals(
+            BookPager.Turn.Bounce(BookTurnPolicy.Direction.PREVIOUS),
+            r.pager.turn(BookTurnPolicy.Direction.PREVIOUS)
+        )
+        r.pager.finishSlide()
+        assertEquals(0, r.pager.currentPage)
+        assertEquals(emptyList<Int>(), r.changes)
+    }
+
+    @Test
+    fun testBookModeTurnDuringASlideLandsTheFirstTurnBeforeStartingTheNext() {
+        // Rapid taps (or key presses) must each count, and each report once.
+        val r = RecordingPager(pageCount = 5)
+
+        r.pager.turn(BookTurnPolicy.Direction.NEXT)
+        val second = r.pager.turn(BookTurnPolicy.Direction.NEXT)
+        r.pager.finishSlide()
+        r.pager.finishSlide()
+
+        assertEquals(BookPager.Turn.Slide(from = 1, to = 2, BookTurnPolicy.Direction.NEXT), second)
+        assertEquals(listOf(1, 2), r.changes)
+    }
+
+    @Test
+    fun testBookModePagePropJumpsAndReportsOnce() {
+        val r = RecordingPager(pageCount = 5)
+
+        r.pager.jumpTo(3)
+        r.pager.jumpTo(3)
+
+        assertEquals(3, r.pager.currentPage)
+        assertEquals(listOf(3), r.changes)
+    }
+
+    @Test
+    fun testBookModePagePropIgnoresOutOfRangePages() {
+        val r = RecordingPager(pageCount = 5, page = 2)
+
+        r.pager.jumpTo(-1)
+        r.pager.jumpTo(5)
+
+        assertEquals(2, r.pager.currentPage)
+        assertEquals(emptyList<Int>(), r.changes)
+    }
+
+    @Test
+    fun testBookModePagePropDuringASlideCancelsTheSlide() {
+        val r = RecordingPager(pageCount = 5)
+
+        r.pager.turn(BookTurnPolicy.Direction.NEXT)
+        r.pager.jumpTo(4)
+        r.pager.finishSlide()
+
+        assertEquals(4, r.pager.currentPage)
+        assertEquals(listOf(4), r.changes)
+    }
+
+    @Test
+    fun testBookModeResetKeepsThePageWithoutReporting() {
+        // Switching displayMode, rotating or resizing re-lays out via reset.
+        val r = RecordingPager(pageCount = 5, page = 3)
+
+        r.pager.reset(pageCount = 5, page = 3)
+
+        assertEquals(3, r.pager.currentPage)
+        assertEquals(emptyList<Int>(), r.changes)
+    }
+
+    @Test
+    fun testBookModeResetClampsToTheDocument() {
+        val r = RecordingPager(pageCount = 2, page = 7)
+        assertEquals(1, r.pager.currentPage)
+        r.pager.reset(pageCount = 2, page = -3)
+        assertEquals(0, r.pager.currentPage)
+        r.pager.reset(pageCount = 0, page = 2)
+        assertEquals(0, r.pager.currentPage)
+    }
+
     // MARK: - Color string parsing
 
     @Test
