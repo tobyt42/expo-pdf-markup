@@ -19,6 +19,29 @@ enum BookTurnInput {
   case key
 }
 
+/// Book mode tuning. The names and values match the web (`src/web/bookMode.ts`) and Android
+/// (`BookTurnPolicy`, `ContinuousPdfView`) implementations.
+enum BookMode {
+  /// Share of the view's width that each edge tap zone covers.
+  static let edgeZoneFraction: CGFloat = 0.25
+  /// Minimum width of an edge tap zone, in points.
+  static let minEdgeZone: CGFloat = 44
+  /// Share of the view's width a slow swipe has to travel to turn the page.
+  static let swipeTurnFraction: CGFloat = 0.25
+  /// A release faster than this (points per second) turns the page even after a short drag.
+  static let flingVelocity: CGFloat = 500
+  /// How much of the finger's travel the page follows where there's no page to turn to.
+  static let edgeResistance: CGFloat = 0.3
+  /// How far (points) the page nudges when a tap or key bounces at either end.
+  static let bouncePoints: CGFloat = 32
+  /// Scales within this share of fit count as "at fit", absorbing pinch rounding.
+  static let fitTolerance: CGFloat = 0.01
+  /// Duration of the slide to the next or previous page, in seconds.
+  static let turnDuration: TimeInterval = 0.25
+  /// Duration of each half of the bounce at either end, in seconds.
+  static let bounceDuration: TimeInterval = 0.12
+}
+
 extension ExpoPdfMarkupView {
   // MARK: - Book mode presentation
 
@@ -151,7 +174,7 @@ extension ExpoPdfMarkupView {
   }
 
   var isZoomedBeyondFit: Bool {
-    pdfView.scaleFactor > pdfView.scaleFactorForSizeToFit * 1.01
+    pdfView.scaleFactor > pdfView.scaleFactorForSizeToFit * (1 + BookMode.fitTolerance)
   }
 
   func bookNeighbour(_ direction: BookTurnDirection) -> PDFPage? {
@@ -168,8 +191,7 @@ extension ExpoPdfMarkupView {
 
     pdfView.transform = .identity
     pdfView.go(to: page)
-    pdfView.scaleFactor = pdfView.scaleFactorForSizeToFit
-    pdfView.autoScales = true
+    resetBookPageToFit()
 
     guard window != nil else { return }
 
@@ -181,7 +203,7 @@ extension ExpoPdfMarkupView {
     // Next slides in from the right, previous from the left.
     let incomingStart = direction == .next ? width + dragOffset : -width + dragOffset
     pdfView.transform = CGAffineTransform(translationX: incomingStart, y: 0)
-    UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseOut, .allowUserInteraction]) {
+    UIView.animate(withDuration: BookMode.turnDuration, delay: 0, options: [.curveEaseOut, .allowUserInteraction]) {
       self.pdfView.transform = .identity
       outgoing?.transform = CGAffineTransform(translationX: direction == .next ? -width : width, y: 0)
     } completion: { _ in
@@ -192,10 +214,24 @@ extension ExpoPdfMarkupView {
     }
   }
 
+  /// Jumps straight to `page` with no slide, as the `page` prop does, and starts it at fit.
+  /// `go(to:)` fires the one `onPageChanged`.
+  func jumpToBookPage(_ page: PDFPage) {
+    finishBookAnimation()
+    pdfView.transform = .identity
+    pdfView.go(to: page)
+    resetBookPageToFit()
+  }
+
+  private func resetBookPageToFit() {
+    pdfView.scaleFactor = pdfView.scaleFactorForSizeToFit
+    pdfView.autoScales = true
+  }
+
   private func animateBookBounce(_ direction: BookTurnDirection) {
     guard window != nil else { return }
-    let nudge: CGFloat = direction == .next ? -32 : 32
-    UIView.animate(withDuration: 0.12, delay: 0, options: [.curveEaseOut, .allowUserInteraction]) {
+    let nudge = direction == .next ? -BookMode.bouncePoints : BookMode.bouncePoints
+    UIView.animate(withDuration: BookMode.bounceDuration, delay: 0, options: [.curveEaseOut, .allowUserInteraction]) {
       self.pdfView.transform = CGAffineTransform(translationX: nudge, y: 0)
     } completion: { _ in
       self.springBookPageBack()
@@ -224,24 +260,40 @@ extension ExpoPdfMarkupView {
 
   /// Width of each edge tap zone: the outer quarter of the view, at least 44 pt.
   var bookEdgeZoneWidth: CGFloat {
-    min(max(bounds.width * 0.25, 44), bounds.width / 2)
+    min(max(bounds.width * BookMode.edgeZoneFraction, BookMode.minEdgeZone), bounds.width / 2)
   }
 
-  /// Turns the page for a tap at `location` (in this view's coordinates) if it lands in an edge zone.
-  func handleBookTap(at location: CGPoint) {
+  /// The turn a tap at `location` (in this view's coordinates) asks for: one in an edge zone while
+  /// the turn policy allows edge taps. `nil` in the middle, where a double-tap zooms instead.
+  func bookEdgeTurn(at location: CGPoint) -> BookTurnDirection? {
+    guard allowsBookTurn(from: .edgeTap) else { return nil }
     let zone = bookEdgeZoneWidth
     if location.x <= zone {
-      turnBookPage(.previous, from: .edgeTap)
-    } else if location.x >= bounds.width - zone {
-      turnBookPage(.next, from: .edgeTap)
+      return .previous
     }
+    if location.x >= bounds.width - zone {
+      return .next
+    }
+    return nil
+  }
+
+  /// Turns the page for a tap at `location` if it lands in an edge zone. `tapCount` is the
+  /// touch's tap count: the second tap of a double-tap is skipped, so a double-tap on an edge
+  /// turns once (as on Android, a third quick tap turns again).
+  func handleBookTap(at location: CGPoint, tapCount: Int = 1) {
+    guard tapCount % 2 == 1, let direction = bookEdgeTurn(at: location) else { return }
+    turnBookPage(direction, from: .edgeTap)
   }
 
   @objc func handleBookTapGesture(_ gesture: UITapGestureRecognizer) {
     guard gesture.state == .ended else { return }
     claimBookKeyFocus()
-    handleBookTap(at: gesture.location(in: self))
+    handleBookTap(at: gesture.location(in: self), tapCount: bookTapCount)
   }
+
+  /// A double-tap on an edge: recognised only so that PDFKit's double-tap zoom, which waits for
+  /// it to fail, doesn't zoom there. The first tap has already turned the page.
+  @objc func handleBookEdgeDoubleTapGesture(_: UITapGestureRecognizer) {}
 
   // MARK: - Swipes
 
@@ -251,7 +303,7 @@ extension ExpoPdfMarkupView {
     case .changed:
       // Follow the finger, with resistance where there is no page to turn to.
       let direction: BookTurnDirection = translationX < 0 ? .next : .previous
-      let offset = bookNeighbour(direction) == nil ? translationX * 0.3 : translationX
+      let offset = bookNeighbour(direction) == nil ? translationX * BookMode.edgeResistance : translationX
       pdfView.transform = CGAffineTransform(translationX: offset, y: 0)
     case .ended:
       endBookSwipe(translationX: translationX, velocityX: gesture.velocity(in: self).x)
@@ -271,8 +323,8 @@ extension ExpoPdfMarkupView {
       return
     }
     let direction: BookTurnDirection = reference < 0 ? .next : .previous
-    let farEnough = abs(translationX) > bounds.width * 0.25
-    let flicked = abs(velocityX) > 500 && (velocityX < 0) == (reference < 0)
+    let farEnough = abs(translationX) > bounds.width * BookMode.swipeTurnFraction
+    let flicked = abs(velocityX) > BookMode.flingVelocity && (velocityX < 0) == (reference < 0)
     guard farEnough || flicked else {
       springBookPageBack()
       return
@@ -290,7 +342,18 @@ extension ExpoPdfMarkupView {
     if gesture === bookTapGesture {
       return allowsBookTurn(from: .edgeTap)
     }
+    if gesture === bookEdgeDoubleTapGesture {
+      return bookEdgeTurn(at: gesture.location(in: self)) != nil
+    }
     return true
+  }
+
+  /// Whether `other` has to wait for `gesture` to fail: PDFKit's own double-tap zoom waits for
+  /// the edge double-tap, so a double-tap zooms only in the middle region.
+  func bookGesture(_ gesture: UIGestureRecognizer, isRequiredToFailBy other: UIGestureRecognizer) -> Bool {
+    guard gesture === bookEdgeDoubleTapGesture, other !== gesture,
+          let tap = other as? UITapGestureRecognizer else { return false }
+    return tap.numberOfTapsRequired >= 2
   }
 
   // MARK: - Gestures
@@ -304,6 +367,15 @@ extension ExpoPdfMarkupView {
     tap.delegate = delegate
     pdfView.addGestureRecognizer(tap)
     bookTapGesture = tap
+
+    let edgeDoubleTap = UITapGestureRecognizer(
+      target: self,
+      action: #selector(handleBookEdgeDoubleTapGesture(_:))
+    )
+    edgeDoubleTap.numberOfTapsRequired = 2
+    edgeDoubleTap.delegate = delegate
+    pdfView.addGestureRecognizer(edgeDoubleTap)
+    bookEdgeDoubleTapGesture = edgeDoubleTap
 
     let pan = UIPanGestureRecognizer(target: self, action: #selector(handleBookPanGesture(_:)))
     pan.maximumNumberOfTouches = 1
@@ -322,6 +394,10 @@ extension ExpoPdfMarkupView {
     if let pan = bookPanGesture {
       pdfView.removeGestureRecognizer(pan)
       bookPanGesture = nil
+    }
+    if let edgeDoubleTap = bookEdgeDoubleTapGesture {
+      pdfView.removeGestureRecognizer(edgeDoubleTap)
+      bookEdgeDoubleTapGesture = nil
     }
     bookGestureDelegate = nil
   }
@@ -345,6 +421,20 @@ final class BookGestureDelegate: NSObject, UIGestureRecognizerDelegate {
     shouldRecognizeSimultaneouslyWith _: UIGestureRecognizer
   ) -> Bool {
     true
+  }
+
+  func gestureRecognizer(
+    _ gestureRecognizer: UIGestureRecognizer,
+    shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer
+  ) -> Bool {
+    view?.bookGesture(gestureRecognizer, isRequiredToFailBy: otherGestureRecognizer) ?? false
+  }
+
+  func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+    if let view, gestureRecognizer === view.bookTapGesture {
+      view.bookTapCount = touch.tapCount
+    }
+    return true
   }
 }
 

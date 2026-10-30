@@ -133,6 +133,52 @@ final class BookModeTests: XCTestCase {
     XCTAssertEqual(shownPage, 2)
   }
 
+  func testTheSecondTapOfADoubleTapOnAnEdgeDoesNotTurnAgain() throws {
+    try loadBook(startPage: 2)
+    view.handleBookTap(at: CGPoint(x: 395, y: 300), tapCount: 1)
+    view.handleBookTap(at: CGPoint(x: 395, y: 300), tapCount: 2)
+    XCTAssertEqual(shownPage, 3, "a double-tap on an edge turns once")
+    view.handleBookTap(at: CGPoint(x: 395, y: 300), tapCount: 3)
+    XCTAssertEqual(shownPage, 4, "a third quick tap starts a new pair, as on Android")
+    XCTAssertEqual(reportedPages, [3, 4])
+  }
+
+  func testDoubleTapZoomsOnlyInTheMiddleRegion() throws {
+    try loadBook(startPage: 2)
+    XCTAssertNotNil(view.bookEdgeTurn(at: CGPoint(x: 395, y: 300)), "an edge double-tap is held back from zooming")
+    XCTAssertNotNil(view.bookEdgeTurn(at: CGPoint(x: 5, y: 300)))
+    XCTAssertNil(view.bookEdgeTurn(at: CGPoint(x: 200, y: 300)), "a double-tap in the middle zooms")
+
+    view.pdfView.scaleFactor = view.pdfView.scaleFactorForSizeToFit * 2
+    XCTAssertNil(view.bookEdgeTurn(at: CGPoint(x: 395, y: 300)), "zoomed in, edges don't turn, so double-tap zooms out")
+  }
+
+  @MainActor func testPDFKitDoubleTapZoomWaitsForTheEdgeDoubleTap() throws {
+    let window = hostInWindow()
+    try loadBook()
+    let edgeDoubleTap = try XCTUnwrap(view.bookEdgeDoubleTapGesture)
+    XCTAssertEqual(edgeDoubleTap.numberOfTapsRequired, 2)
+    let pdfKitDoubleTap = try XCTUnwrap(
+      view.pdfView.gestureRecognizers?.compactMap { $0 as? UITapGestureRecognizer }
+        .first { $0 !== edgeDoubleTap && $0.numberOfTapsRequired == 2 },
+      "PDFView has its own double-tap zoom"
+    )
+    let delegate = try XCTUnwrap(edgeDoubleTap.delegate)
+    XCTAssertEqual(
+      delegate.gestureRecognizer?(edgeDoubleTap, shouldBeRequiredToFailBy: pdfKitDoubleTap),
+      true
+    )
+    XCTAssertNotEqual(
+      try delegate.gestureRecognizer?(edgeDoubleTap, shouldBeRequiredToFailBy: XCTUnwrap(view.bookTapGesture)),
+      true,
+      "single edge taps still turn straight away"
+    )
+
+    view.setDisplayMode("continuous")
+    XCTAssertNil(view.bookEdgeDoubleTapGesture)
+    window.isHidden = true
+  }
+
   func testEdgeTapsDoNothingInContinuousMode() throws {
     try view.loadPdf(from: fixturePath("book-sample"))
     view.layoutIfNeeded()
@@ -278,6 +324,16 @@ final class BookModeTests: XCTestCase {
     view.goToPage(4)
     XCTAssertEqual(shownPage, 4)
     XCTAssertEqual(reportedPages, [4])
+  }
+
+  func testPagePropResetsTheNewPageToFit() throws {
+    try loadBook(startPage: 2)
+    view.pdfView.scaleFactor = view.pdfView.scaleFactorForSizeToFit * 2
+    view.goToPage(4)
+    XCTAssertEqual(shownPage, 4)
+    XCTAssertEqual(view.pdfView.scaleFactor, view.pdfView.scaleFactorForSizeToFit, accuracy: 0.001)
+    XCTAssertTrue(view.pdfView.autoScales)
+    XCTAssertEqual(reportedPages, [4], "a jump reports the new page once")
   }
 
   func testOnPageChangedFiresOncePerTurn() throws {

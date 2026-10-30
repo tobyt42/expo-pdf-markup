@@ -35,6 +35,9 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
   var stampTapGesture: UITapGestureRecognizer?
   var bookTapGesture: UITapGestureRecognizer?
   var bookPanGesture: UIPanGestureRecognizer?
+  var bookEdgeDoubleTapGesture: UITapGestureRecognizer?
+  /// Tap count of the touch the book tap last received, so the second tap of a double-tap is skipped.
+  var bookTapCount = 1
   var bookTurnSnapshot: UIView?
   var bookGestureDelegate: BookGestureDelegate?
   private var selectionObserver: NSObjectProtocol?
@@ -152,7 +155,11 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
       return
     }
 
-    pdfView.go(to: page)
+    if isBookMode {
+      jumpToBookPage(page)
+    } else {
+      pdfView.go(to: page)
+    }
   }
 
   // MARK: - Annotation management
