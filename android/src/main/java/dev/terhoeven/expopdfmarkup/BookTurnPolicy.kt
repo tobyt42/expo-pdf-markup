@@ -2,12 +2,19 @@ package dev.terhoeven.expopdfmarkup
 
 import android.view.KeyEvent
 
+/**
+ * Turn decisions for book mode. Every caller is book mode only, so nothing
+ * here takes the display mode.
+ */
 object BookTurnPolicy {
     /** Scales within this of fit (1.0) count as "at fit", absorbing pinch rounding. */
     private const val FIT_TOLERANCE = 0.01f
 
     private const val EDGE_ZONE_FRACTION = 0.25f
     private const val MIN_EDGE_ZONE_DP = 44f
+
+    /** Share of the view's width a slow swipe has to travel to turn the page. */
+    private const val SWIPE_TURN_FRACTION = 0.25f
 
     enum class SwipeAction { TURN, PAN }
 
@@ -24,14 +31,13 @@ object BookTurnPolicy {
 
     /** The turn an edge tap at [x] asks for, or null for no turn. */
     fun edgeTapTurnFor(
-        isBookMode: Boolean,
         annotationMode: String,
         scale: Float,
         x: Float,
         viewWidth: Float,
         density: Float
     ): Direction? {
-        if (!touchCanTurn(isBookMode, annotationMode, scale) || viewWidth <= 0f) return null
+        if (!touchCanTurn(annotationMode, scale) || viewWidth <= 0f) return null
         val zone = edgeZoneWidth(viewWidth, density)
         return when {
             x < zone -> Direction.PREVIOUS
@@ -41,11 +47,25 @@ object BookTurnPolicy {
     }
 
     /**
-     * Swipes and edge taps turn the page only in book mode, with no markup tool
-     * active, while the page is not zoomed in beyond fit (scale 1).
+     * Whether a double-tap at [x] zooms. Where an edge tap would turn, the
+     * first tap of the pair has already turned the page, so the second is
+     * swallowed: a double-tap zooms only in the middle region, or anywhere
+     * while edge taps can't turn (zoomed in or with a markup tool active).
      */
-    fun touchCanTurn(isBookMode: Boolean, annotationMode: String, scale: Float): Boolean =
-        isBookMode && annotationMode == "none" && scale <= 1f + FIT_TOLERANCE
+    fun doubleTapZooms(
+        annotationMode: String,
+        scale: Float,
+        x: Float,
+        viewWidth: Float,
+        density: Float
+    ): Boolean = edgeTapTurnFor(annotationMode, scale, x, viewWidth, density) == null
+
+    /**
+     * Swipes and edge taps turn the page only with no markup tool active,
+     * while the page is not zoomed in beyond fit (scale 1).
+     */
+    fun touchCanTurn(annotationMode: String, scale: Float): Boolean =
+        annotationMode == "none" && scale <= 1f + FIT_TOLERANCE
 
     /**
      * The turn a released horizontal swipe asks for, or null to settle back.
@@ -61,8 +81,8 @@ object BookTurnPolicy {
         flingVelocity: Float
     ): Direction? {
         val fromDrag = when {
-            dragX <= -viewWidth * EDGE_ZONE_FRACTION -> Direction.NEXT
-            dragX >= viewWidth * EDGE_ZONE_FRACTION -> Direction.PREVIOUS
+            dragX <= -viewWidth * SWIPE_TURN_FRACTION -> Direction.NEXT
+            dragX >= viewWidth * SWIPE_TURN_FRACTION -> Direction.PREVIOUS
             else -> null
         }
         if (kotlin.math.abs(velocityX) < flingVelocity) return fromDrag
@@ -75,17 +95,12 @@ object BookTurnPolicy {
     /**
      * The turn a hardware key (keyboard or page-turner pedal) asks for, or
      * null to leave the key alone. Right, Down and Page Down go forward; Left,
-     * Up and Page Up go back; Space isn't mapped. Keys turn in book mode
-     * whatever the zoom or markup mode, but never while a text input has
-     * focus, and never with a modifier held.
+     * Up and Page Up go back; Space isn't mapped. Keys turn whatever the zoom
+     * or markup mode, but never while a text input has focus, and never with
+     * a modifier held.
      */
-    fun keyTurnFor(
-        keyCode: Int,
-        isBookMode: Boolean,
-        textInputHasFocus: Boolean,
-        hasModifiers: Boolean
-    ): Direction? {
-        if (!isBookMode || textInputHasFocus || hasModifiers) return null
+    fun keyTurnFor(keyCode: Int, textInputHasFocus: Boolean, hasModifiers: Boolean): Direction? {
+        if (textInputHasFocus || hasModifiers) return null
         return when (keyCode) {
             KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_PAGE_DOWN ->
                 Direction.NEXT
@@ -97,6 +112,6 @@ object BookTurnPolicy {
         }
     }
 
-    fun swipeActionFor(isBookMode: Boolean, annotationMode: String, scale: Float): SwipeAction =
-        if (touchCanTurn(isBookMode, annotationMode, scale)) SwipeAction.TURN else SwipeAction.PAN
+    fun swipeActionFor(annotationMode: String, scale: Float): SwipeAction =
+        if (touchCanTurn(annotationMode, scale)) SwipeAction.TURN else SwipeAction.PAN
 }

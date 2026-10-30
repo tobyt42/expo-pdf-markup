@@ -174,28 +174,26 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
         return super.dispatchTouchEvent(ev)
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        val direction = BookTurnPolicy.keyTurnFor(
+    /** The turn a hardware key asks for in book mode, or null to leave it alone. */
+    private fun bookKeyTurn(keyCode: Int, event: KeyEvent): BookTurnPolicy.Direction? {
+        if (!pdfView.isBookMode) return null
+        return BookTurnPolicy.keyTurnFor(
             keyCode,
-            isBookMode = pdfView.isBookMode,
             textInputHasFocus = textInputHasFocus(),
             hasModifiers = !event.hasNoModifiers()
-        ) ?: return super.onKeyDown(keyCode, event)
+        )
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        val direction = bookKeyTurn(keyCode, event) ?: return super.onKeyDown(keyCode, event)
         // A key turns even mid-stroke: drop the unfinished ink rather than carry it to the new page.
         pdfView.cancelActiveGestures()
         turnPage(direction)
         return true
     }
 
-    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
-        val mapped = BookTurnPolicy.keyTurnFor(
-            keyCode,
-            isBookMode = pdfView.isBookMode,
-            textInputHasFocus = textInputHasFocus(),
-            hasModifiers = !event.hasNoModifiers()
-        )
-        return mapped != null || super.onKeyUp(keyCode, event)
-    }
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean =
+        bookKeyTurn(keyCode, event) != null || super.onKeyUp(keyCode, event)
 
     /**
      * Turns one page in book mode, with the same slide, bounce and single

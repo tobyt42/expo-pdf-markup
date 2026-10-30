@@ -507,7 +507,6 @@ class ContinuousPdfView(context: Context) : View(context) {
 
     private fun bookEdgeTapTurn(e: MotionEvent): BookTurnPolicy.Direction? =
         BookTurnPolicy.edgeTapTurnFor(
-            isBookMode,
             annotationMode,
             currentScale,
             e.x,
@@ -1029,14 +1028,18 @@ class ContinuousPdfView(context: Context) : View(context) {
     private inner class GestureListener : GestureDetector.SimpleOnGestureListener() {
         override fun onDown(e: MotionEvent): Boolean {
             // Turn or pan is decided once per gesture, at touch down.
-            bookSwipeAction =
-                BookTurnPolicy.swipeActionFor(isBookMode, annotationMode, currentScale)
+            bookSwipeAction = if (isBookMode) {
+                BookTurnPolicy.swipeActionFor(annotationMode, currentScale)
+            } else {
+                BookTurnPolicy.SwipeAction.PAN
+            }
             bookSwipeDownX = e.x
             bookSwipeVelocityX = 0f
             return true
         }
 
         override fun onSingleTapUp(e: MotionEvent): Boolean {
+            if (!isBookMode) return false
             val direction = bookEdgeTapTurn(e) ?: return false
             turnPage(direction)
             return true
@@ -1076,9 +1079,17 @@ class ContinuousPdfView(context: Context) : View(context) {
         }
 
         override fun onDoubleTap(e: MotionEvent): Boolean {
-            // In book mode a quick second tap on an edge is another turn, not a zoom.
-            bookEdgeTapTurn(e)?.let {
-                turnPage(it)
+            // In book mode the first tap on an edge has already turned the page, so
+            // the second is swallowed: a double-tap zooms only in the middle region.
+            if (isBookMode &&
+                !BookTurnPolicy.doubleTapZooms(
+                    annotationMode,
+                    currentScale,
+                    e.x,
+                    width.toFloat(),
+                    density
+                )
+            ) {
                 return true
             }
             val targetScale = if (currentScale > minScale * 1.5f) minScale else minScale * 2.5f

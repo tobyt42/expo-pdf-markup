@@ -127,10 +127,9 @@ class ExpoPdfMarkupViewTest {
 
     private fun keyTurn(
         keyCode: Int,
-        isBookMode: Boolean = true,
         textInputHasFocus: Boolean = false,
         hasModifiers: Boolean = false
-    ) = BookTurnPolicy.keyTurnFor(keyCode, isBookMode, textInputHasFocus, hasModifiers)
+    ) = BookTurnPolicy.keyTurnFor(keyCode, textInputHasFocus, hasModifiers)
 
     @Test
     fun testRightDownAndPageDownTurnToTheNextPage() {
@@ -162,17 +161,6 @@ class ExpoPdfMarkupViewTest {
     }
 
     @Test
-    fun testContinuousModeRespondsToNoKeys() {
-        for (key in listOf(
-            KeyEvent.KEYCODE_DPAD_RIGHT,
-            KeyEvent.KEYCODE_PAGE_DOWN,
-            KeyEvent.KEYCODE_DPAD_LEFT
-        )) {
-            assertNull("key $key", keyTurn(key, isBookMode = false))
-        }
-    }
-
-    @Test
     fun testKeysAreIgnoredWhileATextInputHasFocus() {
         for (key in listOf(
             KeyEvent.KEYCODE_DPAD_RIGHT,
@@ -193,7 +181,7 @@ class ExpoPdfMarkupViewTest {
     fun testKeysTurnWhereTouchCannotWhileZoomedOrWithAMarkupTool() {
         // Zoomed in with the ink tool active, swipes and edge taps are blocked...
         assertFalse(
-            BookTurnPolicy.touchCanTurn(isBookMode = true, annotationMode = "ink", scale = 2f)
+            BookTurnPolicy.touchCanTurn(annotationMode = "ink", scale = 2f)
         )
         // ...but the key policy doesn't look at zoom or markup mode, so keys still turn.
         assertEquals(BookTurnPolicy.Direction.NEXT, keyTurn(KeyEvent.KEYCODE_PAGE_DOWN))

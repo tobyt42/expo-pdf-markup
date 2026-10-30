@@ -1,7 +1,9 @@
 package dev.terhoeven.expopdfmarkup
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BookTurnPolicyTest {
@@ -10,7 +12,7 @@ class BookTurnPolicyTest {
     fun testSwipeTurnsInBookModeAtFitWithNoTool() {
         assertEquals(
             BookTurnPolicy.SwipeAction.TURN,
-            BookTurnPolicy.swipeActionFor(isBookMode = true, annotationMode = "none", scale = 1f)
+            BookTurnPolicy.swipeActionFor(annotationMode = "none", scale = 1f)
         )
     }
 
@@ -18,7 +20,7 @@ class BookTurnPolicyTest {
     fun testSwipePansWhenZoomedBeyondFit() {
         assertEquals(
             BookTurnPolicy.SwipeAction.PAN,
-            BookTurnPolicy.swipeActionFor(isBookMode = true, annotationMode = "none", scale = 1.5f)
+            BookTurnPolicy.swipeActionFor(annotationMode = "none", scale = 1.5f)
         )
     }
 
@@ -28,17 +30,9 @@ class BookTurnPolicyTest {
             assertEquals(
                 "tool $tool",
                 BookTurnPolicy.SwipeAction.PAN,
-                BookTurnPolicy.swipeActionFor(isBookMode = true, annotationMode = tool, scale = 1f)
+                BookTurnPolicy.swipeActionFor(annotationMode = tool, scale = 1f)
             )
         }
-    }
-
-    @Test
-    fun testSwipeNeverTurnsInContinuousMode() {
-        assertEquals(
-            BookTurnPolicy.SwipeAction.PAN,
-            BookTurnPolicy.swipeActionFor(isBookMode = false, annotationMode = "none", scale = 1f)
-        )
     }
 
     // MARK: - Edge taps
@@ -47,10 +41,9 @@ class BookTurnPolicyTest {
         x: Float,
         viewWidth: Float = 1000f,
         density: Float = 1f,
-        isBookMode: Boolean = true,
         annotationMode: String = "none",
         scale: Float = 1f
-    ) = BookTurnPolicy.edgeTapTurnFor(isBookMode, annotationMode, scale, x, viewWidth, density)
+    ) = BookTurnPolicy.edgeTapTurnFor(annotationMode, scale, x, viewWidth, density)
 
     @Test
     fun testTapInRightQuarterTurnsToNextPage() {
@@ -100,9 +93,28 @@ class BookTurnPolicyTest {
         assertNull(tap(x = 100f, annotationMode = "text"))
     }
 
+    // MARK: - Double taps
+
+    private fun doubleTapZooms(x: Float, annotationMode: String = "none", scale: Float = 1f) =
+        BookTurnPolicy.doubleTapZooms(annotationMode, scale, x, viewWidth = 1000f, density = 1f)
+
     @Test
-    fun testEdgeTapDoesNotTurnInContinuousMode() {
-        assertNull(tap(x = 900f, isBookMode = false))
+    fun testDoubleTapOnAnEdgeDoesNotZoom() {
+        // The first tap already turned the page; the second is swallowed, as on iOS.
+        assertFalse(doubleTapZooms(x = 900f))
+        assertFalse(doubleTapZooms(x = 100f))
+    }
+
+    @Test
+    fun testDoubleTapInTheMiddleZooms() {
+        assertTrue(doubleTapZooms(x = 500f))
+    }
+
+    @Test
+    fun testDoubleTapOnAnEdgeZoomsWhenEdgeTapsCannotTurn() {
+        // Zoomed in, edges don't turn, so a double-tap anywhere zooms back out.
+        assertTrue(doubleTapZooms(x = 900f, scale = 2f))
+        assertTrue(doubleTapZooms(x = 900f, annotationMode = "ink"))
     }
 
     // MARK: - Swipe release
