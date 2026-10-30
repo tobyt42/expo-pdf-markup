@@ -76,6 +76,10 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
       name: .PDFViewPageChanged,
       object: pdfView
     )
+    // When a text input anywhere lets go of the keyboard, book mode takes the keys back.
+    for name in [UITextField.textDidEndEditingNotification, UITextView.textDidEndEditingNotification] {
+      NotificationCenter.default.addObserver(self, selector: #selector(handleTextEditingEnded), name: name, object: nil)
+    }
   }
 
   deinit {
@@ -93,6 +97,21 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
     inkShapeLayer?.frame = bounds
     editingOverlayLayer?.frame = pdfView.documentView?.bounds ?? .zero
     updateEditingOverlay()
+  }
+
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    claimBookKeyFocus()
+  }
+
+  // MARK: - Hardware keys (book mode only, see ExpoPdfMarkupView+Book.swift)
+
+  override var canBecomeFirstResponder: Bool {
+    isBookMode
+  }
+
+  override var keyCommands: [UIKeyCommand]? {
+    isBookMode ? bookKeyCommands : nil
   }
 
   // MARK: - Props

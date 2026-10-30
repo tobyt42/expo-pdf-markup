@@ -334,4 +334,145 @@ final class BookModeTests: XCTestCase {
     XCTAssertEqual(shownPage, 3)
     XCTAssertEqual(view.pdfView.scaleFactor, view.pdfView.scaleFactorForSizeToFit, accuracy: 0.001)
   }
+
+  // MARK: - Hardware keys
+
+  private static let nextKeys = [UIKeyCommand.inputRightArrow, UIKeyCommand.inputDownArrow, UIKeyCommand.inputPageDown]
+  private static let previousKeys = [UIKeyCommand.inputLeftArrow, UIKeyCommand.inputUpArrow, UIKeyCommand.inputPageUp]
+
+  /// The key command the view offers UIKit for an unmodified `input`, if any.
+  private func keyCommand(_ input: String) -> UIKeyCommand? {
+    view.keyCommands?.first { $0.input == input && $0.modifierFlags.isEmpty }
+  }
+
+  /// Presses `input` the way UIKit delivers a hardware key: through the view's key command.
+  /// A key the view has no command for does nothing.
+  private func press(_ input: String) {
+    guard let command = keyCommand(input), let action = command.action else { return }
+    view.perform(action, with: command)
+  }
+
+  func testRightDownAndPageDownTurnToTheNextPage() throws {
+    for input in Self.nextKeys {
+      try loadBook(startPage: 2)
+      press(input)
+      XCTAssertEqual(shownPage, 3, "\(input) goes to the next page")
+      XCTAssertEqual(reportedPages, [3])
+    }
+  }
+
+  func testLeftUpAndPageUpTurnToThePreviousPage() throws {
+    for input in Self.previousKeys {
+      try loadBook(startPage: 2)
+      press(input)
+      XCTAssertEqual(shownPage, 1, "\(input) goes to the previous page")
+      XCTAssertEqual(reportedPages, [1])
+    }
+  }
+
+  func testArrowKeysTakePriorityOverSystemScrolling() throws {
+    try loadBook()
+    for input in Self.nextKeys + Self.previousKeys {
+      XCTAssertEqual(keyCommand(input)?.wantsPriorityOverSystemBehavior, true, input)
+    }
+  }
+
+  func testSpaceIsNotMapped() throws {
+    try loadBook(startPage: 2)
+    XCTAssertNil(keyCommand(" "))
+    press(" ")
+    XCTAssertEqual(shownPage, 2)
+    XCTAssertEqual(reportedPages, [])
+  }
+
+  func testContinuousModeRespondsToNoKeys() throws {
+    try view.loadPdf(from: fixturePath("book-sample"))
+    view.layoutIfNeeded()
+    view.goToPage(2)
+    reportedPages = []
+
+    XCTAssertTrue(view.keyCommands?.isEmpty ?? true)
+    XCTAssertFalse(view.canBecomeFirstResponder)
+    for input in Self.nextKeys + Self.previousKeys {
+      press(input)
+    }
+    XCTAssertEqual(reportedPages, [])
+  }
+
+  func testKeysTurnWhileZoomedInAndWithAMarkupToolActive() throws {
+    try loadBook(startPage: 2)
+    view.setAnnotationMode("ink")
+    view.pdfView.scaleFactor = view.pdfView.scaleFactorForSizeToFit * 2
+
+    press(UIKeyCommand.inputPageDown)
+    XCTAssertEqual(shownPage, 3)
+    for mode in ["highlight", "underline", "text", "stamp", "move", "eraser"] {
+      view.setAnnotationMode(mode)
+      press(UIKeyCommand.inputLeftArrow)
+    }
+    XCTAssertEqual(reportedPages, [3, 2, 1, 0])
+  }
+
+  func testKeyTurnsBounceAtBothEndsAndReportOncePerTurn() throws {
+    try loadBook(startPage: 0)
+    press(UIKeyCommand.inputLeftArrow)
+    XCTAssertEqual(shownPage, 0)
+    XCTAssertEqual(reportedPages, [])
+
+    for _ in 0 ..< 8 {
+      press(UIKeyCommand.inputPageDown)
+    }
+    XCTAssertEqual(shownPage, 5)
+    XCTAssertEqual(reportedPages, [1, 2, 3, 4, 5], "no wrap past the last page")
+  }
+
+  /// The responder UIKit asks first for an unmodified `input`: the nearest one up the responder
+  /// chain from the first responder that has a key command for it.
+  @MainActor private func responderAnswering(_ input: String) -> UIResponder? {
+    var responder = UIResponder.currentFirstResponder
+    while let current = responder {
+      if current.keyCommands?.contains(where: { $0.input == input && $0.modifierFlags.isEmpty }) == true {
+        return current
+      }
+      responder = current.next
+    }
+    return nil
+  }
+
+  @MainActor func testBookModeTakesKeyFocusOnScreen() throws {
+    let window = hostInWindow()
+    window.makeKey()
+    try loadBook()
+    // PDFKit's own views may hold first responder, but none of them claims these keys.
+    for input in Self.nextKeys + Self.previousKeys {
+      XCTAssertTrue(responderAnswering(input) === view, "\(input) reaches the view with no help from the host app")
+    }
+
+    view.setDisplayMode("continuous")
+    XCTAssertFalse(responderAnswering(UIKeyCommand.inputRightArrow) === view)
+    window.isHidden = true
+  }
+
+  func testKeysAreIgnoredWhileATextInputHasFocus() throws {
+    let window = hostInWindow()
+    window.makeKey()
+    try loadBook(startPage: 2)
+    let field = UITextField(frame: CGRect(x: 0, y: 0, width: 100, height: 30))
+    window.addSubview(field)
+    XCTAssertTrue(field.becomeFirstResponder())
+
+    view.setDisplayMode("continuous")
+    view.setDisplayMode("book")
+    XCTAssertTrue(field.isFirstResponder, "book mode never takes focus from a text input")
+    for input in Self.nextKeys + Self.previousKeys {
+      press(input)
+    }
+    XCTAssertEqual(shownPage, 2)
+    XCTAssertEqual(reportedPages, [])
+
+    field.resignFirstResponder()
+    press(UIKeyCommand.inputRightArrow)
+    XCTAssertEqual(reportedPages, [3])
+    window.isHidden = true
+  }
 }

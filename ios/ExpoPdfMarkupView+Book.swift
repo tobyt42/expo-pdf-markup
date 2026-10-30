@@ -38,6 +38,9 @@ extension ExpoPdfMarkupView {
       installBookGestures()
     } else {
       removeBookGestures()
+      if isFirstResponder {
+        resignFirstResponder()
+      }
       pdfView.displayMode = .singlePageContinuous
       pdfView.displayDirection = .vertical
       pdfView.pageBreakMargins = UIEdgeInsets(top: 0, left: 0, bottom: 8, right: 0)
@@ -46,6 +49,67 @@ extension ExpoPdfMarkupView {
 
     if let keptPage {
       pdfView.go(to: keptPage)
+    }
+    claimBookKeyFocus()
+  }
+
+  // MARK: - Hardware keys
+
+  /// The turn a hardware key asks for: Right, Down and Page Down go forward; Left, Up and
+  /// Page Up go back. Space isn't mapped.
+  func bookTurnDirection(forKey input: String) -> BookTurnDirection? {
+    switch input {
+    case UIKeyCommand.inputRightArrow, UIKeyCommand.inputDownArrow, UIKeyCommand.inputPageDown:
+      .next
+    case UIKeyCommand.inputLeftArrow, UIKeyCommand.inputUpArrow, UIKeyCommand.inputPageUp:
+      .previous
+    default:
+      nil
+    }
+  }
+
+  /// Key commands for keyboards and page-turner pedals, offered to UIKit only in book mode.
+  /// Unmodified keys only, and ahead of the system's own arrow-key scrolling.
+  var bookKeyCommands: [UIKeyCommand] {
+    [
+      UIKeyCommand.inputRightArrow, UIKeyCommand.inputDownArrow, UIKeyCommand.inputPageDown,
+      UIKeyCommand.inputLeftArrow, UIKeyCommand.inputUpArrow, UIKeyCommand.inputPageUp,
+    ].map { input in
+      let command = UIKeyCommand(input: input, modifierFlags: [], action: #selector(handleBookKeyCommand(_:)))
+      command.wantsPriorityOverSystemBehavior = true
+      return command
+    }
+  }
+
+  @objc func handleBookKeyCommand(_ command: UIKeyCommand) {
+    guard let input = command.input, let direction = bookTurnDirection(forKey: input) else { return }
+    // Keys typed into a text input (including the host's text annotation input) are its own.
+    guard !isTextInputActive else { return }
+    turnBookPage(direction, from: .key)
+  }
+
+  /// Whether a text input outside this view is first responder, so keys belong to it.
+  /// PDFKit's own views inside this one don't count.
+  var isTextInputActive: Bool {
+    guard let responder = UIResponder.currentFirstResponder, responder is UITextInput else { return false }
+    return !((responder as? UIView)?.isDescendant(of: self) ?? false)
+  }
+
+  /// Becomes first responder in book mode while on screen, so a pedal or keyboard turns the page
+  /// without the host app doing anything. Never takes focus from a text input, and leaves it
+  /// alone when it's already with this view or PDFKit's views inside it.
+  func claimBookKeyFocus() {
+    guard isBookMode, window != nil, !isTextInputActive else { return }
+    if let current = UIResponder.currentFirstResponder as? UIView, current.isDescendant(of: self) {
+      return
+    }
+    becomeFirstResponder()
+  }
+
+  @objc func handleTextEditingEnded() {
+    // Wait for the responder change to settle before taking the keys back.
+    DispatchQueue.main.async { [weak self] in
+      self?.claimBookKeyFocus()
     }
   }
 
@@ -175,6 +239,7 @@ extension ExpoPdfMarkupView {
 
   @objc func handleBookTapGesture(_ gesture: UITapGestureRecognizer) {
     guard gesture.state == .ended else { return }
+    claimBookKeyFocus()
     handleBookTap(at: gesture.location(in: self))
   }
 
@@ -280,5 +345,20 @@ final class BookGestureDelegate: NSObject, UIGestureRecognizerDelegate {
     shouldRecognizeSimultaneouslyWith _: UIGestureRecognizer
   ) -> Bool {
     true
+  }
+}
+
+extension UIResponder {
+  @MainActor private weak static var probedFirstResponder: UIResponder?
+
+  /// The app's current first responder, if any, found by sending an action down the responder chain.
+  @MainActor static var currentFirstResponder: UIResponder? {
+    probedFirstResponder = nil
+    UIApplication.shared.sendAction(#selector(probeFirstResponder), to: nil, from: nil, for: nil)
+    return probedFirstResponder
+  }
+
+  @objc private func probeFirstResponder() {
+    UIResponder.probedFirstResponder = self
   }
 }
