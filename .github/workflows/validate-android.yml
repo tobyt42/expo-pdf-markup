@@ -1,0 +1,60 @@
+name: Validate Android
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  junit:
+    name: Android JUnit
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            example/package-lock.json
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+      - name: Install library dependencies
+        run: npm ci
+      - name: Install example dependencies
+        run: npm ci
+        working-directory: example
+      - name: Generate a clean Android example
+        run: npx expo prebuild --clean --platform android --no-install
+        working-directory: example
+      - name: Run module JUnit tests
+        run: ./gradlew :tobyt-expo-pdf-markup:testDebugUnitTest --no-daemon --stacktrace
+        working-directory: example/android
+      - name: Upload JUnit results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-junit-results
+          path: |
+            android/build/test-results/testDebugUnitTest/
+            android/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: warn

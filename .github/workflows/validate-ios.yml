@@ -1,0 +1,54 @@
+name: Validate iOS
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  xctest:
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      CI: '1'
+      BUNDLE_GEMFILE: ${{ github.workspace }}/scripts/Gemfile
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            example/package-lock.json
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+      - run: npm ci
+      - run: npm ci
+        working-directory: example
+      - run: npm run build
+      - name: Generate a clean native example
+        run: npx expo prebuild --clean --platform ios --no-install
+        working-directory: example
+      - name: Wire XCTest sources, PDF fixtures, scheme and CocoaPods target
+        run: bundle exec ruby scripts/add_test_target.rb
+      - run: bundle exec pod install
+        working-directory: example/ios
+      - name: Run native XCTest suite
+        run: npm run test:swift
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: ios-test-results
+          path: build/test-results
+          if-no-files-found: ignore
