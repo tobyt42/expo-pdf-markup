@@ -1,0 +1,55 @@
+name: Validate TypeScript and web
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-web-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: '1'
+
+jobs:
+  web:
+    name: TypeScript, tests, and web builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            example/package-lock.json
+      - name: Install library dependencies
+        run: npm ci
+      - name: Install example dependencies
+        run: npm ci
+        working-directory: example
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run typecheck:tests
+      - run: npm test -- --ci --runInBand
+      - run: npm run build
+      - run: npm run docs -- --out site/api
+      - name: Typecheck example
+        run: npx --no-install tsc --noEmit
+        working-directory: example
+      - name: Export example web app
+        run: npx --no-install expo export --platform web --output-dir ../site/example
+        working-directory: example
+      - name: Save exported example for browser validation
+        uses: actions/upload-artifact@v6
+        with:
+          name: example-web
+          path: site/example
+          if-no-files-found: error
+          retention-days: 7
