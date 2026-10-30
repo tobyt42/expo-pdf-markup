@@ -33,6 +33,13 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
   var editingOverlayLayer: CAShapeLayer?
   var textTapGesture: UITapGestureRecognizer?
   var stampTapGesture: UITapGestureRecognizer?
+  var bookTapGesture: UITapGestureRecognizer?
+  var bookPanGesture: UIPanGestureRecognizer?
+  var bookEdgeDoubleTapGesture: UITapGestureRecognizer?
+  /// Tap count of the touch the book tap last received, so the second tap of a double-tap is skipped.
+  var bookTapCount = 1
+  var bookTurnSnapshot: UIView?
+  var bookGestureDelegate: BookGestureDelegate?
   private var selectionObserver: NSObjectProtocol?
   private var selectionDebounceTimer: Timer?
   private var currentMarkupType: String?
@@ -72,6 +79,10 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
       name: .PDFViewPageChanged,
       object: pdfView
     )
+    // When a text input anywhere lets go of the keyboard, book mode takes the keys back.
+    for name in [UITextField.textDidEndEditingNotification, UITextView.textDidEndEditingNotification] {
+      NotificationCenter.default.addObserver(self, selector: #selector(handleTextEditingEnded), name: name, object: nil)
+    }
   }
 
   deinit {
@@ -83,10 +94,27 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
 
   override func layoutSubviews() {
     super.layoutSubviews()
-    pdfView.frame = bounds
+    // Bounds and centre rather than frame: book mode slides pdfView with a transform.
+    pdfView.bounds = CGRect(origin: .zero, size: bounds.size)
+    pdfView.center = CGPoint(x: bounds.midX, y: bounds.midY)
     inkShapeLayer?.frame = bounds
     editingOverlayLayer?.frame = pdfView.documentView?.bounds ?? .zero
     updateEditingOverlay()
+  }
+
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    claimBookKeyFocus()
+  }
+
+  // MARK: - Hardware keys (book mode only, see ExpoPdfMarkupView+Book.swift)
+
+  override var canBecomeFirstResponder: Bool {
+    isBookMode
+  }
+
+  override var keyCommands: [UIKeyCommand]? {
+    isBookMode ? bookKeyCommands : nil
   }
 
   // MARK: - Props
@@ -127,7 +155,11 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
       return
     }
 
-    pdfView.go(to: page)
+    if isBookMode {
+      jumpToBookPage(page)
+    } else {
+      pdfView.go(to: page)
+    }
   }
 
   // MARK: - Annotation management
@@ -198,6 +230,18 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
       }
     }
     updateEditingOverlay()
+  }
+
+  // MARK: - Display mode
+
+  /// `"continuous"` (default) or `"book"`. See `ExpoPdfMarkupView+Book.swift`.
+  private(set) var displayMode: String = "continuous"
+
+  func setDisplayMode(_ mode: String) {
+    let normalised = mode == "book" ? "book" : "continuous"
+    guard normalised != displayMode else { return }
+    displayMode = normalised
+    applyDisplayMode()
   }
 
   // MARK: - Annotation mode

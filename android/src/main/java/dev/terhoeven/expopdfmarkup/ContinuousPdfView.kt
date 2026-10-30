@@ -1,5 +1,8 @@
 package dev.terhoeven.expopdfmarkup
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -12,19 +15,50 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
+import android.view.animation.DecelerateInterpolator
 import android.widget.OverScroller
 import java.util.UUID
 
+/**
+ * Draws the PDF and handles touches in both display modes:
+ * - continuous: every page stacked in one vertical scroll (the default).
+ * - book ([isBookMode]): one page at a time, fitted to the view, turned
+ *   sideways. All pages share one content slot; only [BookPager.currentPage]
+ *   (plus its neighbour while sliding) is drawn. Swipe-or-pan and edge-tap
+ *   decisions come from [BookTurnPolicy]; every turn goes through [turnPage].
+ */
 class ContinuousPdfView(context: Context) : View(context) {
-    data class ScrollState(val panX: Float, val panY: Float, val scale: Float)
+    data class ScrollState(val panX: Float, val panY: Float, val scale: Float, val page: Int)
 
     var pendingScrollRestore: ScrollState? = null
 
     fun captureScrollState(): ScrollState? {
         if (pageBitmaps.isEmpty()) return null
-        return ScrollState(panX, panY, currentScale)
+        return ScrollState(panX, panY, currentScale, currentPage)
     }
+
+    /** Book mode lays pages out one at a time. Set before [loadPages]. */
+    var isBookMode = false
+
+    /** The page in view: the one shown in book mode, the one at mid-height in continuous. */
+    val currentPage: Int get() = getVisiblePage()
+
+    private val bookPager = BookPager { notifyPageChange() }
+    private val density = resources.displayMetrics.density
+
+    /** Screen-space horizontal offset of the shown page while dragging or sliding. */
+    private var slideOffset = 0f
+
+    /** The page drawn beside the shown page while dragging or sliding, or -1. */
+    private var slideNeighbour = -1
+    private var slideAnimator: ValueAnimator? = null
+    private var bookSwipeAction = BookTurnPolicy.SwipeAction.PAN
+    private var bookSwipeDownX = 0f
+    private var isBookSwiping = false
+    private var bookSwipeVelocityX = 0f
+
     private val pageBitmaps = mutableListOf<Bitmap>()
+    private val pageXOffsets = mutableListOf<Float>()
     private val pageYOffsets = mutableListOf<Float>()
     private val pageWidths = mutableListOf<Int>()
     private val pageHeights = mutableListOf<Int>()
@@ -102,22 +136,33 @@ class ContinuousPdfView(context: Context) : View(context) {
         (page: Int, point: AnnotationPoint, annotation: AnnotationModel?) -> Unit
     )? = null
 
-    fun loadPages(renderer: PdfRenderer, viewWidth: Int) {
+    /**
+     * Renders every page for the current display mode. With [startPage] (a
+     * mode switch, rotation or resize) the view stays on that page and does
+     * not report it again; without it the view starts at the top.
+     */
+    fun loadPages(renderer: PdfRenderer, viewWidth: Int, viewHeight: Int, startPage: Int? = null) {
+        val keptNotifiedPage = lastNotifiedPage
         recycle()
-        if (viewWidth <= 0) return
+        if (viewWidth <= 0 || (isBookMode && viewHeight <= 0)) return
         setBackgroundColor(pageBackgroundColor)
 
         var yOffset = 0f
         for (i in 0 until renderer.pageCount) {
-            if (i > 0) yOffset += pageGap
+            if (!isBookMode && i > 0) yOffset += pageGap
 
             val page = renderer.openPage(i)
             val pdfW = page.width
             val pdfH = page.height
-            val scale = viewWidth.toFloat() / pdfW.toFloat()
-            val bmpH = (pdfH * scale).toInt()
+            val scale = if (isBookMode) {
+                minOf(viewWidth.toFloat() / pdfW, viewHeight.toFloat() / pdfH)
+            } else {
+                viewWidth.toFloat() / pdfW.toFloat()
+            }
+            val bmpW = if (isBookMode) maxOf(1, (pdfW * scale).toInt()) else viewWidth
+            val bmpH = if (isBookMode) maxOf(1, (pdfH * scale).toInt()) else (pdfH * scale).toInt()
 
-            val bmp = Bitmap.createBitmap(viewWidth, bmpH, Bitmap.Config.ARGB_8888)
+            val bmp = Bitmap.createBitmap(bmpW, bmpH, Bitmap.Config.ARGB_8888)
             Canvas(bmp).drawColor(Color.WHITE)
 
             val m = Matrix()
@@ -125,28 +170,45 @@ class ContinuousPdfView(context: Context) : View(context) {
             page.render(bmp, null, m, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
             page.close()
 
-            pageYOffsets.add(yOffset)
+            if (isBookMode) {
+                // Every page sits centred in the same view-sized slot.
+                pageXOffsets.add((viewWidth - bmpW) / 2f)
+                pageYOffsets.add((viewHeight - bmpH) / 2f)
+            } else {
+                pageXOffsets.add(0f)
+                pageYOffsets.add(yOffset)
+                yOffset += bmpH
+            }
             pageBitmaps.add(bmp)
             pageWidths.add(pdfW)
             pageHeights.add(pdfH)
             renderScales.add(scale)
-            yOffset += bmpH
         }
 
-        totalHeight = yOffset
+        totalHeight = if (isBookMode) viewHeight.toFloat() else yOffset
         contentWidth = viewWidth.toFloat()
         currentScale = 1f
         minScale = 1f
         maxScale = 5f
         panX = 0f
         panY = 0f
-        lastNotifiedPage = -1
+        lastNotifiedPage = if (startPage != null) keptNotifiedPage else -1
+        bookPager.reset(renderer.pageCount, startPage ?: 0)
+
+        if (startPage != null && !isBookMode && startPage in pageYOffsets.indices) {
+            panY = pageYOffsets[startPage]
+            constrainPan()
+        }
 
         pendingScrollRestore?.let { state ->
-            currentScale = state.scale.coerceIn(minScale, maxScale)
-            panX = state.panX
-            panY = state.panY
-            constrainPan()
+            if (isBookMode) {
+                bookPager.reset(renderer.pageCount, state.page)
+            } else {
+                currentScale = state.scale.coerceIn(minScale, maxScale)
+                panX = state.panX
+                panY = state.panY
+                constrainPan()
+            }
             pendingScrollRestore = null
         }
 
@@ -173,43 +235,27 @@ class ContinuousPdfView(context: Context) : View(context) {
                 annotations
             }
 
-        canvas.save()
-        canvas.translate(-panX, -panY)
-        canvas.scale(currentScale, currentScale)
+        if (isBookMode) {
+            drawBookPages(canvas, renderedAnnotations)
+        } else {
+            canvas.save()
+            canvas.translate(-panX, -panY)
+            canvas.scale(currentScale, currentScale)
 
-        for (i in pageBitmaps.indices) {
-            val pageTop = pageYOffsets[i] * currentScale
-            val pageBottom = pageTop + pageBitmaps[i].height * currentScale
-            val visibleTop = panY
-            val visibleBottom = panY + height
+            for (i in pageBitmaps.indices) {
+                val pageTop = pageYOffsets[i] * currentScale
+                val pageBottom = pageTop + pageBitmaps[i].height * currentScale
+                val visibleTop = panY
+                val visibleBottom = panY + height
 
-            // Only draw pages that are visible
-            if (pageBottom >= visibleTop && pageTop <= visibleBottom) {
-                canvas.drawBitmap(pageBitmaps[i], 0f, pageYOffsets[i], null)
-                AnnotationRenderer.drawAnnotations(
-                    canvas,
-                    renderedAnnotations,
-                    i,
-                    pageYOffsets[i],
-                    renderScales[i],
-                    pageHeights[i],
-                    context
-                )
-                if (annotationMode == "move" || annotationMode == "eraser") {
-                    AnnotationRenderer.drawEditingAffordances(
-                        canvas,
-                        renderedAnnotations,
-                        i,
-                        pageYOffsets[i],
-                        renderScales[i],
-                        pageHeights[i],
-                        currentScale
-                    )
+                // Only draw pages that are visible
+                if (pageBottom >= visibleTop && pageTop <= visibleBottom) {
+                    drawPage(canvas, i, renderedAnnotations)
                 }
             }
-        }
 
-        canvas.restore()
+            canvas.restore()
+        }
 
         // Draw live ink preview (in screen coordinates)
         if (isDrawingInk && currentInkPoints.size > 1) {
@@ -247,6 +293,55 @@ class ContinuousPdfView(context: Context) : View(context) {
         }
     }
 
+    /** Draws page [i] and its markup in content space, at its layout offset. */
+    private fun drawPage(canvas: Canvas, i: Int, renderedAnnotations: List<AnnotationModel>) {
+        canvas.save()
+        canvas.translate(pageXOffsets[i], 0f)
+        canvas.drawBitmap(pageBitmaps[i], 0f, pageYOffsets[i], null)
+        AnnotationRenderer.drawAnnotations(
+            canvas,
+            renderedAnnotations,
+            i,
+            pageYOffsets[i],
+            renderScales[i],
+            pageHeights[i],
+            context
+        )
+        if (annotationMode == "move" || annotationMode == "eraser") {
+            AnnotationRenderer.drawEditingAffordances(
+                canvas,
+                renderedAnnotations,
+                i,
+                pageYOffsets[i],
+                renderScales[i],
+                pageHeights[i],
+                currentScale
+            )
+        }
+        canvas.restore()
+    }
+
+    /** Book mode: the shown page, plus its neighbour beside it while sliding. */
+    private fun drawBookPages(canvas: Canvas, renderedAnnotations: List<AnnotationModel>) {
+        val shown = bookPager.currentPage
+        if (shown !in pageBitmaps.indices) return
+
+        canvas.save()
+        canvas.translate(slideOffset - panX, -panY)
+        canvas.scale(currentScale, currentScale)
+        drawPage(canvas, shown, renderedAnnotations)
+        canvas.restore()
+
+        if (slideNeighbour in pageBitmaps.indices && slideNeighbour != shown) {
+            // The next page waits off the right edge, the previous off the left.
+            val side = if (slideNeighbour > shown) 1f else -1f
+            canvas.save()
+            canvas.translate(slideOffset + side * width, 0f)
+            drawPage(canvas, slideNeighbour, renderedAnnotations)
+            canvas.restore()
+        }
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         // Hold off parent interception (e.g. gesture-handler root, scroll
         // containers) for the duration of each gesture only; leaving it set
@@ -255,11 +350,20 @@ class ContinuousPdfView(context: Context) : View(context) {
             parent?.requestDisallowInterceptTouchEvent(it)
         }
 
+        // A new touch in book mode lands any slide still running, so markup
+        // and taps always act on the page that is fully in view.
+        if (isBookMode && event.actionMasked == MotionEvent.ACTION_DOWN) {
+            slideAnimator?.end()
+        }
+
         // Always let scale detector handle pinch zoom
         scaleDetector.onTouchEvent(event)
 
         // If scaling with two fingers, don't process as annotation gesture
-        if (scaleDetector.isInProgress) return true
+        if (scaleDetector.isInProgress) {
+            if (isBookSwiping) settleBookSwipe()
+            return true
+        }
 
         when (annotationMode) {
             "ink" -> {
@@ -308,8 +412,13 @@ class ContinuousPdfView(context: Context) : View(context) {
             }
 
             else -> {
-                // "none" mode — normal scroll/zoom
+                // "none" mode — normal scroll/zoom (book mode: swipe turns at fit)
                 gestureDetector.onTouchEvent(event)
+                if (isBookMode) {
+                    val action = event.actionMasked
+                    if (action == MotionEvent.ACTION_UP) releaseBookSwipe()
+                    if (action == MotionEvent.ACTION_CANCEL) settleBookSwipe()
+                }
             }
         }
 
@@ -333,6 +442,10 @@ class ContinuousPdfView(context: Context) : View(context) {
         dragCurrentPoint = null
         clearMovePreview()
         scroller.forceFinished(true)
+        slideAnimator?.end()
+        isBookSwiping = false
+        slideOffset = 0f
+        slideNeighbour = -1
         parent?.requestDisallowInterceptTouchEvent(false)
         invalidate()
     }
@@ -345,6 +458,129 @@ class ContinuousPdfView(context: Context) : View(context) {
     override fun onDetachedFromWindow() {
         cancelActiveGestures()
         super.onDetachedFromWindow()
+    }
+
+    // --- Book mode turning ---
+
+    /**
+     * Turns one page in book mode: slides to the neighbouring page, or
+     * bounces at either end. The new page starts at fit, and onPageChanged
+     * fires once when the slide lands. Swipes and edge taps call this after
+     * [BookTurnPolicy] allows them; hardware keys can call it directly.
+     * Returns false when nothing could turn (not book mode, nothing loaded).
+     */
+    fun turnPage(direction: BookTurnPolicy.Direction): Boolean {
+        if (!isBookMode || pageBitmaps.isEmpty()) return false
+        // Land a slide still running first, so rapid turns each count.
+        val wasSliding = slideAnimator != null
+        slideAnimator?.end()
+        if (wasSliding) slideOffset = 0f
+        isBookSwiping = false
+        resetToFit()
+
+        when (val turn = bookPager.turn(direction)) {
+            is BookPager.Turn.Slide -> {
+                slideNeighbour = turn.to
+                // Next slides the page off to the left, previous to the right.
+                animateSlideOffset(slideOffset, -direction.delta * width.toFloat()) {
+                    slideOffset = 0f
+                    slideNeighbour = -1
+                    bookPager.finishSlide()
+                }
+            }
+
+            is BookPager.Turn.Bounce -> {
+                slideNeighbour = -1
+                if (slideOffset != 0f) {
+                    // Released a rubber-banded drag at an end: spring back.
+                    animateSlideOffset(slideOffset, 0f) {}
+                } else {
+                    val nudge = -direction.delta * width * BOUNCE_FRACTION
+                    animateSlideOffset(0f, nudge, BOUNCE_DURATION_MS) {
+                        animateSlideOffset(nudge, 0f, BOUNCE_DURATION_MS) {}
+                    }
+                }
+            }
+        }
+        return true
+    }
+
+    private fun bookEdgeTapTurn(e: MotionEvent): BookTurnPolicy.Direction? =
+        BookTurnPolicy.edgeTapTurnFor(
+            annotationMode,
+            currentScale,
+            e.x,
+            width.toFloat(),
+            density
+        )
+
+    private fun resetToFit() {
+        scroller.forceFinished(true)
+        currentScale = minScale
+        panX = 0f
+        panY = 0f
+    }
+
+    private fun animateSlideOffset(
+        from: Float,
+        to: Float,
+        durationMs: Long = SLIDE_DURATION_MS,
+        onEnd: () -> Unit
+    ) {
+        slideAnimator?.removeAllListeners()
+        slideAnimator?.cancel()
+        slideOffset = from
+        val animator = ValueAnimator.ofFloat(from, to).apply {
+            duration = durationMs
+            interpolator = DecelerateInterpolator()
+            addUpdateListener {
+                slideOffset = it.animatedValue as Float
+                invalidate()
+            }
+        }
+        animator.addListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(a: Animator) {
+                if (slideAnimator === animator) slideAnimator = null
+                slideOffset = to
+                onEnd()
+                invalidate()
+            }
+        })
+        slideAnimator = animator
+        animator.start()
+    }
+
+    /** Book mode swipe that is following the finger, at fit. */
+    private fun dragBookSwipe(totalDx: Float) {
+        isBookSwiping = true
+        val neighbour = bookPager.currentPage + if (totalDx < 0f) 1 else -1
+        if (neighbour in pageBitmaps.indices) {
+            slideNeighbour = neighbour
+            slideOffset = totalDx
+        } else {
+            // Nothing that way: rubber-band so the bounce is felt.
+            slideNeighbour = -1
+            slideOffset = totalDx * RUBBER_BAND
+        }
+        invalidate()
+    }
+
+    private fun releaseBookSwipe() {
+        if (!isBookSwiping) return
+        isBookSwiping = false
+        val totalDx = if (slideNeighbour >= 0) slideOffset else slideOffset / RUBBER_BAND
+        val direction = BookTurnPolicy.swipeReleaseTurnFor(
+            dragX = totalDx,
+            velocityX = bookSwipeVelocityX,
+            viewWidth = width.toFloat(),
+            flingVelocity = FLING_VELOCITY_DP * density
+        )
+        if (direction != null) turnPage(direction) else settleBookSwipe()
+    }
+
+    private fun settleBookSwipe() {
+        isBookSwiping = false
+        animateSlideOffset(slideOffset, 0f) { slideNeighbour = -1 }
     }
 
     // --- Ink mode ---
@@ -393,7 +629,7 @@ class ContinuousPdfView(context: Context) : View(context) {
             if (pi != pageIndex || pi < 0) continue
 
             val localY = contentY - pageYOffsets[pi]
-            val pdfX = contentX / renderScales[pi]
+            val pdfX = (contentX - pageXOffsets[pi]) / renderScales[pi]
             val pdfY = pageHeights[pi] - (localY / renderScales[pi])
             pdfPoints.add(AnnotationPoint(pdfX, pdfY))
         }
@@ -461,9 +697,10 @@ class ContinuousPdfView(context: Context) : View(context) {
         val localEndY = endCY - pageYOffsets[pageIndex]
 
         // Convert to PDF coordinates
-        val pdfX1 = startCX / rs
+        val pageX = pageXOffsets[pageIndex]
+        val pdfX1 = (startCX - pageX) / rs
         val pdfY1 = ph - (localStartY / rs)
-        val pdfX2 = endCX / rs
+        val pdfX2 = (endCX - pageX) / rs
         val pdfY2 = ph - (localEndY / rs)
 
         val left = minOf(pdfX1, pdfX2)
@@ -645,6 +882,8 @@ class ContinuousPdfView(context: Context) : View(context) {
     // --- Helpers ---
 
     private fun pageIndexAtContentY(contentY: Float): Int {
+        // Book mode: every page shares one slot, so a touch is on the page shown.
+        if (isBookMode) return bookPager.currentPage
         for (i in pageYOffsets.indices.reversed()) {
             if (pageYOffsets[i] <= contentY) return i
         }
@@ -670,7 +909,7 @@ class ContinuousPdfView(context: Context) : View(context) {
         if (pageIndex < 0 || pageIndex >= pageYOffsets.size) return null
 
         val localY = contentY - pageYOffsets[pageIndex]
-        val pdfX = contentX / renderScales[pageIndex]
+        val pdfX = (contentX - pageXOffsets[pageIndex]) / renderScales[pageIndex]
         val pdfY = pageHeights[pageIndex] - (localY / renderScales[pageIndex])
         return PdfTouchPoint(pageIndex, AnnotationPoint(pdfX, pdfY))
     }
@@ -693,6 +932,7 @@ class ContinuousPdfView(context: Context) : View(context) {
     }
 
     private fun getVisiblePage(): Int {
+        if (isBookMode) return bookPager.currentPage
         val centerY = (panY + height / 2f) / currentScale
         for (i in pageYOffsets.indices.reversed()) {
             if (pageYOffsets[i] <= centerY) return i
@@ -702,6 +942,19 @@ class ContinuousPdfView(context: Context) : View(context) {
 
     fun scrollToPage(pageIndex: Int) {
         if (pageIndex < 0 || pageIndex >= pageYOffsets.size) return
+        if (isBookMode) {
+            // The page prop jumps straight there, at fit, with no slide.
+            slideAnimator?.removeAllListeners()
+            slideAnimator?.cancel()
+            slideAnimator = null
+            isBookSwiping = false
+            slideOffset = 0f
+            slideNeighbour = -1
+            resetToFit()
+            bookPager.jumpTo(pageIndex) // reports through notifyPageChange
+            invalidate()
+            return
+        }
         panY = pageYOffsets[pageIndex] * currentScale
         constrainPan()
         invalidate()
@@ -721,7 +974,14 @@ class ContinuousPdfView(context: Context) : View(context) {
     fun recycle() {
         pageBitmaps.forEach { it.recycle() }
         pageBitmaps.clear()
+        pageXOffsets.clear()
         pageYOffsets.clear()
+        slideAnimator?.removeAllListeners()
+        slideAnimator?.cancel()
+        slideAnimator = null
+        isBookSwiping = false
+        slideOffset = 0f
+        slideNeighbour = -1
         pageWidths.clear()
         pageHeights.clear()
         renderScales.clear()
@@ -734,6 +994,20 @@ class ContinuousPdfView(context: Context) : View(context) {
         clearMovePreview()
         totalHeight = 0f
         lastNotifiedPage = -1
+    }
+
+    private companion object {
+        const val SLIDE_DURATION_MS = 250L
+        const val BOUNCE_DURATION_MS = 120L
+
+        /** How far an edge tap or key nudges the page at either end. */
+        const val BOUNCE_FRACTION = 0.06f
+
+        /** How much of the finger's travel the page follows at either end. */
+        const val RUBBER_BAND = 0.3f
+
+        /** A release faster than this turns the page even after a short drag. */
+        const val FLING_VELOCITY_DP = 500f
     }
 
     private inner class ScaleListener : ScaleGestureDetector.SimpleOnScaleGestureListener() {
@@ -752,9 +1026,30 @@ class ContinuousPdfView(context: Context) : View(context) {
     }
 
     private inner class GestureListener : GestureDetector.SimpleOnGestureListener() {
-        override fun onDown(e: MotionEvent): Boolean = true
+        override fun onDown(e: MotionEvent): Boolean {
+            // Turn or pan is decided once per gesture, at touch down.
+            bookSwipeAction = if (isBookMode) {
+                BookTurnPolicy.swipeActionFor(annotationMode, currentScale)
+            } else {
+                BookTurnPolicy.SwipeAction.PAN
+            }
+            bookSwipeDownX = e.x
+            bookSwipeVelocityX = 0f
+            return true
+        }
+
+        override fun onSingleTapUp(e: MotionEvent): Boolean {
+            if (!isBookMode) return false
+            val direction = bookEdgeTapTurn(e) ?: return false
+            turnPage(direction)
+            return true
+        }
 
         override fun onScroll(e1: MotionEvent?, e2: MotionEvent, dx: Float, dy: Float): Boolean {
+            if (isBookMode && bookSwipeAction == BookTurnPolicy.SwipeAction.TURN) {
+                dragBookSwipe(e2.x - (e1?.x ?: bookSwipeDownX))
+                return true
+            }
             panX += dx
             panY += dy
             constrainPan()
@@ -764,6 +1059,11 @@ class ContinuousPdfView(context: Context) : View(context) {
         }
 
         override fun onFling(e1: MotionEvent?, e2: MotionEvent, vx: Float, vy: Float): Boolean {
+            if (isBookMode && bookSwipeAction == BookTurnPolicy.SwipeAction.TURN) {
+                // Picked up when the finger lifts, in releaseBookSwipe.
+                bookSwipeVelocityX = vx
+                return true
+            }
             scroller.fling(
                 panX.toInt(),
                 panY.toInt(),
@@ -779,6 +1079,19 @@ class ContinuousPdfView(context: Context) : View(context) {
         }
 
         override fun onDoubleTap(e: MotionEvent): Boolean {
+            // In book mode the first tap on an edge has already turned the page, so
+            // the second is swallowed: a double-tap zooms only in the middle region.
+            if (isBookMode &&
+                !BookTurnPolicy.doubleTapZooms(
+                    annotationMode,
+                    currentScale,
+                    e.x,
+                    width.toFloat(),
+                    density
+                )
+            ) {
+                return true
+            }
             val targetScale = if (currentScale > minScale * 1.5f) minScale else minScale * 2.5f
             val oldScale = currentScale
             currentScale = targetScale

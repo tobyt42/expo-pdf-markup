@@ -1,7 +1,21 @@
 import { ExpoPdfMarkupView } from '@tobyt/expo-pdf-markup';
-import type { AnnotationMode, StampDefinition, TextInputRequest } from '@tobyt/expo-pdf-markup';
+import type {
+  AnnotationMode,
+  DisplayMode,
+  StampDefinition,
+  TextInputRequest,
+} from '@tobyt/expo-pdf-markup';
 import { useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const MODES: { label: string; mode: AnnotationMode }[] = [
@@ -29,9 +43,16 @@ const STAMPS: StampDefinition[] = [
   { id: 'crescendo', label: 'Crescendo', text: '<' },
 ];
 
+export type SampleDocument = { id: string; label: string };
+
+type PageReadout = { page: number; pageCount: number };
+
 type Props = {
   pdfPath: string | null;
   fontsLoaded: boolean;
+  documents: SampleDocument[];
+  documentId: string;
+  onDocumentChange: (id: string) => void;
   annotations: string;
   annotationMode: AnnotationMode;
   annotationColor: string;
@@ -45,6 +66,9 @@ type Props = {
 export default function PdfScreen({
   pdfPath,
   fontsLoaded,
+  documents,
+  documentId,
+  onDocumentChange,
   annotations,
   annotationMode,
   annotationColor,
@@ -60,6 +84,14 @@ export default function PdfScreen({
   const resolveRef = useRef<((text: string | null) => void) | null>(null);
 
   const [armedStamp, setArmedStamp] = useState<StampDefinition | null>(null);
+
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('continuous');
+  const [pageReadout, setPageReadout] = useState<PageReadout | null>(null);
+
+  const changeDocument = (id: string) => {
+    setPageReadout(null);
+    onDocumentChange(id);
+  };
 
   const handleTextInputRequested = (request: TextInputRequest): Promise<string | null> => {
     setTextRequest(request);
@@ -91,6 +123,7 @@ export default function PdfScreen({
       ) : (
         <ExpoPdfMarkupView
           source={pdfPath}
+          displayMode={displayMode}
           style={styles.pdf}
           annotations={annotations}
           annotationMode={annotationMode}
@@ -103,15 +136,43 @@ export default function PdfScreen({
           onLoadComplete={({ nativeEvent: { pageCount } }) =>
             console.log(`PDF loaded: ${pageCount} pages`)
           }
-          onPageChanged={({ nativeEvent: { page, pageCount } }) =>
-            console.log(`Page ${page + 1} of ${pageCount}`)
-          }
+          onPageChanged={({ nativeEvent: { page, pageCount } }) => {
+            console.log(`Page ${page + 1} of ${pageCount}`);
+            setPageReadout({ page, pageCount });
+          }}
           onError={({ nativeEvent: { message } }) => console.error(`PDF error: ${message}`)}
           onAnnotationsChanged={({ nativeEvent }) => onAnnotationsChanged(nativeEvent.annotations)}
         />
       )}
 
       <View style={styles.toolbar}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.toolbarRow}>
+          {documents.map(({ id, label }) => (
+            <Pressable
+              key={id}
+              style={[styles.button, documentId === id && styles.buttonActive]}
+              onPress={() => changeDocument(id)}
+            >
+              <Text style={[styles.buttonText, documentId === id && styles.buttonTextActive]}>
+                {label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+
+        <View style={[styles.toolbarRow, styles.displayRow]}>
+          <Text style={styles.buttonText}>Book mode</Text>
+          <Switch
+            value={displayMode === 'book'}
+            onValueChange={(on) => setDisplayMode(on ? 'book' : 'continuous')}
+          />
+          <Text style={styles.readout} testID="page-readout">
+            {pageReadout
+              ? `Page ${pageReadout.page + 1} of ${pageReadout.pageCount} (page: ${pageReadout.page})`
+              : 'No onPageChanged yet'}
+          </Text>
+        </View>
+
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.toolbarRow}>
           {MODES.map(({ label, mode }) => (
             <Pressable
@@ -229,6 +290,16 @@ const styles = StyleSheet.create({
   },
   toolbarRow: {
     flexDirection: 'row',
+  },
+  displayRow: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  readout: {
+    color: '#ccc',
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
+    flexShrink: 1,
   },
   button: {
     paddingHorizontal: 12,

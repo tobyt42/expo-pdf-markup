@@ -20,7 +20,24 @@ import {
   serializeAnnotations,
   translateAnnotation,
 } from './web/annotationUtils';
-import type { PdfPageMeta } from './web/types';
+import {
+  BOUNCE_PX,
+  EDGE_RESISTANCE,
+  TAP_SLOP_PX,
+  isViewShown,
+  ownsArrowKeys,
+  keyTurnFor,
+  canGestureTurn,
+  classifySwipe,
+  classifyTap,
+  releaseVelocityX,
+  resolveTurn,
+  slideOffsetFor,
+  type PointerSample,
+  type TurnDirection,
+} from './web/bookMode';
+import { computePageMetas } from './web/layout';
+import type { PageSize, PdfPageMeta } from './web/types';
 
 // Configure pdfjs worker once at module level (consumers can override before mounting)
 if (!pdfjs.GlobalWorkerOptions.workerSrc) {
@@ -399,6 +416,7 @@ function PageView({
   return (
     <div
       ref={containerRef}
+      data-pdf-page={pageIndex}
       style={{ position: 'relative', width: cssWidth, height: cssHeight, margin: '0 auto' }}
     >
       <canvas
@@ -435,9 +453,25 @@ function PageView({
 // Main component
 // ---------------------------------------------------------------------------
 
+/** Duration of the book mode slide, in ms. */
+const TURN_DURATION_MS = 250;
+
+type BookGesture = {
+  startX: number;
+  startY: number;
+  lastX: number;
+  lastY: number;
+  /** `'turn'` drags the page sideways; `'pan'` scrolls a zoomed page. */
+  kind: 'turn' | 'pan';
+  moved: boolean;
+  /** Recent positions, oldest first, for the speed at release. */
+  samples: PointerSample[];
+};
+
 export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
   const {
     source,
+    displayMode = 'continuous',
     page: propPage,
     backgroundColor = '#f0f0f0',
     annotations: annotationsProp,
@@ -455,10 +489,12 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
     style,
   } = props;
 
+  const isBook = displayMode === 'book';
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = React.useState(0);
+  const [containerSize, setContainerSize] = React.useState({ width: 0, height: 0 });
+  const containerWidth = containerSize.width;
   const [doc, setDoc] = React.useState<PDFDocumentProxy | null>(null);
-  const [pageMetas, setPageMetas] = React.useState<PdfPageMeta[]>([]);
+  const [pageSizes, setPageSizes] = React.useState<PageSize[]>([]);
   const [annotations, setAnnotations] = React.useState<Annotation[]>([]);
   const lastAnnotationsJsonRef = React.useRef<string | undefined>(undefined);
   const pageContainerRefs = React.useRef<(HTMLDivElement | null)[]>([]);
@@ -467,7 +503,48 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
   const [zoomLevel, setZoomLevel] = React.useState(1);
   const zoomRef = React.useRef(1);
 
-  // ResizeObserver → containerWidth
+  // The page the reader is on, shared by both modes so switching mode keeps it. The ref is read
+  // by the turn path, so quick turns in a row see the latest page before React re-renders.
+  const [currentPage, setCurrentPage] = React.useState(0);
+  const currentPageRef = React.useRef(0);
+  const lastReportedPageRef = React.useRef(-1);
+  // Book mode slide: horizontal offset of the page strip, and whether it animates there.
+  const [slide, setSlide] = React.useState({ offset: 0, animated: false });
+  const slideOffsetRef = React.useRef(0);
+  const turnTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const turnFrameRef = React.useRef<number | null>(null);
+  const pendingTurnRef = React.useRef<number | null>(null);
+  const gestureRef = React.useRef<BookGesture | null>(null);
+  const activePointersRef = React.useRef(new Set<number>());
+
+  const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
+  // Continuous mode ignores the view's height, so a height change doesn't re-lay it out.
+  const fitHeight = isBook ? containerSize.height : 0;
+  const pageMetas = React.useMemo(
+    () => computePageMetas(pageSizes, containerWidth, fitHeight, displayMode, dpr),
+    [pageSizes, containerWidth, fitHeight, displayMode, dpr]
+  );
+  const pageCount = doc ? pageMetas.length : 0;
+
+  /** Records the reader's page and fires `onPageChanged` once per change. */
+  const reportPage = React.useCallback(
+    (page: number) => {
+      currentPageRef.current = page;
+      setCurrentPage(page);
+      if (!doc || page === lastReportedPageRef.current) return;
+      lastReportedPageRef.current = page;
+      onPageChanged?.({
+        nativeEvent: {
+          page,
+          pageCount: doc.numPages,
+          pageWidth: pageSizes[page]?.pdfWidth ?? 0,
+          pageHeight: pageSizes[page]?.pdfHeight ?? 0,
+        },
+      });
+    },
+    [doc, pageSizes, onPageChanged]
+  );
+
   const applyAnnotations = React.useCallback(
     (updater: (prev: Annotation[]) => Annotation[]) => {
       setAnnotations((prev) => {
@@ -481,12 +558,17 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
     [onAnnotationsChanged]
   );
 
+  // ResizeObserver → containerSize
   React.useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
-      const width = entries[0]?.contentRect.width ?? 0;
-      setContainerWidth(width);
+      const rect = entries[0]?.contentRect;
+      const width = rect?.width ?? 0;
+      const height = rect?.height ?? 0;
+      setContainerSize((prev) =>
+        prev.width === width && prev.height === height ? prev : { width, height }
+      );
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -566,9 +648,13 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
     };
   }, []);
 
-  // Load PDF when source or containerWidth changes
+  // Load the PDF once the view has a size. Page layout is derived from the page sizes, so
+  // resizing the view re-lays out the pages without reloading the document, even when it comes
+  // back from zero size (e.g. a screen that was display: none in a back stack).
+  const hasSize = containerWidth > 0;
+  const loadedSourceRef = React.useRef<string | null>(null);
   React.useEffect(() => {
-    if (!source || containerWidth <= 0) return;
+    if (!source || !hasSize || loadedSourceRef.current === source) return;
     let cancelled = false;
     loadingSourceRef.current = source;
 
@@ -580,8 +666,7 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
           loadedDoc.loadingTask.destroy();
           return;
         }
-        const metas: PdfPageMeta[] = [];
-        const dpr = window.devicePixelRatio ?? 1;
+        const sizes: PageSize[] = [];
         for (let i = 1; i <= loadedDoc.numPages; i++) {
           const pg = await loadedDoc.getPage(i);
           if (cancelled) {
@@ -590,21 +675,17 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
             return;
           }
           const viewport = pg.getViewport({ scale: 1 });
-          const scale = containerWidth / viewport.width;
-          const cssHeight = viewport.height * scale;
-          metas.push({
-            pdfWidth: viewport.width,
-            pdfHeight: viewport.height,
-            scale,
-            canvasWidth: Math.round(containerWidth * dpr),
-            canvasHeight: Math.round(cssHeight * dpr),
-          });
+          sizes.push({ pdfWidth: viewport.width, pdfHeight: viewport.height });
           pg.cleanup();
         }
         docRef.current?.loadingTask.destroy();
         docRef.current = loadedDoc;
+        loadedSourceRef.current = source;
+        currentPageRef.current = 0;
+        lastReportedPageRef.current = -1;
+        setCurrentPage(0);
         setDoc(loadedDoc);
-        setPageMetas(metas);
+        setPageSizes(sizes);
         pageContainerRefs.current = new Array(loadedDoc.numPages).fill(null);
         onLoadComplete?.({ nativeEvent: { pageCount: loadedDoc.numPages } });
       } catch (err) {
@@ -619,7 +700,23 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
     return () => {
       cancelled = true;
     };
-  }, [source, containerWidth]); // intentionally omit callbacks — they should not re-trigger a PDF load
+  }, [source, hasSize]); // intentionally omit callbacks — they should not re-trigger a PDF load
+
+  // Continuous mode keeps the events it had in 1.1.4, when a width change reloaded the document:
+  // `onLoadComplete` fires again and the page in view is reported afresh. The document now loads
+  // once, so those events are replayed here instead. Book mode, and switching mode, fire neither.
+  const laidOutRef = React.useRef<{ doc: PDFDocumentProxy | null; width: number }>({
+    doc: null,
+    width: 0,
+  });
+  React.useEffect(() => {
+    const last = laidOutRef.current;
+    laidOutRef.current = { doc, width: containerWidth };
+    if (!doc || isBook || last.doc !== doc) return;
+    if (containerWidth <= 0 || containerWidth === last.width) return;
+    lastReportedPageRef.current = -1;
+    onLoadComplete?.({ nativeEvent: { pageCount: doc.numPages } });
+  }, [doc, containerWidth, isBook]); // intentionally omit callbacks — only a resize fires these
 
   // Sync annotations prop → state (guard round-trips)
   React.useEffect(() => {
@@ -629,19 +726,179 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
     setAnnotations(parsed.annotations);
   }, [annotationsProp]);
 
-  // Scroll to propPage
+  // -------------------------------------------------------------------------
+  // Book mode turns
+  // -------------------------------------------------------------------------
+
+  const setSlideOffset = React.useCallback((offset: number, animated: boolean) => {
+    slideOffsetRef.current = offset;
+    setSlide((prev) =>
+      prev.offset === offset && prev.animated === animated ? prev : { offset, animated }
+    );
+  }, []);
+
+  const clearTurnTimer = React.useCallback(() => {
+    if (turnTimerRef.current != null) clearTimeout(turnTimerRef.current);
+    turnTimerRef.current = null;
+    if (turnFrameRef.current != null) cancelAnimationFrame(turnFrameRef.current);
+    turnFrameRef.current = null;
+  }, []);
+
+  const resetZoom = React.useCallback(() => {
+    if (zoomRef.current === 1) return;
+    zoomRef.current = 1;
+    setZoomLevel(1);
+    const el = scrollContainerRef.current;
+    if (el) {
+      el.scrollLeft = 0;
+      el.scrollTop = 0;
+    }
+  }, []);
+
+  /** Shows `page` straight away, with no slide, and reports it. */
+  const showBookPage = React.useCallback(
+    (page: number) => {
+      clearTurnTimer();
+      pendingTurnRef.current = null;
+      setSlideOffset(0, false);
+      reportPage(page);
+    },
+    [clearTurnTimer, reportPage, setSlideOffset]
+  );
+
+  /** Lands a slide that is still running, so a new turn starts from the page it was going to. */
+  const finishPendingTurn = React.useCallback(() => {
+    const pending = pendingTurnRef.current;
+    if (pending != null) showBookPage(pending);
+    else clearTurnTimer();
+  }, [clearTurnTimer, showBookPage]);
+
+  /** Slides the page back to rest. From rest it nudges towards `direction` first: the bounce. */
+  const bounce = React.useCallback(
+    (direction: TurnDirection) => {
+      clearTurnTimer();
+      if (slideOffsetRef.current === 0) {
+        setSlideOffset(slideOffsetFor(direction, BOUNCE_PX), true);
+        turnTimerRef.current = setTimeout(() => {
+          setSlideOffset(0, true);
+          turnTimerRef.current = null;
+        }, TURN_DURATION_MS / 2);
+      } else {
+        setSlideOffset(0, true);
+      }
+    },
+    [clearTurnTimer, setSlideOffset]
+  );
+
+  /**
+   * The one turn path for book mode. Swipes and edge taps call it once the turn policy allows
+   * them; hardware keys can call it directly. It resets zoom to fit, slides the page in
+   * `direction` (or bounces at either end) and fires `onPageChanged` once the turn lands.
+   */
+  const turnPage = React.useCallback(
+    (direction: TurnDirection) => {
+      if (!isBook || pageCount === 0) return;
+      finishPendingTurn();
+      const wasZoomed = zoomRef.current !== 1;
+      resetZoom();
+      const target = resolveTurn(currentPageRef.current, direction, pageCount);
+      if (target == null) {
+        bounce(direction);
+        return;
+      }
+      pendingTurnRef.current = target;
+      const slideAway = () => {
+        turnFrameRef.current = null;
+        setSlideOffset(slideOffsetFor(direction, containerWidth), true);
+        turnTimerRef.current = setTimeout(() => showBookPage(target), TURN_DURATION_MS);
+      };
+      if (!wasZoomed) {
+        slideAway();
+        return;
+      }
+      // A zoomed page shows on its own, so the strip of neighbours only comes back with this
+      // render. Let it paint at rest first, or the slide would jump instead of animating.
+      setSlideOffset(0, false);
+      turnFrameRef.current = requestAnimationFrame(() => {
+        turnFrameRef.current = requestAnimationFrame(slideAway);
+      });
+    },
+    [
+      isBook,
+      pageCount,
+      containerWidth,
+      finishPendingTurn,
+      resetZoom,
+      bounce,
+      setSlideOffset,
+      showBookPage,
+    ]
+  );
+
+  React.useEffect(() => clearTurnTimer, [clearTurnTimer]);
+
+  // Hardware keys and page-turner pedals turn the page in book mode.
+  React.useEffect(() => {
+    if (!isBook) return;
+    function onKeyDown(e: KeyboardEvent) {
+      // A modified arrow belongs to the browser or the host app (Alt+Left is Back, Shift selects).
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const direction = keyTurnFor(e.key);
+      if (!direction) return;
+      // Keys pressed in a text field or an arrow-key control anywhere on the page are its own.
+      if (ownsArrowKeys(e.target as Element | null) || ownsArrowKeys(document.activeElement)) {
+        return;
+      }
+      // A view that isn't on screen (hidden, or a screen left mounted in a back stack) keeps out.
+      if (!isViewShown(scrollContainerRef.current, containerSize.width, containerSize.height)) {
+        return;
+      }
+      e.preventDefault();
+      turnPage(direction);
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isBook, turnPage, containerSize]);
+
+  // Switching mode keeps the reader's page and starts it at fit.
+  React.useLayoutEffect(() => {
+    if (!doc) return;
+    finishPendingTurn();
+    resetZoom();
+    if (!isBook) {
+      pageContainerRefs.current[currentPageRef.current]?.scrollIntoView({
+        behavior: 'instant' as ScrollBehavior,
+      });
+    }
+    // Only a mode switch should move the page; the other dependencies are stable per document.
+  }, [isBook]);
+
+  // In book mode, report the page shown when the document opens.
+  React.useEffect(() => {
+    if (isBook && doc && pageCount > 0) reportPage(currentPageRef.current);
+  }, [isBook, doc, pageCount, reportPage]);
+
+  // Go to propPage
   React.useEffect(() => {
     if (propPage == null || !doc) return;
+    if (isBook) {
+      if (propPage < 0 || propPage >= pageSizes.length) return;
+      // `page` is a one-shot command, so acting on it here is the event, not derived state.
+      resetZoom();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      showBookPage(propPage);
+      return;
+    }
     const el = pageContainerRefs.current[propPage];
     el?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
+    // Only a new `page` (or document) is a jump; switching mode keeps the current page instead.
   }, [propPage, doc]);
 
-  // IntersectionObserver → onPageChanged
+  // IntersectionObserver → onPageChanged (continuous mode)
   React.useEffect(() => {
-    if (!doc || pageMetas.length === 0) return;
+    if (isBook || !doc || pageMetas.length === 0) return;
     const els = pageContainerRefs.current.filter(Boolean) as HTMLDivElement[];
     if (els.length === 0) return;
-    let lastReported = -1;
     const io = new IntersectionObserver(
       (entries) => {
         let topPage = -1;
@@ -655,23 +912,98 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
             }
           }
         }
-        if (topPage !== -1 && topPage !== lastReported) {
-          lastReported = topPage;
-          onPageChanged?.({
-            nativeEvent: {
-              page: topPage,
-              pageCount: doc.numPages,
-              pageWidth: pageMetas[topPage]?.pdfWidth ?? 0,
-              pageHeight: pageMetas[topPage]?.pdfHeight ?? 0,
-            },
-          });
-        }
+        if (topPage !== -1) reportPage(topPage);
       },
       { root: scrollContainerRef.current, threshold: 0.1 }
     );
     for (const el of els) io.observe(el);
     return () => io.disconnect();
-  }, [doc, pageMetas, onPageChanged]);
+  }, [isBook, doc, pageMetas, reportPage]);
+
+  // -------------------------------------------------------------------------
+  // Book mode gestures: swipes and edge taps
+  // -------------------------------------------------------------------------
+
+  function cancelBookGesture() {
+    const gesture = gestureRef.current;
+    gestureRef.current = null;
+    if (gesture?.kind === 'turn' && slideOffsetRef.current !== 0 && turnTimerRef.current == null) {
+      setSlideOffset(0, true);
+    }
+  }
+
+  function handleBookPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    activePointersRef.current.add(e.pointerId);
+    if (activePointersRef.current.size > 1) {
+      // A second finger means a pinch, never a turn.
+      cancelBookGesture();
+      return;
+    }
+    if (e.button !== 0 || annotationMode !== 'none') return;
+    const kind = canGestureTurn(annotationMode, zoomRef.current) ? 'turn' : 'pan';
+    if (kind === 'turn') finishPendingTurn();
+    gestureRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      lastX: e.clientX,
+      lastY: e.clientY,
+      kind,
+      moved: false,
+      samples: [{ x: e.clientX, t: e.timeStamp }],
+    };
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // The pointer may already be gone (e.g. a synthetic event); the drag still works without capture.
+    }
+  }
+
+  function handleBookPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const gesture = gestureRef.current;
+    if (!gesture) return;
+    const dx = e.clientX - gesture.startX;
+    const dy = e.clientY - gesture.startY;
+    if (!gesture.moved && Math.hypot(dx, dy) >= TAP_SLOP_PX) gesture.moved = true;
+    if (gesture.kind === 'pan') {
+      const el = scrollContainerRef.current;
+      if (el) {
+        el.scrollLeft -= e.clientX - gesture.lastX;
+        el.scrollTop -= e.clientY - gesture.lastY;
+      }
+    } else if (gesture.moved) {
+      // Past either end the page follows the finger only part of the way.
+      const blocked = resolveTurn(currentPageRef.current, dx < 0 ? 'next' : 'previous', pageCount);
+      setSlideOffset(blocked == null ? dx * EDGE_RESISTANCE : dx, false);
+    }
+    gesture.lastX = e.clientX;
+    gesture.lastY = e.clientY;
+    gesture.samples.push({ x: e.clientX, t: e.timeStamp });
+    if (gesture.samples.length > 20) gesture.samples.shift();
+  }
+
+  function handleBookPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    activePointersRef.current.delete(e.pointerId);
+    const gesture = gestureRef.current;
+    gestureRef.current = null;
+    if (!gesture || gesture.kind === 'pan') return;
+    const dx = e.clientX - gesture.startX;
+    const dy = e.clientY - gesture.startY;
+    if (!gesture.moved) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const direction = classifyTap(e.clientX - rect.left, containerWidth);
+      if (direction) turnPage(direction);
+      return;
+    }
+    gesture.samples.push({ x: e.clientX, t: e.timeStamp });
+    const direction = classifySwipe(dx, dy, containerWidth, releaseVelocityX(gesture.samples));
+    if (direction) turnPage(direction);
+    else if (slideOffsetRef.current !== 0) setSlideOffset(0, true);
+  }
+
+  function handleBookPointerCancel(e: React.PointerEvent<HTMLDivElement>) {
+    activePointersRef.current.delete(e.pointerId);
+    cancelBookGesture();
+  }
 
   const handleAnnotationAdded = React.useCallback(
     (annotation: Annotation) => {
@@ -752,43 +1084,102 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
 
   const styleObj = style as React.CSSProperties | undefined;
 
+  const pageViewProps = {
+    annotations,
+    annotationMode,
+    annotationColor,
+    annotationLineWidth,
+    stampText,
+    stampSize,
+    zoomLevel,
+    onAnnotationAdded: handleAnnotationAdded,
+    onAnnotationRemoved: handleAnnotationRemoved,
+    onAnnotationUpdated: handleAnnotationUpdated,
+    onTextInputRequested: handleTextInputRequested,
+  };
+
+  const { width, height } = containerSize;
+  const zoomed = zoomLevel > 1;
+  // Book mode: one slot per page, each the size of the view with the page centred in it. At fit,
+  // the current page sits between its neighbours on a strip that slides sideways. Zoomed in,
+  // only the current page is shown, and the view scrolls over it.
+  const slotStyle: React.CSSProperties = {
+    width,
+    height,
+    flex: 'none',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  };
+  const bookSlots = zoomed ? [currentPage] : [currentPage - 1, currentPage, currentPage + 1];
+
+  // The root element stays the same across modes, so the size and zoom listeners stay attached.
   return (
     <div
       ref={scrollContainerRef}
+      data-display-mode={displayMode}
+      data-page={isBook ? currentPage : undefined}
       style={{
-        overflowY: 'scroll',
-        overflowX: 'auto',
         backgroundColor,
         height: '100%',
+        ...(isBook
+          ? { overflow: zoomed ? 'auto' : 'hidden', touchAction: 'none', userSelect: 'none' }
+          : { overflowY: 'scroll', overflowX: 'auto' }),
         ...styleObj,
       }}
+      onPointerDown={isBook ? handleBookPointerDown : undefined}
+      onPointerMove={isBook ? handleBookPointerMove : undefined}
+      onPointerUp={isBook ? handleBookPointerUp : undefined}
+      onPointerCancel={isBook ? handleBookPointerCancel : undefined}
     >
       <div style={{ zoom: zoomLevel }}>
-        {doc &&
+        {isBook ? (
+          <div
+            style={{
+              display: 'flex',
+              width: width * bookSlots.length,
+              transform: zoomed ? undefined : `translateX(${slide.offset - width}px)`,
+              transition: slide.animated ? `transform ${TURN_DURATION_MS}ms ease-out` : 'none',
+            }}
+          >
+            {bookSlots.map((i) => (
+              <div
+                key={i}
+                style={slotStyle}
+                aria-hidden={i === currentPage ? undefined : true}
+                data-book-slot={i}
+              >
+                {doc && pageMetas[i] && (
+                  <PageView
+                    {...pageViewProps}
+                    doc={doc}
+                    pageIndex={i}
+                    meta={pageMetas[i]}
+                    containerRef={(el) => {
+                      pageContainerRefs.current[i] = el;
+                    }}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          doc &&
           pageMetas.map((meta, i) => (
             <React.Fragment key={i}>
               <PageView
+                {...pageViewProps}
                 doc={doc}
                 pageIndex={i}
                 meta={meta}
-                annotations={annotations}
-                annotationMode={annotationMode}
-                annotationColor={annotationColor}
-                annotationLineWidth={annotationLineWidth}
-                stampText={stampText}
-                stampSize={stampSize}
-                zoomLevel={zoomLevel}
-                onAnnotationAdded={handleAnnotationAdded}
-                onAnnotationRemoved={handleAnnotationRemoved}
-                onAnnotationUpdated={handleAnnotationUpdated}
-                onTextInputRequested={handleTextInputRequested}
                 containerRef={(el) => {
                   pageContainerRefs.current[i] = el;
                 }}
               />
               {i < pageMetas.length - 1 && <div style={{ height: 8 }} aria-hidden />}
             </React.Fragment>
-          ))}
+          ))
+        )}
       </div>
     </div>
   );

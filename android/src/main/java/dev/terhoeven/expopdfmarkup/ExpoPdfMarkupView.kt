@@ -3,7 +3,11 @@ package dev.terhoeven.expopdfmarkup
 import android.app.AlertDialog
 import android.content.Context
 import android.graphics.pdf.PdfRenderer
+import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.view.KeyEvent
+import android.view.MotionEvent
+import android.view.ViewTreeObserver
 import android.widget.EditText
 import expo.modules.kotlin.AppContext
 import expo.modules.kotlin.viewevent.EventDispatcher
@@ -34,8 +38,18 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
     private var pendingTextPoint: AnnotationPoint? = null
     private var pendingTextAnnotationId: String? = null
 
+    /** When a text input elsewhere lets go of focus, book mode takes the keys back. */
+    private val focusChangeListener = ViewTreeObserver.OnGlobalFocusChangeListener {
+            oldFocus,
+            newFocus
+        ->
+        if (newFocus == null && oldFocus?.onCheckIsTextEditor() == true) post { claimKeyFocus() }
+    }
+
     init {
         addView(pdfView)
+        // Book mode takes key focus for pedals and keyboards; it has nothing to highlight.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) defaultFocusHighlightEnabled = false
         pdfView.onPageChangeListener = { page, pageCount, pageWidth, pageHeight ->
             onPageChanged(
                 mapOf(
@@ -85,13 +99,14 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
             renderer = r
             lastLoadedSource = source
             onLoadComplete(mapOf("pageCount" to r.pageCount))
-            if (width > 0) {
-                pdfView.loadPages(r, width)
+            if (width > 0 && (height > 0 || !pdfView.isBookMode)) {
+                pdfView.loadPages(r, width, height)
             } else {
-                post { renderer?.let { pdfView.loadPages(it, width) } }
+                post { renderer?.let { pdfView.loadPages(it, width, height) } }
             }
             // Re-apply pending annotations after load
             pendingAnnotationsJson?.let { loadAnnotations(it) }
+            claimKeyFocus()
         } catch (e: Exception) {
             onError(mapOf("message" to "Failed to load PDF: ${e.message}"))
         }
@@ -118,6 +133,73 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
         val deduped = data.annotations.reversed().filter { seen.add(it.id) }.reversed()
         pdfView.annotations = deduped
     }
+
+    /** `"continuous"` (default) or `"book"`: one page at a time, turned sideways. */
+    var displayMode: String = "continuous"
+        private set
+
+    /** Switches display mode, keeping the reader on the page they were on. */
+    fun setDisplayMode(mode: String?) {
+        val newMode = if (mode == "book") "book" else "continuous"
+        if (newMode == displayMode) return
+        displayMode = newMode
+        val page = pdfView.currentPage
+        pdfView.isBookMode = newMode == "book"
+        renderer?.let { pdfView.loadPages(it, width, height, startPage = page) }
+        // Only book mode handles keys, so only book mode takes focus.
+        isFocusable = pdfView.isBookMode
+        isFocusableInTouchMode = pdfView.isBookMode
+        if (pdfView.isBookMode) {
+            claimKeyFocus()
+        } else if (hasFocus()) {
+            clearFocus()
+        }
+    }
+
+    /** Whether a text input in this window has focus, so keys belong to it. */
+    private fun textInputHasFocus(): Boolean = rootView.findFocus()?.onCheckIsTextEditor() == true
+
+    /**
+     * Takes key focus in book mode, so a keyboard or page-turner pedal turns
+     * the page without the host app doing anything. Never takes it from a
+     * text input.
+     */
+    private fun claimKeyFocus() {
+        if (!pdfView.isBookMode || !isAttachedToWindow || hasFocus() || textInputHasFocus()) return
+        requestFocus()
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) claimKeyFocus()
+        return super.dispatchTouchEvent(ev)
+    }
+
+    /** The turn a hardware key asks for in book mode, or null to leave it alone. */
+    private fun bookKeyTurn(keyCode: Int, event: KeyEvent): BookTurnPolicy.Direction? {
+        if (!pdfView.isBookMode) return null
+        return BookTurnPolicy.keyTurnFor(
+            keyCode,
+            textInputHasFocus = textInputHasFocus(),
+            hasModifiers = !event.hasNoModifiers()
+        )
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        val direction = bookKeyTurn(keyCode, event) ?: return super.onKeyDown(keyCode, event)
+        // A key turns even mid-stroke: drop the unfinished ink rather than carry it to the new page.
+        pdfView.cancelActiveGestures()
+        turnPage(direction)
+        return true
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean =
+        bookKeyTurn(keyCode, event) != null || super.onKeyUp(keyCode, event)
+
+    /**
+     * Turns one page in book mode, with the same slide, bounce and single
+     * onPageChanged as a swipe or edge tap. No-op in continuous mode.
+     */
+    fun turnPage(direction: BookTurnPolicy.Direction): Boolean = pdfView.turnPage(direction)
 
     fun setAnnotationMode(mode: String?) {
         pdfView.annotationMode = mode ?: "none"
@@ -200,6 +282,7 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
     }
 
     override fun onDetachedFromWindow() {
+        viewTreeObserver.removeOnGlobalFocusChangeListener(focusChangeListener)
         super.onDetachedFromWindow()
         pdfView.cancelActiveGestures()
         // Save the successfully-loaded source before close() so we can reload on re-attach.
@@ -212,6 +295,8 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        viewTreeObserver.addOnGlobalFocusChangeListener(focusChangeListener)
+        post { claimKeyFocus() }
         sourceToReloadOnAttach?.let { source ->
             sourceToReloadOnAttach = null
             pdfView.pendingScrollRestore = savedScrollState
@@ -222,8 +307,14 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        if (w > 0 && w != oldw) {
-            renderer?.let { pdfView.loadPages(it, w) }
+        val r = renderer ?: return
+        if (pdfView.isBookMode) {
+            // Rotation or resize: re-fit the page in view and stay on it.
+            if (w > 0 && h > 0 && (w != oldw || h != oldh)) {
+                pdfView.loadPages(r, w, h, startPage = pdfView.currentPage)
+            }
+        } else if (w > 0 && w != oldw) {
+            pdfView.loadPages(r, w, h)
         }
     }
 }
