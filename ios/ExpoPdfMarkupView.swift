@@ -33,6 +33,10 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
   var editingOverlayLayer: CAShapeLayer?
   var textTapGesture: UITapGestureRecognizer?
   var stampTapGesture: UITapGestureRecognizer?
+  var bookTapGesture: UITapGestureRecognizer?
+  var bookPanGesture: UIPanGestureRecognizer?
+  var bookTurnSnapshot: UIView?
+  var bookGestureDelegate: BookGestureDelegate?
   private var selectionObserver: NSObjectProtocol?
   private var selectionDebounceTimer: Timer?
   private var currentMarkupType: String?
@@ -83,7 +87,9 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
 
   override func layoutSubviews() {
     super.layoutSubviews()
-    pdfView.frame = bounds
+    // Bounds and centre rather than frame: book mode slides pdfView with a transform.
+    pdfView.bounds = CGRect(origin: .zero, size: bounds.size)
+    pdfView.center = CGPoint(x: bounds.midX, y: bounds.midY)
     inkShapeLayer?.frame = bounds
     editingOverlayLayer?.frame = pdfView.documentView?.bounds ?? .zero
     updateEditingOverlay()
@@ -202,11 +208,14 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
 
   // MARK: - Display mode
 
-  /// `"continuous"` (default) or `"book"`. Book mode currently still renders continuously.
+  /// `"continuous"` (default) or `"book"`. See `ExpoPdfMarkupView+Book.swift`.
   private(set) var displayMode: String = "continuous"
 
   func setDisplayMode(_ mode: String) {
-    displayMode = mode == "book" ? "book" : "continuous"
+    let normalised = mode == "book" ? "book" : "continuous"
+    guard normalised != displayMode else { return }
+    displayMode = normalised
+    applyDisplayMode()
   }
 
   // MARK: - Annotation mode
