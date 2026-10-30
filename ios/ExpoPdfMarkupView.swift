@@ -200,6 +200,15 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
     updateEditingOverlay()
   }
 
+  // MARK: - Display mode
+
+  /// `"continuous"` (default) or `"book"`. Book mode currently still renders continuously.
+  private(set) var displayMode: String = "continuous"
+
+  func setDisplayMode(_ mode: String) {
+    displayMode = mode == "book" ? "book" : "continuous"
+  }
+
   // MARK: - Annotation mode
 
   func setAnnotationMode(_ mode: String) {

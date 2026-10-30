@@ -68,6 +68,10 @@ class ExpoPdfMarkupModule : Module() {
                 view.loadAnnotations(json)
             }
 
+            Prop("displayMode") { view: ExpoPdfMarkupView, mode: String? ->
+                view.setDisplayMode(mode)
+            }
+
             Prop("annotationMode") { view: ExpoPdfMarkupView, mode: String? ->
                 view.setAnnotationMode(mode)
             }

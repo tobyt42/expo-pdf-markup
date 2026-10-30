@@ -92,9 +92,22 @@ export type TextInputRequest = {
   currentText?: string;
 };
 
+/**
+ * How the document's pages are presented.
+ * - `'continuous'`: every page stacked in one continuous vertical scroll.
+ * - `'book'`: one page at a time, fitted to the view, turned sideways by swiping, tapping near
+ *   the left or right edge, or pressing the arrow or Page Up / Page Down keys.
+ */
+export type DisplayMode = 'continuous' | 'book';
+
 export type ExpoPdfMarkupViewProps = {
   /** Absolute local file path of the PDF to display. */
   source: string;
+  /**
+   * How pages are presented: `'continuous'` vertical scroll, or `'book'` mode with one page at a
+   * time. `page` and `onPageChanged` mean the same in both modes. Defaults to `'continuous'`.
+   */
+  displayMode?: DisplayMode;
   /** 0-based page number to display. Can be used to restore scroll position on orientation change. */
   page?: number;
   /** Background colour shown behind the PDF pages. */

@@ -43,3 +43,15 @@ it('passes text input request context to onTextInputRequested', () => {
 
   expect(true).toBe(true);
 });
+
+it('accepts the continuous and book display modes only', () => {
+  // displayMode is optional (defaults to 'continuous')
+  accept({ source: 'test.pdf' });
+  accept({ source: 'test.pdf', displayMode: 'continuous' });
+  accept({ source: 'test.pdf', displayMode: 'book' });
+
+  // @ts-expect-error: only 'continuous' and 'book' are valid display modes
+  accept({ source: 'test.pdf', displayMode: 'paged' });
+
+  expect(true).toBe(true);
+});

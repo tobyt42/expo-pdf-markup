@@ -119,6 +119,14 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
         pdfView.annotations = deduped
     }
 
+    /** `"continuous"` (default) or `"book"`. Book mode currently still renders continuously. */
+    var displayMode: String = "continuous"
+        private set
+
+    fun setDisplayMode(mode: String?) {
+        displayMode = if (mode == "book") "book" else "continuous"
+    }
+
     fun setAnnotationMode(mode: String?) {
         pdfView.annotationMode = mode ?: "none"
     }
