@@ -790,8 +790,23 @@ describeDom('ExpoPdfMarkupView (web) book mode', () => {
       expect(onPageChanged).not.toHaveBeenCalled();
 
       resize(VIEW_WIDTH, VIEW_HEIGHT);
+      await flush();
       press('ArrowRight');
       expect(reportedPages(onPageChanged)).toEqual([3]);
+    });
+
+    it('coming back from zero size keeps the page, without reloading the document', async () => {
+      const onLoadComplete = jest.fn();
+      await render({ displayMode: 'book', page: 2, onLoadComplete });
+      const loads = (pdfjs.getDocument as jest.Mock).mock.calls.length;
+
+      resize(0, 0);
+      resize(VIEW_WIDTH, VIEW_HEIGHT);
+      await flush();
+
+      expect(shownPage()).toBe(2);
+      expect(onLoadComplete).toHaveBeenCalledTimes(1);
+      expect((pdfjs.getDocument as jest.Mock).mock.calls.length).toBe(loads);
     });
 
     it('bounces at the first and last page, and reports once per turn', async () => {

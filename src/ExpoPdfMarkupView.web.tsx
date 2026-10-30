@@ -649,10 +649,12 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
   }, []);
 
   // Load the PDF once the view has a size. Page layout is derived from the page sizes, so
-  // resizing the view re-lays out the pages without reloading the document.
+  // resizing the view re-lays out the pages without reloading the document, even when it comes
+  // back from zero size (e.g. a screen that was display: none in a back stack).
   const hasSize = containerWidth > 0;
+  const loadedSourceRef = React.useRef<string | null>(null);
   React.useEffect(() => {
-    if (!source || !hasSize) return;
+    if (!source || !hasSize || loadedSourceRef.current === source) return;
     let cancelled = false;
     loadingSourceRef.current = source;
 
@@ -678,6 +680,7 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
         }
         docRef.current?.loadingTask.destroy();
         docRef.current = loadedDoc;
+        loadedSourceRef.current = source;
         currentPageRef.current = 0;
         lastReportedPageRef.current = -1;
         setCurrentPage(0);
