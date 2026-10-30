@@ -29,8 +29,10 @@ import {
   canGestureTurn,
   classifySwipe,
   classifyTap,
+  releaseVelocityX,
   resolveTurn,
   slideOffsetFor,
+  type PointerSample,
   type TurnDirection,
 } from './web/bookMode';
 import { computePageMetas } from './web/layout';
@@ -461,6 +463,8 @@ type BookGesture = {
   /** `'turn'` drags the page sideways; `'pan'` scrolls a zoomed page. */
   kind: 'turn' | 'pan';
   moved: boolean;
+  /** Recent positions, oldest first, for the speed at release. */
+  samples: PointerSample[];
 };
 
 export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
@@ -935,6 +939,7 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
       lastY: e.clientY,
       kind,
       moved: false,
+      samples: [{ x: e.clientX, t: e.timeStamp }],
     };
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -962,6 +967,8 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
     }
     gesture.lastX = e.clientX;
     gesture.lastY = e.clientY;
+    gesture.samples.push({ x: e.clientX, t: e.timeStamp });
+    if (gesture.samples.length > 20) gesture.samples.shift();
   }
 
   function handleBookPointerUp(e: React.PointerEvent<HTMLDivElement>) {
@@ -977,7 +984,8 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
       if (direction) turnPage(direction);
       return;
     }
-    const direction = classifySwipe(dx, dy, containerWidth);
+    gesture.samples.push({ x: e.clientX, t: e.timeStamp });
+    const direction = classifySwipe(dx, dy, containerWidth, releaseVelocityX(gesture.samples));
     if (direction) turnPage(direction);
     else if (slideOffsetRef.current !== 0) setSlideOffset(0, true);
   }

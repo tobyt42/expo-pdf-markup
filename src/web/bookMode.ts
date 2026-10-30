@@ -9,10 +9,15 @@ export const MIN_EDGE_ZONE_PX = 44;
 export const EDGE_ZONE_FRACTION = 0.25;
 /** Pointer travel (CSS px) below which a press counts as a tap rather than a drag. */
 export const TAP_SLOP_PX = 10;
-/** Horizontal travel (CSS px) a swipe needs before it turns the page. */
-export const MIN_SWIPE_PX = 50;
-/** Share of the view's width a swipe can cover instead of {@link MIN_SWIPE_PX}, whichever is less. */
-export const SWIPE_FRACTION = 0.2;
+/** Share of the view's width a slow swipe has to travel to turn the page, as on iOS and Android. */
+export const SWIPE_TURN_FRACTION = 0.25;
+/**
+ * A release faster than this (CSS px per ms) turns the page even after a short drag. It's the
+ * 500 pt/s (iOS) and 500 dp/s (Android) fling speed.
+ */
+export const FLING_VELOCITY_PX_PER_MS = 0.5;
+/** How far back (ms) the pointer's movement counts towards its release speed. */
+export const VELOCITY_WINDOW_MS = 100;
 /** How much of the drag the page follows past the first or last page. */
 export const EDGE_RESISTANCE = 0.3;
 /** How far (CSS px) the page nudges when a tap or key bounces at either end. */
@@ -104,10 +109,38 @@ export function classifyTap(x: number, viewWidth: number): TurnDirection | null 
   return null;
 }
 
-/** The turn a finished drag asks for, or `null` if it was too short or mostly vertical. */
-export function classifySwipe(dx: number, dy: number, viewWidth: number): TurnDirection | null {
-  const threshold = Math.min(MIN_SWIPE_PX, viewWidth * SWIPE_FRACTION);
-  if (Math.abs(dx) < threshold || Math.abs(dx) < Math.abs(dy)) return null;
-  // Swipe left (finger moves towards smaller x) always means next.
-  return dx < 0 ? 'next' : 'previous';
+/**
+ * The turn a finished drag asks for, or `null` to settle back. `velocityX` is the horizontal speed
+ * at release in px/ms (negative = leftwards). Swipe left always means next, whatever the layout
+ * direction. A slow release turns once the drag passes a quarter of the view; a fast fling turns
+ * in its own direction unless it flicks back against the drag. A mostly vertical drag never turns.
+ */
+export function classifySwipe(
+  dx: number,
+  dy: number,
+  viewWidth: number,
+  velocityX: number
+): TurnDirection | null {
+  if (Math.abs(dx) < Math.abs(dy)) return null;
+  const threshold = viewWidth * SWIPE_TURN_FRACTION;
+  const fromDrag = dx <= -threshold ? 'next' : dx >= threshold ? 'previous' : null;
+  if (Math.abs(velocityX) < FLING_VELOCITY_PX_PER_MS) return fromDrag;
+  const fromFling = velocityX < 0 ? 'next' : 'previous';
+  const dragOpposes = (fromFling === 'next' && dx > 0) || (fromFling === 'previous' && dx < 0);
+  return dragOpposes ? null : fromFling;
+}
+
+/** A pointer position at a moment, for working out the release speed. */
+export type PointerSample = { x: number; t: number };
+
+/**
+ * Horizontal speed (px/ms) over the samples from the last {@link VELOCITY_WINDOW_MS}, or 0 when
+ * they span no time. `samples` are oldest first, ending with the release.
+ */
+export function releaseVelocityX(samples: PointerSample[]): number {
+  const last = samples[samples.length - 1];
+  if (!last) return 0;
+  const first = samples.find((s) => last.t - s.t <= VELOCITY_WINDOW_MS) ?? last;
+  const dt = last.t - first.t;
+  return dt > 0 ? (last.x - first.x) / dt : 0;
 }

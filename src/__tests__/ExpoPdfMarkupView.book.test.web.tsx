@@ -111,6 +111,8 @@ function view(): HTMLElement {
 function pointer(type: string, x: number, y: number, target: Element = view()) {
   const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y });
   Object.assign(event, { pointerId: 1, pointerType: 'touch', isPrimary: true });
+  // jsdom stamps events with the real clock; follow the fake one so a drag's speed is controlled.
+  Object.defineProperty(event, 'timeStamp', { value: Date.now() });
   act(() => {
     target.dispatchEvent(event);
   });
@@ -129,6 +131,21 @@ function drag(fromX: number, toX: number, y = VIEW_HEIGHT / 2, target: Element =
     pointer('pointermove', fromX + ((toX - fromX) * i) / steps, y, target);
   }
   pointer('pointerup', toX, y, target);
+}
+
+/** A horizontal drag that takes `durationMs` from press to release, so it has a speed. */
+function timedSwipe(fromX: number, toX: number, durationMs: number) {
+  const y = VIEW_HEIGHT / 2;
+  const steps = 5;
+  pointer('pointerdown', fromX, y);
+  for (let i = 1; i <= steps; i++) {
+    act(() => {
+      jest.advanceTimersByTime(durationMs / steps);
+    });
+    pointer('pointermove', fromX + ((toX - fromX) * i) / steps, y);
+  }
+  pointer('pointerup', toX, y);
+  finishAnimations();
 }
 
 function swipe(fromX: number, toX: number, y = VIEW_HEIGHT / 2) {
@@ -306,6 +323,30 @@ describeDom('ExpoPdfMarkupView (web) book mode', () => {
 
     expect(onPageChanged).not.toHaveBeenCalled();
     expect(shownPage()).toBe(2);
+  });
+
+  it('a slow swipe turns only past a quarter of the width, as on iOS and Android', async () => {
+    const onPageChanged = jest.fn();
+    await render({ displayMode: 'book', page: 2, onPageChanged });
+    onPageChanged.mockClear();
+
+    timedSwipe(300, 210, 1000); // 90 px of 400, slowly
+    expect(onPageChanged).not.toHaveBeenCalled();
+
+    timedSwipe(300, 190, 1000); // 110 px
+    expect(reportedPages(onPageChanged)).toEqual([3]);
+  });
+
+  it('a quick flick turns the page over a short distance', async () => {
+    const onPageChanged = jest.fn();
+    await render({ displayMode: 'book', page: 2, onPageChanged });
+    onPageChanged.mockClear();
+
+    timedSwipe(300, 260, 40); // 40 px in 40 ms: 1 px/ms, past the 0.5 px/ms fling speed
+    expect(reportedPages(onPageChanged)).toEqual([3]);
+
+    timedSwipe(100, 140, 40);
+    expect(reportedPages(onPageChanged)).toEqual([3, 2]);
   });
 
   it('tapping the outer quarter turns the page, and a tap in the middle does not', async () => {
