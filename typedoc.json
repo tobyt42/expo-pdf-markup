@@ -1,6 +1,6 @@
 {
   "entryPoints": ["src/index.ts"],
-  "out": "docs",
+  "out": "site/api",
   "name": "@tobyt/expo-pdf-markup",
   "entryPointStrategy": "expand",
   "excludePrivate": true,

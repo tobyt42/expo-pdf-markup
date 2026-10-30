@@ -55,4 +55,4 @@ yarn-error.log
 
 # Expo
 .expo/*
-docs/
+site/
