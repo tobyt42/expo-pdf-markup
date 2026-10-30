@@ -451,6 +451,44 @@ describeDom('ExpoPdfMarkupView (web) book mode', () => {
     expect((pdfjs.getDocument as jest.Mock).mock.calls.length).toBe(loads);
   });
 
+  it('continuous mode keeps the 1.1.4 resize events: a width change re-fires load and page', async () => {
+    const onLoadComplete = jest.fn();
+    const onPageChanged = jest.fn();
+    await render({ onLoadComplete, onPageChanged });
+    scrollContinuousTo(2);
+    expect(onLoadComplete).toHaveBeenCalledTimes(1);
+    onLoadComplete.mockClear();
+    onPageChanged.mockClear();
+
+    resize(800, VIEW_HEIGHT);
+    await flush();
+    expect(onLoadComplete).toHaveBeenCalledTimes(1);
+    expect(onLoadComplete.mock.calls[0][0].nativeEvent).toEqual({ pageCount: 5 });
+    // The re-laid-out pages are observed afresh, so the page in view is reported again.
+    scrollContinuousTo(2);
+    expect(reportedPages(onPageChanged)).toEqual([2]);
+
+    // As in 1.1.4, only the width matters: a height change fires nothing.
+    onLoadComplete.mockClear();
+    onPageChanged.mockClear();
+    resize(800, 300);
+    await flush();
+    scrollContinuousTo(2);
+    expect(onLoadComplete).not.toHaveBeenCalled();
+    expect(onPageChanged).not.toHaveBeenCalled();
+  });
+
+  it('switching mode is not a resize: no extra load event in either direction', async () => {
+    const onLoadComplete = jest.fn();
+    await render({ displayMode: 'book', onLoadComplete });
+    resize(800, 500);
+    await render({ displayMode: 'continuous', onLoadComplete });
+    await render({ displayMode: 'book', onLoadComplete });
+    await flush();
+
+    expect(onLoadComplete).toHaveBeenCalledTimes(1);
+  });
+
   it('zoomed in beyond fit, a swipe pans and edge taps do not turn', async () => {
     const onPageChanged = jest.fn();
     await render({ displayMode: 'book', page: 2, onPageChanged });

@@ -694,6 +694,22 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
     };
   }, [source, hasSize]); // intentionally omit callbacks — they should not re-trigger a PDF load
 
+  // Continuous mode keeps the events it had in 1.1.4, when a width change reloaded the document:
+  // `onLoadComplete` fires again and the page in view is reported afresh. The document now loads
+  // once, so those events are replayed here instead. Book mode, and switching mode, fire neither.
+  const laidOutRef = React.useRef<{ doc: PDFDocumentProxy | null; width: number }>({
+    doc: null,
+    width: 0,
+  });
+  React.useEffect(() => {
+    const last = laidOutRef.current;
+    laidOutRef.current = { doc, width: containerWidth };
+    if (!doc || isBook || last.doc !== doc) return;
+    if (containerWidth <= 0 || containerWidth === last.width) return;
+    lastReportedPageRef.current = -1;
+    onLoadComplete?.({ nativeEvent: { pageCount: doc.numPages } });
+  }, [doc, containerWidth, isBook]); // intentionally omit callbacks — only a resize fires these
+
   // Sync annotations prop → state (guard round-trips)
   React.useEffect(() => {
     if (annotationsProp === lastAnnotationsJsonRef.current) return;
