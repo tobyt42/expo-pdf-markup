@@ -177,6 +177,16 @@ function reportedPages(onPageChanged: jest.Mock): number[] {
   return onPageChanged.mock.calls.map((call) => call[0].nativeEvent.page);
 }
 
+/** Presses `key` the way a keyboard or page-turner pedal does, at `target` (the page by default). */
+function press(key: string, target: Element = document.body, init: KeyboardEventInit = {}) {
+  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init });
+  act(() => {
+    target.dispatchEvent(event);
+  });
+  finishAnimations();
+  return event;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -530,5 +540,186 @@ describeDom('ExpoPdfMarkupView (web) book mode', () => {
     expect(view().querySelectorAll('[data-pdf-page]')).toHaveLength(5);
     expect(view().querySelector('[data-book-slot]')).toBeNull();
     expect(view().style.overflowY).toBe('scroll');
+  });
+
+  describe('hardware keys', () => {
+    it.each(['ArrowRight', 'ArrowDown', 'PageDown'])('%s turns to the next page', async (key) => {
+      const onPageChanged = jest.fn();
+      await render({ displayMode: 'book', page: 2, onPageChanged });
+      onPageChanged.mockClear();
+
+      press(key);
+
+      expect(reportedPages(onPageChanged)).toEqual([3]);
+      expect(shownPage()).toBe(3);
+    });
+
+    it.each(['ArrowLeft', 'ArrowUp', 'PageUp'])('%s turns to the previous page', async (key) => {
+      const onPageChanged = jest.fn();
+      await render({ displayMode: 'book', page: 2, onPageChanged });
+      onPageChanged.mockClear();
+
+      press(key);
+
+      expect(reportedPages(onPageChanged)).toEqual([1]);
+      expect(shownPage()).toBe(1);
+    });
+
+    it('Space does not turn the page, and is left to the browser', async () => {
+      const onPageChanged = jest.fn();
+      await render({ displayMode: 'book', page: 2, onPageChanged });
+      onPageChanged.mockClear();
+
+      const event = press(' ');
+
+      expect(onPageChanged).not.toHaveBeenCalled();
+      expect(event.defaultPrevented).toBe(false);
+    });
+
+    it('continuous mode responds to no keys', async () => {
+      const onPageChanged = jest.fn();
+      await render({ page: 2, onPageChanged });
+      onPageChanged.mockClear();
+
+      for (const key of ['ArrowRight', 'ArrowDown', 'PageDown', 'ArrowLeft']) {
+        expect(press(key).defaultPrevented).toBe(false);
+      }
+
+      expect(onPageChanged).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['an input', () => document.createElement('input')],
+      ['a textarea', () => document.createElement('textarea')],
+      [
+        'a contenteditable element',
+        () => {
+          const el = document.createElement('div');
+          // jsdom doesn't reflect the contentEditable property, so set the attribute.
+          el.setAttribute('contenteditable', 'true');
+          el.tabIndex = 0;
+          return el;
+        },
+      ],
+    ])('keys are left alone while %s on the host page has focus', async (_name, make) => {
+      const onPageChanged = jest.fn();
+      await render({ displayMode: 'book', page: 2, onPageChanged });
+      onPageChanged.mockClear();
+      const field = make();
+      document.body.appendChild(field);
+      field.focus();
+
+      const events = ['ArrowRight', 'ArrowLeft', 'PageDown'].map((key) => press(key, field));
+      field.remove();
+
+      expect(onPageChanged).not.toHaveBeenCalled();
+      expect(events.map((e) => e.defaultPrevented)).toEqual([false, false, false]);
+    });
+
+    it('bounces at the first and last page, and reports once per turn', async () => {
+      const onPageChanged = jest.fn();
+      await render({ displayMode: 'book', page: 0, onPageChanged });
+      onPageChanged.mockClear();
+
+      act(() => {
+        document.body.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true })
+        );
+      });
+      // The strip nudges towards the missing page, then springs back to rest.
+      expect(pageStrip().style.transform).toBe(`translateX(${40 - VIEW_WIDTH}px)`);
+      finishAnimations();
+      expect(pageStrip().style.transform).toBe(`translateX(${-VIEW_WIDTH}px)`);
+      expect(shownPage()).toBe(0);
+
+      for (let i = 0; i < 6; i++) press('PageDown');
+
+      expect(reportedPages(onPageChanged)).toEqual([1, 2, 3, 4]);
+      expect(shownPage()).toBe(4);
+    });
+
+    it('keys still turn the page while zoomed in, and the new page starts at fit', async () => {
+      const onPageChanged = jest.fn();
+      await render({ displayMode: 'book', page: 2, onPageChanged });
+      onPageChanged.mockClear();
+      zoomIn();
+
+      press('ArrowRight');
+
+      expect(reportedPages(onPageChanged)).toEqual([3]);
+      expect(visiblePages()).toEqual([3]);
+      // Back at fit: the strip of neighbours is shown again, and edge taps turn.
+      expect(view().querySelectorAll('[data-book-slot]')).toHaveLength(3);
+      tap(VIEW_WIDTH - 20);
+      expect(reportedPages(onPageChanged)).toEqual([3, 4]);
+    });
+
+    it('a key turn from a zoomed page slides rather than jumps', async () => {
+      await render({ displayMode: 'book', page: 2 });
+      zoomIn();
+
+      act(() => {
+        document.body.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })
+        );
+      });
+      // First the strip comes back at rest, with no transition...
+      expect(pageStrip().style.transform).toBe(`translateX(${-VIEW_WIDTH}px)`);
+      expect(pageStrip().style.transition).toBe('none');
+
+      // ...then, a frame or two later, it slides to the next page.
+      act(() => {
+        jest.advanceTimersByTime(50);
+      });
+      expect(pageStrip().style.transform).toBe(`translateX(${-2 * VIEW_WIDTH}px)`);
+      expect(pageStrip().style.transition).toContain('transform');
+      finishAnimations();
+      expect(shownPage()).toBe(3);
+    });
+
+    it.each(['ink', 'highlight', 'underline', 'text', 'stamp', 'move', 'eraser'] as const)(
+      'keys still turn the page with the %s tool active',
+      async (annotationMode) => {
+        const onPageChanged = jest.fn();
+        await render({
+          displayMode: 'book',
+          page: 2,
+          annotationMode,
+          stampText: 'S',
+          onPageChanged,
+        });
+        onPageChanged.mockClear();
+
+        press('ArrowRight');
+        press('PageUp');
+        press('PageUp');
+
+        expect(reportedPages(onPageChanged)).toEqual([3, 2, 1]);
+      }
+    );
+
+    it.each([{ altKey: true }, { ctrlKey: true }, { metaKey: true }, { shiftKey: true }])(
+      'leaves keys pressed with a modifier (%o) to the browser',
+      async (modifier) => {
+        const onPageChanged = jest.fn();
+        await render({ displayMode: 'book', page: 2, onPageChanged });
+        onPageChanged.mockClear();
+
+        const event = press('ArrowLeft', document.body, modifier);
+
+        expect(onPageChanged).not.toHaveBeenCalled();
+        expect(event.defaultPrevented).toBe(false);
+      }
+    );
+
+    it('stops listening for keys when switched back to continuous mode', async () => {
+      const onPageChanged = jest.fn();
+      await render({ displayMode: 'book', page: 2, onPageChanged });
+      await render({ displayMode: 'continuous', page: 2, onPageChanged });
+      onPageChanged.mockClear();
+
+      expect(press('ArrowRight').defaultPrevented).toBe(false);
+      expect(onPageChanged).not.toHaveBeenCalled();
+    });
   });
 });

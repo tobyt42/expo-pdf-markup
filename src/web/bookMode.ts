@@ -33,6 +33,50 @@ export function canGestureTurn(
   return displayMode === 'book' && annotationMode === 'none' && zoom <= 1;
 }
 
+const KEY_TURNS: Record<string, TurnDirection> = {
+  ArrowRight: 'next',
+  ArrowDown: 'next',
+  PageDown: 'next',
+  ArrowLeft: 'previous',
+  ArrowUp: 'previous',
+  PageUp: 'previous',
+};
+
+/**
+ * The turn a hardware key asks for in book mode, or `null` for a key that doesn't turn.
+ * Right, Down and Page Down go forward; Left, Up and Page Up go back. Space isn't mapped.
+ * Keys turn whatever the zoom or markup mode, so they don't go through {@link canGestureTurn}.
+ */
+export function keyTurnFor(key: string): TurnDirection | null {
+  return KEY_TURNS[key] ?? null;
+}
+
+/** `<input>` types that don't take typed text, so arrow keys there can still turn the page. */
+const NON_TEXT_INPUT_TYPES = new Set([
+  'button',
+  'checkbox',
+  'color',
+  'file',
+  'hidden',
+  'image',
+  'radio',
+  'range',
+  'reset',
+  'submit',
+]);
+
+/**
+ * Whether `el` takes typed text: a text `<input>`, a `<textarea>`, a `<select>` or anything
+ * contenteditable. Keys pressed there belong to it, never to the page turn.
+ */
+export function isTextEntry(el: Element | null): boolean {
+  if (!el) return false;
+  const tag = el.tagName;
+  if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  if (tag === 'INPUT') return !NON_TEXT_INPUT_TYPES.has((el as HTMLInputElement).type);
+  return el.closest('[contenteditable]:not([contenteditable="false"])') != null;
+}
+
 /**
  * The page a turn lands on, or `null` when it would go before the first page or past the last.
  * Nothing wraps round.

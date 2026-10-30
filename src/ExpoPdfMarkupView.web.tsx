@@ -24,6 +24,8 @@ import {
   BOUNCE_PX,
   EDGE_RESISTANCE,
   TAP_SLOP_PX,
+  isTextEntry,
+  keyTurnFor,
   canGestureTurn,
   classifySwipe,
   classifyTap,
@@ -505,6 +507,7 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
   const [slide, setSlide] = React.useState({ offset: 0, animated: false });
   const slideOffsetRef = React.useRef(0);
   const turnTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const turnFrameRef = React.useRef<number | null>(null);
   const pendingTurnRef = React.useRef<number | null>(null);
   const gestureRef = React.useRef<BookGesture | null>(null);
   const activePointersRef = React.useRef(new Set<number>());
@@ -713,6 +716,8 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
   const clearTurnTimer = React.useCallback(() => {
     if (turnTimerRef.current != null) clearTimeout(turnTimerRef.current);
     turnTimerRef.current = null;
+    if (turnFrameRef.current != null) cancelAnimationFrame(turnFrameRef.current);
+    turnFrameRef.current = null;
   }, []);
 
   const resetZoom = React.useCallback(() => {
@@ -770,6 +775,7 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
     (direction: TurnDirection) => {
       if (!isBook || pageCount === 0) return;
       finishPendingTurn();
+      const wasZoomed = zoomRef.current !== 1;
       resetZoom();
       const target = resolveTurn(currentPageRef.current, direction, pageCount);
       if (target == null) {
@@ -777,8 +783,21 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
         return;
       }
       pendingTurnRef.current = target;
-      setSlideOffset(direction === 'next' ? -containerWidth : containerWidth, true);
-      turnTimerRef.current = setTimeout(() => showBookPage(target), TURN_DURATION_MS);
+      const slideAway = () => {
+        turnFrameRef.current = null;
+        setSlideOffset(direction === 'next' ? -containerWidth : containerWidth, true);
+        turnTimerRef.current = setTimeout(() => showBookPage(target), TURN_DURATION_MS);
+      };
+      if (!wasZoomed) {
+        slideAway();
+        return;
+      }
+      // A zoomed page shows on its own, so the strip of neighbours only comes back with this
+      // render. Let it paint at rest first, or the slide would jump instead of animating.
+      setSlideOffset(0, false);
+      turnFrameRef.current = requestAnimationFrame(() => {
+        turnFrameRef.current = requestAnimationFrame(slideAway);
+      });
     },
     [
       isBook,
@@ -793,6 +812,23 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
   );
 
   React.useEffect(() => clearTurnTimer, [clearTurnTimer]);
+
+  // Hardware keys and page-turner pedals turn the page in book mode.
+  React.useEffect(() => {
+    if (!isBook) return;
+    function onKeyDown(e: KeyboardEvent) {
+      // A modified arrow belongs to the browser or the host app (Alt+Left is Back, Shift selects).
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const direction = keyTurnFor(e.key);
+      if (!direction) return;
+      // Keys typed into a text field anywhere on the page are the field's, not a page turn.
+      if (isTextEntry(e.target as Element | null) || isTextEntry(document.activeElement)) return;
+      e.preventDefault();
+      turnPage(direction);
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isBook, turnPage]);
 
   // Switching mode keeps the reader's page and starts it at fit.
   React.useLayoutEffect(() => {
