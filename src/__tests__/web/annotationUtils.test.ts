@@ -303,7 +303,7 @@ describe('parseAnnotations', () => {
     const data = serializeAnnotations({ version: 1, annotations: [highlightAnnotation] });
     const result = parseAnnotations(data);
     expect(result.annotations).toHaveLength(1);
-    expect(result.annotations[0].id).toBe('hl1');
+    expect(result.annotations[0]!.id).toBe('hl1');
   });
 
   it('deduplicates by id — last wins', () => {
@@ -312,7 +312,7 @@ describe('parseAnnotations', () => {
     const data = serializeAnnotations({ version: 1, annotations: [a1, a2] });
     const result = parseAnnotations(data);
     expect(result.annotations).toHaveLength(1);
-    expect(result.annotations[0].color).toBe('#00FF00');
+    expect(result.annotations[0]!.color).toBe('#00FF00');
   });
 });
 
