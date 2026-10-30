@@ -14,6 +14,7 @@ __tests__
 /tsconfig.json
 /typedoc.json
 /CLAUDE.md
+/AGENTS.md
 /scripts/
 
 # Android build artifacts and Gradle caches

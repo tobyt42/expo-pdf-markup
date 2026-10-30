@@ -1,34 +1,105 @@
 version: 2
 updates:
-  # Root library package
+  # Expo patches are notifications: use the dependency-batches / upgrading-expo workflow.
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
+    groups:
+      expo-family-patches:
+        patterns:
+          - "expo*"
+          - "@expo/*"
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "react-test-renderer"
+          - "@types/react-test-renderer"
+          - "react-native*"
+          - "@react-native/*"
+          - "babel-preset-expo"
+          - "eslint-config-expo"
+          - "jest-expo"
+        update-types: [patch]
     ignore:
       - dependency-name: "expo*"
+        update-types: [version-update:semver-minor, version-update:semver-major]
       - dependency-name: "@expo/*"
+        update-types: [version-update:semver-minor, version-update:semver-major]
       - dependency-name: "react"
+        update-types: [version-update:semver-minor, version-update:semver-major]
       - dependency-name: "react-dom"
+        update-types: [version-update:semver-minor, version-update:semver-major]
       - dependency-name: "@types/react"
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: "@types/react-dom"
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: "react-test-renderer"
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: "@types/react-test-renderer"
+        update-types: [version-update:semver-minor, version-update:semver-major]
       - dependency-name: "react-native*"
+        update-types: [version-update:semver-minor, version-update:semver-major]
       - dependency-name: "@react-native/*"
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: "babel-preset-expo"
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: "eslint-config-expo"
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: "jest-expo"
+        update-types: [version-update:semver-minor, version-update:semver-major]
 
-  # Example app
+  # Expo patches are notifications: use the dependency-batches / upgrading-expo workflow.
   - package-ecosystem: npm
     directory: /example
     schedule:
       interval: weekly
+    groups:
+      expo-family-patches:
+        patterns:
+          - "expo*"
+          - "@expo/*"
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "react-test-renderer"
+          - "@types/react-test-renderer"
+          - "react-native*"
+          - "@react-native/*"
+          - "babel-preset-expo"
+          - "eslint-config-expo"
+          - "jest-expo"
+        update-types: [patch]
     ignore:
       - dependency-name: "expo*"
+        update-types: [version-update:semver-minor, version-update:semver-major]
       - dependency-name: "@expo/*"
+        update-types: [version-update:semver-minor, version-update:semver-major]
       - dependency-name: "react"
+        update-types: [version-update:semver-minor, version-update:semver-major]
       - dependency-name: "react-dom"
+        update-types: [version-update:semver-minor, version-update:semver-major]
       - dependency-name: "@types/react"
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: "@types/react-dom"
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: "react-test-renderer"
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: "@types/react-test-renderer"
+        update-types: [version-update:semver-minor, version-update:semver-major]
       - dependency-name: "react-native*"
+        update-types: [version-update:semver-minor, version-update:semver-major]
       - dependency-name: "@react-native/*"
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: "babel-preset-expo"
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: "eslint-config-expo"
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: "jest-expo"
+        update-types: [version-update:semver-minor, version-update:semver-major]
 
-  # GitHub Actions
   - package-ecosystem: github-actions
     directory: /
     schedule:
