@@ -19,8 +19,9 @@ enum BookTurnInput {
   case key
 }
 
-/// Book mode tuning. The names and values match the web (`src/web/bookMode.ts`) and Android
-/// (`BookTurnPolicy`, `ContinuousPdfView`) implementations.
+/// Book mode tuning. The names follow the web (`src/web/bookMode.ts`) and Android
+/// (`BookTurnPolicy`, `ContinuousPdfView`) constants, and the turn thresholds have the same values
+/// on every platform. Only the bounce nudge distance differs.
 enum BookMode {
   /// Share of the view's width that each edge tap zone covers.
   static let edgeZoneFraction: CGFloat = 0.25
