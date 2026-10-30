@@ -53,3 +53,33 @@ jobs:
           path: site/example
           if-no-files-found: error
           retention-days: 7
+
+  browser:
+    name: PDF browser rendering
+    needs: web
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: scripts/browser/package-lock.json
+      - uses: actions/download-artifact@v7
+        with:
+          name: example-web
+          path: site/example
+      - run: npm ci
+        working-directory: scripts/browser
+      - run: npx --no-install playwright install --with-deps chromium
+        working-directory: scripts/browser
+      - run: npm test
+        working-directory: scripts/browser
+      - name: Save browser failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: pdf-browser-failure
+          path: scripts/browser/test-results
+          retention-days: 7
