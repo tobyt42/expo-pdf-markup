@@ -24,7 +24,8 @@ import {
   BOUNCE_PX,
   EDGE_RESISTANCE,
   TAP_SLOP_PX,
-  isTextEntry,
+  isViewShown,
+  ownsArrowKeys,
   keyTurnFor,
   canGestureTurn,
   classifySwipe,
@@ -841,14 +842,20 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
       if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
       const direction = keyTurnFor(e.key);
       if (!direction) return;
-      // Keys typed into a text field anywhere on the page are the field's, not a page turn.
-      if (isTextEntry(e.target as Element | null) || isTextEntry(document.activeElement)) return;
+      // Keys pressed in a text field or an arrow-key control anywhere on the page are its own.
+      if (ownsArrowKeys(e.target as Element | null) || ownsArrowKeys(document.activeElement)) {
+        return;
+      }
+      // A view that isn't on screen (hidden, or a screen left mounted in a back stack) keeps out.
+      if (!isViewShown(scrollContainerRef.current, containerSize.width, containerSize.height)) {
+        return;
+      }
       e.preventDefault();
       turnPage(direction);
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [isBook, turnPage]);
+  }, [isBook, turnPage, containerSize]);
 
   // Switching mode keeps the reader's page and starts it at fit.
   React.useLayoutEffect(() => {

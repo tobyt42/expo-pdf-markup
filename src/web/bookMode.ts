@@ -49,30 +49,70 @@ export function keyTurnFor(key: string): TurnDirection | null {
   return KEY_TURNS[key] ?? null;
 }
 
-/** `<input>` types that don't take typed text, so arrow keys there can still turn the page. */
-const NON_TEXT_INPUT_TYPES = new Set([
+/**
+ * `<input>` types that use neither typed text nor arrow keys, so arrow keys there can still turn
+ * the page. Range and radio inputs aren't here: arrows move a slider or pick the next radio.
+ */
+const KEYLESS_INPUT_TYPES = new Set([
   'button',
   'checkbox',
   'color',
   'file',
   'hidden',
   'image',
-  'radio',
-  'range',
   'reset',
   'submit',
 ]);
 
 /**
- * Whether `el` takes typed text: a text `<input>`, a `<textarea>`, a `<select>` or anything
- * contenteditable. Keys pressed there belong to it, never to the page turn.
+ * ARIA roles of widgets that move with arrow keys. A key pressed on one, or on an item inside
+ * one (a tab in a tablist, an option in a listbox), belongs to it.
  */
-export function isTextEntry(el: Element | null): boolean {
+const ARROW_KEY_ROLES = [
+  'combobox',
+  'grid',
+  'listbox',
+  'menu',
+  'menubar',
+  'radiogroup',
+  'slider',
+  'spinbutton',
+  'tablist',
+  'tree',
+  'treegrid',
+];
+const ARROW_KEY_WIDGET = ARROW_KEY_ROLES.map((role) => '[role~="' + role + '"]').join(',');
+
+/**
+ * Whether keys pressed at `el` belong to it, never to the page turn: a text `<input>`, a
+ * `<textarea>`, anything contenteditable, or a control that uses arrow keys (a `<select>`, a
+ * range or radio input, or an ARIA widget such as a slider, radiogroup, listbox, menu or tablist).
+ */
+export function ownsArrowKeys(el: Element | null): boolean {
   if (!el) return false;
   const tag = el.tagName;
   if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
-  if (tag === 'INPUT') return !NON_TEXT_INPUT_TYPES.has((el as HTMLInputElement).type);
+  if (tag === 'INPUT') return !KEYLESS_INPUT_TYPES.has((el as HTMLInputElement).type);
+  if (el.closest(ARROW_KEY_WIDGET) != null) return true;
   return el.closest('[contenteditable]:not([contenteditable="false"])') != null;
+}
+
+/**
+ * Whether the view is on screen, so keys may turn its page: it has a size, and neither it nor
+ * an ancestor is hidden, `display: none` or `visibility: hidden` (as on a screen kept mounted in
+ * a navigation back stack).
+ */
+export function isViewShown(el: Element | null, width: number, height: number): boolean {
+  if (!el?.isConnected || width <= 0 || height <= 0) return false;
+  if (typeof el.checkVisibility === 'function') {
+    return el.checkVisibility({ visibilityProperty: true });
+  }
+  for (let node: Element | null = el; node; node = node.parentElement) {
+    if (node.hasAttribute('hidden')) return false;
+    const style = getComputedStyle(node);
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+  }
+  return true;
 }
 
 /**

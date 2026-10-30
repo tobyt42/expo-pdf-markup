@@ -695,6 +695,105 @@ describeDom('ExpoPdfMarkupView (web) book mode', () => {
       expect(events.map((e) => e.defaultPrevented)).toEqual([false, false, false]);
     });
 
+    /** An element with `role`, holding a focusable child with `childRole` (e.g. a tab in a tablist). */
+    function widget(role: string, childRole?: string) {
+      return () => {
+        const el = document.createElement('div');
+        el.setAttribute('role', role);
+        el.tabIndex = 0;
+        if (!childRole) return el;
+        const child = document.createElement('div');
+        child.setAttribute('role', childRole);
+        child.tabIndex = 0;
+        el.appendChild(child);
+        return el;
+      };
+    }
+
+    function input(type: string) {
+      return () => {
+        const el = document.createElement('input');
+        el.type = type;
+        return el;
+      };
+    }
+
+    it.each([
+      ['a range input', input('range'), false],
+      ['a radio button', input('radio'), false],
+      ['a select', () => document.createElement('select'), false],
+      ['a slider', widget('slider'), false],
+      ['a radio in a radiogroup', widget('radiogroup', 'radio'), true],
+      ['an option in a listbox', widget('listbox', 'option'), true],
+      ['an item in a menu', widget('menu', 'menuitem'), true],
+      ['a tab in a tablist', widget('tablist', 'tab'), true],
+    ])('keys are left to %s that uses arrows', async (_name, make, focusChild) => {
+      const onPageChanged = jest.fn();
+      await render({ displayMode: 'book', page: 2, onPageChanged });
+      onPageChanged.mockClear();
+      const control = make();
+      document.body.appendChild(control);
+      const focused = (focusChild ? control.firstElementChild : control) as HTMLElement;
+      focused.focus();
+
+      const events = ['ArrowRight', 'ArrowLeft', 'ArrowDown'].map((key) => press(key, focused));
+      control.remove();
+
+      expect(onPageChanged).not.toHaveBeenCalled();
+      expect(events.map((e) => e.defaultPrevented)).toEqual([false, false, false]);
+    });
+
+    it('a checkbox or button with focus still lets keys turn the page', async () => {
+      const onPageChanged = jest.fn();
+      await render({ displayMode: 'book', page: 2, onPageChanged });
+      onPageChanged.mockClear();
+      const checkbox = input('checkbox')();
+      const button = document.createElement('button');
+      document.body.append(checkbox, button);
+
+      checkbox.focus();
+      press('ArrowRight', checkbox);
+      button.focus();
+      press('ArrowRight', button);
+      checkbox.remove();
+      button.remove();
+
+      expect(reportedPages(onPageChanged)).toEqual([3, 4]);
+    });
+
+    it.each([
+      ['hidden', (el: HTMLElement) => (el.hidden = true)],
+      ['display: none', (el: HTMLElement) => (el.style.display = 'none')],
+      ['visibility: hidden', (el: HTMLElement) => (el.style.visibility = 'hidden')],
+    ])('ignores keys while the view is %s, as on a back-stack screen', async (_name, hide) => {
+      const onPageChanged = jest.fn();
+      await render({ displayMode: 'book', page: 2, onPageChanged });
+      onPageChanged.mockClear();
+
+      hide(container);
+      expect(press('ArrowRight').defaultPrevented).toBe(false);
+      expect(onPageChanged).not.toHaveBeenCalled();
+
+      container.hidden = false;
+      container.removeAttribute('style');
+      press('ArrowRight');
+      expect(reportedPages(onPageChanged)).toEqual([3]);
+    });
+
+    it('ignores keys while the view has no size', async () => {
+      const onPageChanged = jest.fn();
+      await render({ displayMode: 'book', page: 2, onPageChanged });
+      onPageChanged.mockClear();
+
+      resize(0, 0);
+      expect(press('ArrowRight').defaultPrevented).toBe(false);
+      expect(onPageChanged).not.toHaveBeenCalled();
+
+      resize(VIEW_WIDTH, VIEW_HEIGHT);
+      press('ArrowRight');
+      expect(reportedPages(onPageChanged)).toEqual([3]);
+    });
+
     it('bounces at the first and last page, and reports once per turn', async () => {
       const onPageChanged = jest.fn();
       await render({ displayMode: 'book', page: 0, onPageChanged });
