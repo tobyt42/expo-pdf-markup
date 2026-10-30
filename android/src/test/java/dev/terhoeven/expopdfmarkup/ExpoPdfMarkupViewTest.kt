@@ -1,7 +1,9 @@
 package dev.terhoeven.expopdfmarkup
 
+import android.view.KeyEvent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -119,6 +121,101 @@ class ExpoPdfMarkupViewTest {
         assertTrue(2 in validRange)
         assertFalse(-1 in validRange)
         assertFalse(3 in validRange)
+    }
+
+    // MARK: - Book mode hardware keys
+
+    private fun keyTurn(
+        keyCode: Int,
+        isBookMode: Boolean = true,
+        textInputHasFocus: Boolean = false,
+        hasModifiers: Boolean = false
+    ) = BookTurnPolicy.keyTurnFor(keyCode, isBookMode, textInputHasFocus, hasModifiers)
+
+    @Test
+    fun testRightDownAndPageDownTurnToTheNextPage() {
+        for (key in listOf(
+            KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_PAGE_DOWN
+        )) {
+            assertEquals("key $key", BookTurnPolicy.Direction.NEXT, keyTurn(key))
+        }
+    }
+
+    @Test
+    fun testLeftUpAndPageUpTurnToThePreviousPage() {
+        for (key in listOf(
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_PAGE_UP
+        )) {
+            assertEquals("key $key", BookTurnPolicy.Direction.PREVIOUS, keyTurn(key))
+        }
+    }
+
+    @Test
+    fun testSpaceAndOtherKeysDoNotTurn() {
+        assertNull(keyTurn(KeyEvent.KEYCODE_SPACE))
+        assertNull(keyTurn(KeyEvent.KEYCODE_ENTER))
+        assertNull(keyTurn(KeyEvent.KEYCODE_A))
+    }
+
+    @Test
+    fun testContinuousModeRespondsToNoKeys() {
+        for (key in listOf(
+            KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_PAGE_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT
+        )) {
+            assertNull("key $key", keyTurn(key, isBookMode = false))
+        }
+    }
+
+    @Test
+    fun testKeysAreIgnoredWhileATextInputHasFocus() {
+        for (key in listOf(
+            KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_PAGE_UP
+        )) {
+            assertNull("key $key", keyTurn(key, textInputHasFocus = true))
+        }
+    }
+
+    @Test
+    fun testKeysWithAModifierAreLeftAlone() {
+        assertNull(keyTurn(KeyEvent.KEYCODE_DPAD_LEFT, hasModifiers = true))
+        assertNull(keyTurn(KeyEvent.KEYCODE_PAGE_DOWN, hasModifiers = true))
+    }
+
+    @Test
+    fun testKeysTurnWhereTouchCannotWhileZoomedOrWithAMarkupTool() {
+        // Zoomed in with the ink tool active, swipes and edge taps are blocked...
+        assertFalse(
+            BookTurnPolicy.touchCanTurn(isBookMode = true, annotationMode = "ink", scale = 2f)
+        )
+        // ...but the key policy doesn't look at zoom or markup mode, so keys still turn.
+        assertEquals(BookTurnPolicy.Direction.NEXT, keyTurn(KeyEvent.KEYCODE_PAGE_DOWN))
+    }
+
+    @Test
+    fun testKeyTurnsBounceAtBothEndsAndReportOncePerTurn() {
+        val r = RecordingPager(pageCount = 3)
+        fun pressAndLand(keyCode: Int): BookPager.Turn {
+            val turn = r.pager.turn(keyTurn(keyCode)!!)
+            r.pager.finishSlide()
+            return turn
+        }
+
+        assertEquals(
+            BookPager.Turn.Bounce(BookTurnPolicy.Direction.PREVIOUS),
+            pressAndLand(KeyEvent.KEYCODE_DPAD_LEFT)
+        )
+        repeat(4) { pressAndLand(KeyEvent.KEYCODE_PAGE_DOWN) }
+
+        assertEquals(listOf(1, 2), r.changes)
+        assertEquals(2, r.pager.currentPage)
     }
 
     // MARK: - Book mode page turning

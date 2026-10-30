@@ -1,5 +1,7 @@
 package dev.terhoeven.expopdfmarkup
 
+import android.view.KeyEvent
+
 object BookTurnPolicy {
     /** Scales within this of fit (1.0) count as "at fit", absorbing pinch rounding. */
     private const val FIT_TOLERANCE = 0.01f
@@ -68,6 +70,31 @@ object BookTurnPolicy {
         val dragOpposes = (fromFling == Direction.NEXT && dragX > 0f) ||
             (fromFling == Direction.PREVIOUS && dragX < 0f)
         return if (dragOpposes) null else fromFling
+    }
+
+    /**
+     * The turn a hardware key (keyboard or page-turner pedal) asks for, or
+     * null to leave the key alone. Right, Down and Page Down go forward; Left,
+     * Up and Page Up go back; Space isn't mapped. Keys turn in book mode
+     * whatever the zoom or markup mode, but never while a text input has
+     * focus, and never with a modifier held.
+     */
+    fun keyTurnFor(
+        keyCode: Int,
+        isBookMode: Boolean,
+        textInputHasFocus: Boolean,
+        hasModifiers: Boolean
+    ): Direction? {
+        if (!isBookMode || textInputHasFocus || hasModifiers) return null
+        return when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_PAGE_DOWN ->
+                Direction.NEXT
+
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_PAGE_UP ->
+                Direction.PREVIOUS
+
+            else -> null
+        }
     }
 
     fun swipeActionFor(isBookMode: Boolean, annotationMode: String, scale: Float): SwipeAction =
