@@ -47,7 +47,7 @@ jobs:
         run: npx --no-install expo export --platform web --output-dir ../site/example
         working-directory: example
       - name: Save exported example for browser validation
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: example-web
           path: site/example
@@ -78,7 +78,7 @@ jobs:
         working-directory: scripts/browser
       - name: Save browser failure diagnostics
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: pdf-browser-failure
           path: scripts/browser/test-results
