@@ -135,28 +135,35 @@ function PageView({
   React.useEffect(() => {
     let cancelled = false;
     async function render() {
-      if (!pdfCanvasRef.current) return;
-      renderTaskRef.current?.cancel();
-      renderTaskRef.current = null;
-      const page = await doc.getPage(pageIndex + 1);
-      if (cancelled) {
-        page.cleanup();
-        return;
-      }
-      pageRef.current = page;
       const canvas = pdfCanvasRef.current;
       if (!canvas) return;
-      canvas.width = meta.canvasWidth;
-      canvas.height = meta.canvasHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      const viewport = page.getViewport({ scale: meta.scale * dpr });
-      const task = page.render({ canvas: null, canvasContext: ctx, viewport });
-      renderTaskRef.current = task;
+      canvas.dataset.pdfRenderState = 'pending';
+      renderTaskRef.current?.cancel();
+      renderTaskRef.current = null;
       try {
+        const page = await doc.getPage(pageIndex + 1);
+        if (cancelled) {
+          page.cleanup();
+          return;
+        }
+        pageRef.current = page;
+        canvas.width = meta.canvasWidth;
+        canvas.height = meta.canvasHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          canvas.dataset.pdfRenderState = 'error';
+          return;
+        }
+        const viewport = page.getViewport({ scale: meta.scale * dpr });
+        const task = page.render({ canvas: null, canvasContext: ctx, viewport });
+        renderTaskRef.current = task;
         await task.promise;
-      } catch {
-        // Render cancelled — ignore
+        if (!cancelled) canvas.dataset.pdfRenderState = 'complete';
+      } catch (error) {
+        if (!cancelled) {
+          canvas.dataset.pdfRenderState = 'error';
+          console.error('PDF page rendering failed', error);
+        }
       }
     }
     render();
@@ -421,6 +428,8 @@ function PageView({
     >
       <canvas
         ref={pdfCanvasRef}
+        data-pdf-layer="pdf"
+        data-pdf-render-state="pending"
         style={{
           position: 'absolute',
           top: 0,
@@ -432,6 +441,7 @@ function PageView({
       />
       <canvas
         ref={annotCanvasRef}
+        data-pdf-layer="annotations"
         style={{
           position: 'absolute',
           top: 0,
