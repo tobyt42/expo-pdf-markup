@@ -12,10 +12,10 @@
   "dependencies": {
     "@tobyt/expo-pdf-markup": "file:..",
     "expo": "~57.0.18",
-    "expo-asset": "~57.0.6",
-    "expo-font": "~57.0.1",
-    "expo-splash-screen": "~57.0.8",
-    "react": "19.2.3",
+    "expo-asset": "~57.0.20",
+    "expo-font": "~57.0.4",
+    "expo-splash-screen": "~57.0.10",
+    "react": "19.2.9",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-web": "^0.21.2"
@@ -23,7 +23,7 @@
   "devDependencies": {
     "@types/react": "~19.2.17",
     "patch-package": "^8.0.1",
-    "react-dom": "19.2.3",
+    "react-dom": "19.2.9",
     "typescript": "~6.0.3"
   },
   "private": true,
