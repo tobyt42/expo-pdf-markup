@@ -39,7 +39,9 @@ final class AnnotationSerializerTests: XCTestCase {
                                   bounds: AnnotationBounds(x: 80, y: 120, width: 100, height: 48), contents: "A",
                                   text: "♫")
       let annotation = try XCTUnwrap(AnnotationSerializer.toPDFAnnotation(model, pageBounds: crop))
-      XCTAssertEqual(annotation.bounds, CGRect(x: 180, y: 200, width: 100, height: 48), type)
+      let contentBounds = (annotation as? AreaUnderlinePDFAnnotation)?
+        .contentBounds ?? (annotation as? StampPDFAnnotation)?.contentBounds ?? annotation.bounds
+      XCTAssertEqual(contentBounds, CGRect(x: 180, y: 200, width: 100, height: 48), type)
     }
   }
 
@@ -91,7 +93,7 @@ final class AnnotationSerializerTests: XCTestCase {
 
     let annotation = AnnotationSerializer.toPDFAnnotation(model)
     XCTAssertNotNil(annotation)
-    XCTAssertEqual(annotation?.type, "Underline")
+    XCTAssertEqual(annotation.flatMap { AnnotationSerializer.toModel(from: $0, page: 0) }?.type, "underline")
   }
 
   func testCreateFreeTextAnnotation() {

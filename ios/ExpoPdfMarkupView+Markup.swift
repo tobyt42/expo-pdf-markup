@@ -110,14 +110,37 @@ extension ExpoPdfMarkupView {
 /// Drawing the visible rectangle's lower edge also keeps edit and hit geometry aligned.
 final class AreaUnderlinePDFAnnotation: PDFAnnotation {
   static let strokeWidth: CGFloat = 2
-  var renderedBounds: CGRect {
-    bounds.insetBy(dx: -Self.strokeWidth / 2, dy: -Self.strokeWidth / 2)
+
+  required init?(coder: NSCoder) {
+    super.init(coder: coder)
   }
 
-  override func draw(with _: PDFDisplayBox, in context: CGContext) {
-    let coordinates = page.map { AnnotationCoordinates(page: $0) } ?? AnnotationCoordinates(bounds: .zero)
-    let visible = bounds.applying(coordinates.nativeToVisible)
+  override init(bounds: CGRect, forType type: PDFAnnotationSubtype, withProperties properties: [AnyHashable: Any]?) {
+    super.init(
+      bounds: bounds.insetBy(
+        dx: -AnnotationCoordinates.appearancePadding,
+        dy: -AnnotationCoordinates.appearancePadding
+      ),
+      forType: type,
+      withProperties: properties
+    )
+  }
+
+  var contentBounds: CGRect {
+    bounds.insetBy(dx: AnnotationCoordinates.appearancePadding, dy: AnnotationCoordinates.appearancePadding)
+  }
+
+  var renderedBounds: CGRect {
+    contentBounds.insetBy(dx: -Self.strokeWidth / 2, dy: -Self.strokeWidth / 2)
+  }
+
+  override func draw(with box: PDFDisplayBox, in context: CGContext) {
+    let coordinates = page.map {
+      AnnotationCoordinates(bounds: $0.bounds(for: box), rotation: $0.rotation)
+    } ?? AnnotationCoordinates(bounds: .zero)
+    let visible = contentBounds.applying(coordinates.nativeToVisible)
     context.saveGState()
+    coordinates.prepareForDrawing(in: context, annotationBounds: bounds)
     context.setStrokeColor(color.cgColor)
     context.setLineWidth(Self.strokeWidth)
     context.move(to: CGPoint(x: visible.minX, y: visible.minY))
