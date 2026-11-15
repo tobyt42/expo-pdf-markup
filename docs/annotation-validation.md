@@ -1,5 +1,40 @@
 # Annotation validation for spec #126
 
+## Manual regression PDFs in the example app
+
+The example's horizontal document picker includes **Scan regression (6 pages)** and
+**Text regression (4 pages)**. Scroll the document row to find them. Both files are
+bundled in `example/assets/`; no external document or download is required.
+
+| Sample | Pages | Purpose |
+| --- | --- | --- |
+| Scan regression | 1–4 | Image-only MediaBox `[0,0,800,1000]`, CropBox `[100,80,700,920]`, rotations 0/90/180/270 |
+| Scan regression | 5 | Image-only uncropped, zero-origin control |
+| Scan regression | 6 | Image-only zero-origin CropBox `[0,0,600,840]` with different right/top edges |
+| Text regression | 1–4 | The same nonzero crop and rotations, with an actual selectable-text sentence |
+
+The scan's labels, lines and asymmetric blue/green anchors are raster pixels; the PDF
+contains no selectable text. On the text controls, the sentence beginning “Selectable
+text” is real PDF text, while the surrounding visual guides remain rasterized.
+
+1. Select **Scan regression**, then **Ink**. Trace an anchor or staff line; the stroke
+   must stay in place when you lift your finger.
+2. Select **Highlight** or **Underline** and drag a rectangle over a guide. The page
+   must stay still; highlighting fills the area and underlining follows its lower edge.
+3. Try **Text**, then **Stamp** with **Note**, **Star** and **Emoji**, including near the
+   visible edges. Check placement and clipping on all four rotated pages.
+4. Select **Move** or **Eraser**. Blue outlines and touch targets must agree with the
+   marks. Switch to **View** to navigate/pinch, then repeat after zooming and scrolling.
+5. Repeat with **Text regression**, and compare the scan's zero-origin controls. Book
+   mode makes it easy to review each rotation separately.
+6. Open **Annotations → Show raw JSON** to inspect the saved paths and bounds. The
+   example keeps annotations in memory and clears them when changing documents or
+   restarting; this UI does not itself test persistent save/reopen or thumbnails.
+
+Regenerate both checked-in PDFs with `python3 scripts/generate_annotation_pdfs.py`
+(requires Pillow >= 10.1 and PyMuPDF; installation is documented in the script).
+All fixture content is generated for this project and is redistributable.
+
 ## Coordinate slice (#127), 2026-11-15
 
 All repository changes and native builds ran in a task-specific linked worktree.
