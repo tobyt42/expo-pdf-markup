@@ -160,3 +160,9 @@ npx expo start
 ## License
 
 MIT
+
+### Annotation coordinates and compatibility
+
+Annotations use zero-origin visible-page coordinates, in PDF points with y increasing upward.
+See [the coordinate contract and upgrade guidance](docs/annotation-coordinates.md) for cropped
+and rotated pages, v1 compatibility limits, and native rebuild requirements.

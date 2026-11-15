@@ -156,12 +156,13 @@ extension ExpoPdfMarkupView {
     annotation: PDFAnnotation?
   ) -> [String: Any] {
     let pageIndex = pdfView.document?.index(for: page) ?? 0
+    let visiblePoint = point.applying(AnnotationCoordinates(page: page).nativeToVisible)
     var payload: [String: Any] = [
       "mode": annotation == nil ? "create" : "edit",
       "page": pageIndex,
       "point": [
-        "x": point.x,
-        "y": point.y,
+        "x": visiblePoint.x,
+        "y": visiblePoint.y,
       ],
     ]
     if let contents = annotation?.contents {
