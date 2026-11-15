@@ -1,5 +1,9 @@
 ---
-'@tobyt/expo-pdf-markup': patch
+'@tobyt/expo-pdf-markup': major
 ---
 
-Correct iOS annotation placement on cropped PDFs, including ink commitment, stamps, editing outlines and move/erase targets. Align loading and serialization with the shared visible-page coordinate contract, including rotated pages, without automatically migrating ambiguous historical v1 data. Keep live text creation and editing stable across reopen, and render stamps and underlines consistently in live views and scaled thumbnails at every page rotation. Consumers must rebuild their native iOS application; a JavaScript-only update does not replace the Swift implementation.
+Fix iOS annotation placement, moving and erasing on cropped or rotated PDFs, including stamps in thumbnails and text after reopening.
+
+iOS annotation coordinates and `onTextInputRequested.point` now use the visible page, with `(0, 0)` at its bottom-left after rotation. Some annotations saved by older iOS versions may move; existing data is not automatically migrated. Back up saved annotations before upgrading.
+
+Rebuild your native iOS app to apply these fixes.
