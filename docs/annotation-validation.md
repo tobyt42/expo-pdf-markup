@@ -13,7 +13,7 @@ All repository changes and native builds ran in a task-specific linked worktree.
 | `npm run format:swift:check` and `git diff --check` | Passed |
 | Android shared-fixture QA | Run independently with the shared-fixture implementation; see PR validation for the result |
 
-The iPhone result bundle is `build/test-results/ios-1794753626.xcresult`; the iPad result bundle is `build/test-results/ios-1794753664.xcresult` in the #127 worktree. Live PDFView stamp screenshots are retained as XCTest attachments. Result bundles are build artifacts, not checked-in fixtures.
+The iPhone result bundle is `build/test-results/ios-1794753626.xcresult`; the iPad result bundle is `build/test-results/ios-1794753664.xcresult` in the integration worktree. Live PDFView stamp screenshots are retained as XCTest attachments. Result bundles are build artifacts, not checked-in fixtures.
 
 ### Failure evidence before correction
 
@@ -39,3 +39,22 @@ npm run qa:ts
 ```
 
 Use an installed simulator name or ID when the devices above are unavailable. `scripts/test-swift.sh` writes a fresh `.xcresult` bundle for each invocation.
+
+## Area-markup slice (#128), 2026-11-15
+
+| Check | Result |
+| --- | --- |
+| `npm run qa:ts` | Passed; 25 suites, 282 tests passed, 72 existing platform skips |
+| `npm run qa:ios` | Passed; formatting, SwiftLint, 101 XCTest cases on iPhone 13 mini / iOS 26.4 |
+| iPad Pro 13-inch (M5), iOS 26.4 | 101 XCTest cases passed, with area tests using the tablet screen dimensions |
+| Android | The unchanged shared-fixture implementation passed its 97 JVM tests and ktlint; no Android source changes were required in this slice |
+
+The final iPhone result bundle is `build/test-results/ios-1794769031.xcresult`; the iPad result bundle is `build/test-results/ios-1794769069.xcresult`. The integration worktree retains these bundles alongside the coordinate-slice artifacts.
+
+### Failure evidence and corrected behavior
+
+- Before the area overlay, the image-only highlight regression left scrolling enabled and had no input overlay capable of producing markup. The same drag now produces a visible rectangle and serialized visible bounds `(80,120,100,40)` without moving the scroll offset.
+- Native PDFKit underline rendering selected the wrong edge at 90/180/270 degrees. Ordered quadrilaterals corrected the edge but still left the 180-degree baseline outside the selected rectangle. At a crop-edge rectangle `(80,1,100,40)`, no underline pixels remained visible. A small native underline renderer now draws the visible lower edge directly; rendering, reopened marks and their hit targets agree at every rotation, including that crop edge.
+- The final area suite exercises both tools on raster-only and selectable-text PDFs across nonzero-origin, zero-origin and right/top crop controls. It checks serialized geometry, zoom/scroll input, movement, rendered output and fresh-view reopen. Cancellation, all tool switches, prior scrolling/gesture-state restoration, source changes, the `page` prop and book-mode hardware keys discard stale drags and leave navigation usable.
+
+These are simulator PDFKit/view tests driven through the existing overlay callbacks and native gesture handlers. Physical finger/Pencil input on real iPhone/iPad devices remains a separate outstanding manual check. No package was published.

@@ -116,7 +116,11 @@ export type ExpoPdfMarkupViewProps = {
   backgroundColor?: string;
   /** Serialised {@link AnnotationsData} JSON string to load when the document opens. */
   annotations?: string;
-  /** Active annotation tool. Defaults to `'none'` (view-only). */
+  /**
+   * Active annotation tool. Defaults to `'none'` (view-only).
+   * On iOS, highlight/underline use a one-finger area drag on scanned and text-bearing pages.
+   * Set `'none'` for touch navigation/zoom; `page` and book-mode hardware keys remain available.
+   */
   annotationMode?: AnnotationMode;
   /** Colour applied to new annotations, as a CSS colour string (e.g. `'#FF0000'`). */
   annotationColor?: string;

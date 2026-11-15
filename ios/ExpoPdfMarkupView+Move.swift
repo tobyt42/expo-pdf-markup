@@ -181,7 +181,7 @@ extension ExpoPdfMarkupView {
         dy: -padding
       )
     } else {
-      pdfRect = annotation.bounds
+      pdfRect = (annotation as? AreaUnderlinePDFAnnotation)?.renderedBounds ?? annotation.bounds
     }
 
     let pdfViewRect = pdfView.convert(pdfRect, from: page)
