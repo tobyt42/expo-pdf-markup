@@ -66,8 +66,11 @@ extension ExpoPdfMarkupView {
           let startPoint = moveStartPoint else { return }
 
     let pdfPoint = pdfView.convert(location, to: page)
-    let rawDeltaX = pdfPoint.x - startPoint.x
-    let rawDeltaY = pdfPoint.y - startPoint.y
+    let coordinates = AnnotationCoordinates(page: page)
+    let current = pdfPoint.applying(coordinates.nativeToVisible)
+    let start = startPoint.applying(coordinates.nativeToVisible)
+    let rawDeltaX = current.x - start.x
+    let rawDeltaY = current.y - start.y
     let clampedDelta = clampedTranslation(for: originalModel, dx: rawDeltaX, dy: rawDeltaY, on: page)
     let translatedModel = translatedModel(originalModel, dx: clampedDelta.x, dy: clampedDelta.y)
     guard translatedModel != movingPreviewModel,
@@ -173,7 +176,10 @@ extension ExpoPdfMarkupView {
       }
       guard !combinedBounds.isNull else { return nil }
       let padding = max(annotation.border?.lineWidth ?? 2.0, 10.0)
-      pdfRect = combinedBounds.insetBy(dx: -padding, dy: -padding)
+      pdfRect = combinedBounds.offsetBy(dx: annotation.bounds.minX, dy: annotation.bounds.minY).insetBy(
+        dx: -padding,
+        dy: -padding
+      )
     } else {
       pdfRect = annotation.bounds
     }
@@ -183,7 +189,11 @@ extension ExpoPdfMarkupView {
   }
 
   private func annotationForModel(_ model: AnnotationModel, on page: PDFPage) -> PDFAnnotation? {
-    AnnotationSerializer.toPDFAnnotation(model, pageBounds: page.bounds(for: pdfView.displayBox))
+    AnnotationSerializer.toPDFAnnotation(
+      model,
+      pageBounds: page.bounds(for: pdfView.displayBox),
+      pageRotation: page.rotation
+    )
   }
 
   private func translatedModel(_ model: AnnotationModel, dx: CGFloat, dy: CGFloat) -> AnnotationModel {
@@ -223,7 +233,7 @@ extension ExpoPdfMarkupView {
       return CGPoint(x: dx, y: dy)
     }
 
-    let pageBounds = page.bounds(for: pdfView.displayBox)
+    let pageBounds = AnnotationCoordinates(page: page).visibleBounds
     let minDx = pageBounds.minX - outlineBounds.x
     let maxDx = pageBounds.maxX - (outlineBounds.x + outlineBounds.width)
     let minDy = pageBounds.minY - outlineBounds.y

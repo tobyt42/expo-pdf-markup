@@ -3,6 +3,46 @@ import PDFKit
 import XCTest
 
 final class AnnotationSerializerTests: XCTestCase {
+  func testCroppedPageInkRendersAtVisiblePageCoordinates() throws {
+    let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 800, height: 1000))
+    let document = try XCTUnwrap(PDFDocument(data: renderer.pdfData { context in
+      context.beginPage()
+      UIColor.white.setFill()
+      context.fill(CGRect(x: 0, y: 0, width: 800, height: 1000))
+    }))
+    let page = try XCTUnwrap(document.page(at: 0))
+    page.setBounds(CGRect(x: 100, y: 80, width: 600, height: 840), for: .cropBox)
+    let model = AnnotationModel(
+      id: "crop-ink", type: "ink", page: 0, color: "#FF0000", lineWidth: 8,
+      paths: [[["x": 80, "y": 120], ["x": 180, "y": 120]]], createdAt: 123
+    )
+    let annotation = try XCTUnwrap(AnnotationSerializer.toPDFAnnotation(model, pageBounds: page.bounds(for: .cropBox)))
+    page.addAnnotation(annotation)
+    let image = try XCTUnwrap(page.thumbnail(of: CGSize(width: 600, height: 840), for: .cropBox).cgImage)
+    let context = try XCTUnwrap(CGContext(data: nil, width: image.width, height: image.height,
+                                          bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                                          space: CGColorSpaceCreateDeviceRGB(),
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+    context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+    let pixels = try XCTUnwrap(context.data).bindMemory(to: UInt8.self, capacity: image.width * image.height * 4)
+    // The midpoint is 130 pt from the visible left and 120 pt from the visible bottom.
+    let offset = ((image.height - 120) * image.width + 130) * 4
+    XCTAssertGreaterThan(pixels[offset], 200)
+    XCTAssertLessThan(pixels[offset + 1], 80)
+    XCTAssertLessThan(pixels[offset + 2], 80)
+  }
+
+  func testRectangularModelsUseVisiblePageCoordinatesOnCroppedPages() throws {
+    let crop = CGRect(x: 100, y: 80, width: 600, height: 840)
+    for type in ["highlight", "underline", "freeText", "stamp"] {
+      let model = AnnotationModel(id: "crop-\(type)", type: type, page: 0, color: "#FF0000",
+                                  bounds: AnnotationBounds(x: 80, y: 120, width: 100, height: 48), contents: "A",
+                                  text: "♫")
+      let annotation = try XCTUnwrap(AnnotationSerializer.toPDFAnnotation(model, pageBounds: crop))
+      XCTAssertEqual(annotation.bounds, CGRect(x: 180, y: 200, width: 100, height: 48), type)
+    }
+  }
+
   // MARK: - PDFAnnotation creation
 
   func testCreateInkAnnotation() throws {

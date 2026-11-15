@@ -185,7 +185,11 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
       guard model.page >= 0, model.page < document.pageCount else { continue }
       guard let page = document.page(at: model.page) else { continue }
       let pageBounds = page.bounds(for: pdfView.displayBox)
-      guard let pdfAnnotation = AnnotationSerializer.toPDFAnnotation(model, pageBounds: pageBounds) else {
+      guard let pdfAnnotation = AnnotationSerializer.toPDFAnnotation(
+        model,
+        pageBounds: pageBounds,
+        pageRotation: page.rotation
+      ) else {
         continue
       }
       page.addAnnotation(pdfAnnotation)
@@ -325,7 +329,8 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
             lineJoin: .round,
             miterLimit: 0
           )
-          if hitPath.contains(point) {
+          let localPoint = CGPoint(x: point.x - annotation.bounds.minX, y: point.y - annotation.bounds.minY)
+          if hitPath.contains(localPoint) {
             return annotation
           }
         }

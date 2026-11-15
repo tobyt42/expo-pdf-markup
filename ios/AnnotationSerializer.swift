@@ -18,7 +18,20 @@ enum AnnotationSerializer {
 
   // MARK: - PDFAnnotation ↔ AnnotationModel
 
-  static func toPDFAnnotation(_ model: AnnotationModel, pageBounds: CGRect? = nil) -> PDFAnnotation? {
+  static func toPDFAnnotation(_ model: AnnotationModel, pageBounds: CGRect? = nil,
+                              pageRotation: Int = 0) -> PDFAnnotation? {
+    let coordinates = AnnotationCoordinates(bounds: pageBounds ?? .zero, rotation: pageRotation)
+    var visibleModel = model
+    if model.type == "text" || model.type == "freeText", let bounds = model.bounds {
+      let size = model.fontSize ?? 16
+      let font = UIFont(name: model.fontFamily ?? "", size: size) ?? UIFont.systemFont(ofSize: size)
+      visibleModel.bounds = AnnotationBounds(normalizedFreeTextBounds(
+        bounds: bounds.cgRect,
+        text: model.contents ?? "",
+        font: font
+      ))
+    }
+    let model = coordinates.transform(visibleModel, using: coordinates.visibleToNative)
     let color = colorFromHex(model.color) ?? .red
 
     switch model.type {
@@ -46,7 +59,8 @@ enum AnnotationSerializer {
       forAnnotationKey: PDFAnnotationKey(rawValue: "_createdAt")
     ) as? Double ?? Date().timeIntervalSince1970
 
-    guard let type = modelType(for: annotation.type) else { return nil }
+    guard let nativeType = modelType(for: annotation.type) else { return nil }
+    let type = annotation.value(forAnnotationKey: PDFAnnotationKey(rawValue: "_modelType")) as? String ?? nativeType
     var model = AnnotationModel(
       id: id,
       type: type,
@@ -56,8 +70,8 @@ enum AnnotationSerializer {
     )
 
     populateModelDetails(&model, from: annotation)
-
-    return model
+    let coordinates = annotation.page.map { AnnotationCoordinates(page: $0) } ?? AnnotationCoordinates(bounds: .zero)
+    return coordinates.transform(model, using: coordinates.nativeToVisible)
   }
 
   private static func modelType(for annotationType: String?) -> String? {
@@ -101,12 +115,12 @@ enum AnnotationSerializer {
       // type declares it non-optional, and `JSONEncoder` drops nil keys entirely, so a
       // nil here reaches consumers as a missing property rather than an empty stroke list.
       model.paths = (annotation.paths ?? []).map { path in
-        pointsFromBezierPath(path).map { ["x": $0.x, "y": $0.y] }
+        pointsFromBezierPath(path).map { ["x": $0.x + annotation.bounds.minX, "y": $0.y + annotation.bounds.minY] }
       }
     case "highlight", "underline":
       model.bounds = AnnotationBounds(annotation.bounds)
       if model.type == "highlight" {
-        model.alpha = 0.5
+        model.alpha = annotation.color.cgColor.alpha
       }
     case "text", "freeText":
       model.bounds = AnnotationBounds(annotation.bounds)
@@ -221,9 +235,9 @@ enum AnnotationSerializer {
       let bezierPath = UIBezierPath()
       for (index, point) in path.enumerated() {
         if index == 0 {
-          bezierPath.move(to: CGPoint(x: point.x, y: point.y))
+          bezierPath.move(to: CGPoint(x: point.x - annotationBounds.minX, y: point.y - annotationBounds.minY))
         } else {
-          bezierPath.addLine(to: CGPoint(x: point.x, y: point.y))
+          bezierPath.addLine(to: CGPoint(x: point.x - annotationBounds.minX, y: point.y - annotationBounds.minY))
         }
       }
       annotation.add(bezierPath)
@@ -255,7 +269,7 @@ enum AnnotationSerializer {
     let font = UIFont(name: model.fontFamily ?? "", size: fontSize) ?? UIFont.systemFont(ofSize: fontSize)
     let contents = model.contents ?? ""
     let annotation = PDFAnnotation(
-      bounds: normalizedFreeTextBounds(bounds: bounds.cgRect, text: contents, font: font),
+      bounds: bounds.cgRect,
       forType: .freeText,
       withProperties: nil
     )
@@ -263,6 +277,7 @@ enum AnnotationSerializer {
     annotation.fontColor = color
     annotation.color = .clear
     annotation.contents = contents
+    annotation.setValue(model.type, forAnnotationKey: PDFAnnotationKey(rawValue: "_modelType"))
 
     let createdAt = model.createdAt ?? Date().timeIntervalSince1970
     tagAsModuleManaged(annotation, id: model.id, createdAt: createdAt, colorHex: model.color)
@@ -314,5 +329,51 @@ enum AnnotationSerializer {
       }
     }
     return points
+  }
+}
+
+/// Interchange coordinates are zero-origin, y-up points on the visible, rotated page.
+/// PDFKit uses unrotated page coordinates; ink paths additionally use annotation-local points.
+struct AnnotationCoordinates {
+  let nativeToVisible: CGAffineTransform
+  var visibleToNative: CGAffineTransform {
+    nativeToVisible.inverted()
+  }
+
+  let visibleBounds: CGRect
+
+  init(page: PDFPage) {
+    self.init(bounds: page.bounds(for: .cropBox), rotation: page.rotation)
+  }
+
+  init(bounds: CGRect, rotation: Int = 0) {
+    switch (rotation % 360 + 360) % 360 {
+    case 90:
+      nativeToVisible = CGAffineTransform(a: 0, b: -1, c: 1, d: 0, tx: -bounds.minY, ty: bounds.maxX)
+      visibleBounds = CGRect(x: 0, y: 0, width: bounds.height, height: bounds.width)
+    case 180:
+      nativeToVisible = CGAffineTransform(a: -1, b: 0, c: 0, d: -1, tx: bounds.maxX, ty: bounds.maxY)
+      visibleBounds = CGRect(origin: .zero, size: bounds.size)
+    case 270:
+      nativeToVisible = CGAffineTransform(a: 0, b: 1, c: -1, d: 0, tx: bounds.maxY, ty: -bounds.minX)
+      visibleBounds = CGRect(x: 0, y: 0, width: bounds.height, height: bounds.width)
+    default:
+      nativeToVisible = CGAffineTransform(translationX: -bounds.minX, y: -bounds.minY)
+      visibleBounds = CGRect(origin: .zero, size: bounds.size)
+    }
+  }
+
+  func transform(_ model: AnnotationModel, using transform: CGAffineTransform) -> AnnotationModel {
+    var result = model
+    if let bounds = model.bounds { result.bounds = AnnotationBounds(bounds.cgRect.applying(transform)) }
+    if model.paths != nil {
+      result.paths = model.encodedPaths(from: model.decodedPaths.map { stroke in
+        stroke.map { point in
+          let converted = CGPoint(x: point.x, y: point.y).applying(transform)
+          return AnnotationPoint(x: converted.x, y: converted.y)
+        }
+      })
+    }
+    return result
   }
 }

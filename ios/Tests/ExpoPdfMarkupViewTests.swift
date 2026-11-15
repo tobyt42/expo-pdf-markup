@@ -15,6 +15,35 @@ final class ExpoPdfMarkupViewTests: XCTestCase {
     super.tearDown()
   }
 
+  @MainActor func testCommittedInkOnCroppedPageStaysUnderInputAndSerializesVisibleCoordinates() throws {
+    let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 800, height: 1000))
+    let document = try XCTUnwrap(PDFDocument(data: renderer.pdfData { context in context.beginPage() }))
+    let page = try XCTUnwrap(document.page(at: 0))
+    page.setBounds(CGRect(x: 100, y: 80, width: 600, height: 840), for: .cropBox)
+    let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 400, height: 700))
+    let controller = UIViewController()
+    window.rootViewController = controller
+    window.makeKeyAndVisible()
+    view.frame = controller.view.bounds
+    controller.view.addSubview(view)
+    view.pdfView.document = document
+    view.layoutIfNeeded()
+    view.pdfView.layoutDocumentView()
+    view.setAnnotationMode("ink")
+    let overlay = try XCTUnwrap(view.inkOverlayView)
+    let first = view.convert(view.pdfView.convert(CGPoint(x: 180, y: 200), from: page), from: view.pdfView)
+    let last = view.convert(view.pdfView.convert(CGPoint(x: 280, y: 200), from: page), from: view.pdfView)
+    overlay.onBegan?(first)
+    overlay.onMoved?(last)
+    overlay.onEnded?()
+    let result = try XCTUnwrap(AnnotationSerializer.deserialize(from: view.serializeCurrentAnnotations()))
+    XCTAssertEqual(
+      result.annotations.first?.decodedPaths,
+      [[AnnotationPoint(x: 80, y: 120), AnnotationPoint(x: 180, y: 120)]]
+    )
+    window.isHidden = true
+  }
+
   // MARK: - Initial state
 
   func testInitialState() {

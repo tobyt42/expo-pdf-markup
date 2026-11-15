@@ -27,12 +27,15 @@ final class StampPDFAnnotation: PDFAnnotation {
     value(forAnnotationKey: Self.textKey) as? String
   }
 
-  override func draw(with _: PDFDisplayBox, in context: CGContext) {
+  override func draw(with box: PDFDisplayBox, in context: CGContext) {
     guard let text = stampText else { return }
     let colorHex = (value(forAnnotationKey: Self.colorKey) as? String) ?? "#000000"
     guard let cgImage = Self.image(forText: text, colorHex: colorHex) else { return }
 
-    context.draw(cgImage, in: bounds)
+    // PDFKit supplies custom annotations a context whose origin is the visible box,
+    // whereas `bounds` remains in native page coordinates.
+    let origin = page?.bounds(for: box).origin ?? .zero
+    context.draw(cgImage, in: bounds.offsetBy(dx: -origin.x, dy: -origin.y))
   }
 
   private static func image(forText text: String, colorHex: String) -> CGImage? {

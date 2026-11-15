@@ -1,7 +1,9 @@
 import type { StyleProp, ViewStyle } from 'react-native';
 
+/** Zero-origin visible-page points after page rotation, in PDF points with y increasing upward. */
 export type AnnotationPoint = { x: number; y: number };
 
+/** Visible-page rectangle; x/y locate its bottom-left corner. See docs/annotation-coordinates.md. */
 export type AnnotationBounds = { x: number; y: number; width: number; height: number };
 
 export type InkAnnotation = {

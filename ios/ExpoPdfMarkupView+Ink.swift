@@ -84,35 +84,20 @@ extension ExpoPdfMarkupView {
     let pdfViewMidPoint = pdfView.convert(midPoint, from: self)
     guard let page = pdfView.page(for: pdfViewMidPoint, nearest: true) else { return }
 
-    // Convert all display points to PDF page coordinates
-    let pdfPoints = inkPoints.map { displayPoint -> CGPoint in
-      let pdfViewPoint = pdfView.convert(displayPoint, from: self)
-      return pdfView.convert(pdfViewPoint, to: page)
+    let coordinates = AnnotationCoordinates(page: page)
+    let points = inkPoints.map { displayPoint -> [String: CGFloat] in
+      let location = pdfView.convert(displayPoint, from: self)
+      let point = pdfView.convert(location, to: page).applying(coordinates.nativeToVisible)
+      return ["x": point.x, "y": point.y]
     }
-
-    // Use the full page bounds — PDFKit clips ink rendering to annotation bounds,
-    // and tight bounds calculations are fragile with coordinate transforms.
-    let annotationBounds = page.bounds(for: pdfView.displayBox)
-
-    let annotation = PDFAnnotation(bounds: annotationBounds, forType: .ink, withProperties: nil)
-    annotation.color = AnnotationSerializer.colorFromHex(annotationColor) ?? .red
-
-    let border = PDFBorder()
-    border.lineWidth = annotationLineWidth
-    annotation.border = border
-
-    let bezierPath = UIBezierPath()
-    for (index, point) in pdfPoints.enumerated() {
-      if index == 0 {
-        bezierPath.move(to: point)
-      } else {
-        bezierPath.addLine(to: point)
-      }
-    }
-    annotation.add(bezierPath)
-
-    let id = UUID().uuidString
-    AnnotationSerializer.tagAsModuleManaged(annotation, id: id, createdAt: Date().timeIntervalSince1970)
+    let model = AnnotationModel(id: UUID().uuidString, type: "ink", page: 0,
+                                color: annotationColor, lineWidth: annotationLineWidth, paths: [points],
+                                createdAt: Date().timeIntervalSince1970)
+    guard let annotation = AnnotationSerializer.toPDFAnnotation(
+      model,
+      pageBounds: page.bounds(for: .cropBox),
+      pageRotation: page.rotation
+    ) else { return }
     page.addAnnotation(annotation)
 
     emitAnnotationsChanged()
