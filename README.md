@@ -166,3 +166,15 @@ MIT
 Annotations use zero-origin visible-page coordinates, in PDF points with y increasing upward.
 See [the coordinate contract and upgrade guidance](docs/annotation-coordinates.md) for cropped
 and rotated pages, v1 compatibility limits, and native rebuild requirements.
+
+### Highlighting and underlining on iOS
+
+With `annotationMode="highlight"` or `"underline"`, drag one finger to mark a rectangular area on
+any page, including scanned PDFs. Highlights cover the rectangle; underlines follow its lower
+edge. The tools use area selection on text-bearing pages too, without snapping to text lines.
+
+The active tool captures touch input so marking does not scroll the page. Set
+`annotationMode="none"` to scroll, pinch to zoom, or turn pages by touch, then reselect the tool.
+The `page` prop and book-mode hardware keys remain available while marking; navigating cancels
+an unfinished drag. Cancelling a gesture or switching tools also discards the unfinished area.
+These Swift changes require a native iOS rebuild; a JavaScript-only update cannot install them.

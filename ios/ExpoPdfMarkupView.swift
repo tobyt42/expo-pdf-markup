@@ -40,9 +40,13 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
   var bookTapCount = 1
   var bookTurnSnapshot: UIView?
   var bookGestureDelegate: BookGestureDelegate?
-  private var selectionObserver: NSObjectProtocol?
-  private var selectionDebounceTimer: Timer?
-  private var currentMarkupType: String?
+  var markupOverlayView: InkOverlayView?
+  var markupPreviewLayer: CAShapeLayer?
+  var markupPage: PDFPage?
+  var markupStartPoint: CGPoint?
+  var markupEndPoint: CGPoint?
+  var markupDisabledGestures: [UIGestureRecognizer] = []
+  var markupScrollWasEnabled: Bool?
   var movingPage: PDFPage?
   var movingOriginalModel: AnnotationModel?
   var movingPreviewModel: AnnotationModel?
@@ -87,9 +91,6 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
 
   deinit {
     NotificationCenter.default.removeObserver(self)
-    if let selectionObserver {
-      NotificationCenter.default.removeObserver(selectionObserver)
-    }
   }
 
   override func layoutSubviews() {
@@ -125,6 +126,7 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
 
   func loadPdf(from source: String) {
     guard source != currentSource else { return }
+    cancelAreaMarkup()
     currentSource = source
 
     let fileURL = URL(fileURLWithPath: source)
@@ -155,6 +157,7 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
       return
     }
 
+    cancelAreaMarkup()
     if isBookMode {
       jumpToBookPage(page)
     } else {
@@ -244,6 +247,7 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
   func setDisplayMode(_ mode: String) {
     let normalised = mode == "book" ? "book" : "continuous"
     guard normalised != displayMode else { return }
+    cancelAreaMarkup()
     displayMode = normalised
     applyDisplayMode()
   }
@@ -256,12 +260,15 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
 
     // Clean up previous mode
     if previousMode != mode {
-      removeInkMode()
-      removeEraserGesture()
-      removeMoveMode()
-      removeTextGesture()
-      removeStampGesture()
-      removeSelectionObserver()
+      switch previousMode {
+      case "ink": removeInkMode()
+      case "eraser": removeEraserGesture()
+      case "move": removeMoveMode()
+      case "text": removeTextGesture()
+      case "stamp": removeStampGesture()
+      case "highlight", "underline": removeAreaMarkupMode()
+      default: break
+      }
     }
 
     switch mode {
@@ -272,7 +279,7 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
     case "move":
       setupMoveMode()
     case "highlight", "underline":
-      setupSelectionObserver(markupType: mode)
+      setupAreaMarkupMode()
     case "text":
       setupTextGesture()
     case "stamp":
@@ -334,77 +341,11 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
             return annotation
           }
         }
-      } else if annotation.bounds.contains(point) {
+      } else if ((annotation as? AreaUnderlinePDFAnnotation)?.renderedBounds ?? annotation.bounds).contains(point) {
         return annotation
       }
     }
     return nil
-  }
-
-  // MARK: - Highlight / Underline
-
-  private func setupSelectionObserver(markupType: String) {
-    guard selectionObserver == nil else { return }
-    currentMarkupType = markupType
-
-    // Observe selection changes with a debounce — the notification fires continuously
-    // during drag. We wait for the selection to settle before creating the annotation.
-    selectionObserver = NotificationCenter.default.addObserver(
-      forName: .PDFViewSelectionChanged,
-      object: pdfView,
-      queue: .main
-    ) { [weak self] _ in
-      self?.scheduleSelectionHandler()
-    }
-  }
-
-  private func removeSelectionObserver() {
-    selectionDebounceTimer?.invalidate()
-    selectionDebounceTimer = nil
-    currentMarkupType = nil
-    if let observer = selectionObserver {
-      NotificationCenter.default.removeObserver(observer)
-      selectionObserver = nil
-    }
-    pdfView.clearSelection()
-  }
-
-  private func scheduleSelectionHandler() {
-    selectionDebounceTimer?.invalidate()
-    selectionDebounceTimer = Timer.scheduledTimer(
-      withTimeInterval: 0.5,
-      repeats: false
-    ) { [weak self] _ in
-      self?.applyMarkupToSelection()
-    }
-  }
-
-  private func applyMarkupToSelection() {
-    guard let markupType = currentMarkupType else { return }
-    guard let selection = pdfView.currentSelection else { return }
-    let selectionsByPage = selection.selectionsByLine()
-
-    var didAdd = false
-    for lineSelection in selectionsByPage {
-      guard let page = lineSelection.pages.first else { continue }
-      let bounds = lineSelection.bounds(for: page)
-      guard bounds.width > 0, bounds.height > 0 else { continue }
-
-      let subtype: PDFAnnotationSubtype = markupType == "highlight" ? .highlight : .underline
-      let annotation = PDFAnnotation(bounds: bounds, forType: subtype, withProperties: nil)
-      let color = AnnotationSerializer.colorFromHex(annotationColor) ?? .yellow
-      annotation.color = markupType == "highlight" ? color.withAlphaComponent(0.5) : color
-
-      let id = UUID().uuidString
-      AnnotationSerializer.tagAsModuleManaged(annotation, id: id, createdAt: Date().timeIntervalSince1970)
-      page.addAnnotation(annotation)
-      didAdd = true
-    }
-
-    if didAdd {
-      pdfView.clearSelection()
-      emitAnnotationsChanged()
-    }
   }
 
   // MARK: - UIGestureRecognizerDelegate
@@ -419,6 +360,7 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
   // MARK: - Page change notification
 
   @objc private func handlePageChanged() {
+    cancelAreaMarkup()
     guard let document = pdfView.document,
           let currentPage = pdfView.currentPage else { return }
 

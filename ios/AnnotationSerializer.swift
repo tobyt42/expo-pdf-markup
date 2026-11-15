@@ -254,7 +254,9 @@ enum AnnotationSerializer {
     subtype: PDFAnnotationSubtype
   ) -> PDFAnnotation? {
     guard let bounds = model.bounds else { return nil }
-    let annotation = PDFAnnotation(bounds: bounds.cgRect, forType: subtype, withProperties: nil)
+    let annotation: PDFAnnotation = subtype == .underline
+      ? AreaUnderlinePDFAnnotation(bounds: bounds.cgRect, forType: subtype, withProperties: nil)
+      : PDFAnnotation(bounds: bounds.cgRect, forType: subtype, withProperties: nil)
     let alpha = model.alpha ?? (subtype == .highlight ? 0.5 : 1.0)
     annotation.color = color.withAlphaComponent(alpha)
 
