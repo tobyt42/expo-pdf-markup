@@ -118,7 +118,7 @@ enum AnnotationSerializer {
         pointsFromBezierPath(path).map { ["x": $0.x + annotation.bounds.minX, "y": $0.y + annotation.bounds.minY] }
       }
     case "highlight", "underline":
-      model.bounds = AnnotationBounds(annotation.bounds)
+      model.bounds = AnnotationBounds((annotation as? AreaUnderlinePDFAnnotation)?.contentBounds ?? annotation.bounds)
       if model.type == "highlight" {
         model.alpha = annotation.color.cgColor.alpha
       }
@@ -130,7 +130,7 @@ enum AnnotationSerializer {
         model.fontFamily = font.fontName
       }
     case "stamp":
-      model.bounds = AnnotationBounds(annotation.bounds)
+      model.bounds = AnnotationBounds((annotation as? StampPDFAnnotation)?.contentBounds ?? annotation.bounds)
       if let stamp = annotation as? StampPDFAnnotation {
         model.text = stamp.stampText
       }
@@ -255,8 +255,13 @@ enum AnnotationSerializer {
   ) -> PDFAnnotation? {
     guard let bounds = model.bounds else { return nil }
     let annotation: PDFAnnotation = subtype == .underline
-      ? AreaUnderlinePDFAnnotation(bounds: bounds.cgRect, forType: subtype, withProperties: nil)
+      ? AreaUnderlinePDFAnnotation(bounds: bounds.cgRect, forType: .stamp, withProperties: nil)
       : PDFAnnotation(bounds: bounds.cgRect, forType: subtype, withProperties: nil)
+    if subtype == .underline {
+      // PDFKit's live underline view bypasses draw(with:in:). A custom stamp
+      // appearance invokes our renderer while the shared model remains underline.
+      annotation.setValue("underline", forAnnotationKey: PDFAnnotationKey(rawValue: "_modelType"))
+    }
     let alpha = model.alpha ?? (subtype == .highlight ? 0.5 : 1.0)
     annotation.color = color.withAlphaComponent(alpha)
 
@@ -337,6 +342,9 @@ enum AnnotationSerializer {
 /// Interchange coordinates are zero-origin, y-up points on the visible, rotated page.
 /// PDFKit uses unrotated page coordinates; ink paths additionally use annotation-local points.
 struct AnnotationCoordinates {
+  /// Separate the live appearance clip from its content, including full-page marks.
+  static let appearancePadding: CGFloat = 2
+  private let nativeBounds: CGRect
   let nativeToVisible: CGAffineTransform
   var visibleToNative: CGAffineTransform {
     nativeToVisible.inverted()
@@ -349,6 +357,7 @@ struct AnnotationCoordinates {
   }
 
   init(bounds: CGRect, rotation: Int = 0) {
+    nativeBounds = bounds
     switch (rotation % 360 + 360) % 360 {
     case 90:
       nativeToVisible = CGAffineTransform(a: 0, b: -1, c: 1, d: 0, tx: -bounds.minY, ty: bounds.maxX)
@@ -363,6 +372,21 @@ struct AnnotationCoordinates {
       nativeToVisible = CGAffineTransform(translationX: -bounds.minX, y: -bounds.minY)
       visibleBounds = CGRect(origin: .zero, size: bounds.size)
     }
+  }
+
+  /// PDFKit clips a recorded live appearance to the native, crop-relative annotation
+  /// rectangle. Whole-page renderers instead clip to the visible page. Match that
+  /// geometry before adapting custom drawing; do not call bitmap-only context APIs
+  /// on PDFKit's vector appearance contexts.
+  func prepareForDrawing(in context: CGContext, annotationBounds: CGRect) {
+    let clip = context.boundingBoxOfClipPath
+    let localBounds = annotationBounds.offsetBy(dx: -nativeBounds.minX, dy: -nativeBounds.minY)
+    let tolerance: CGFloat = 1
+    guard localBounds.insetBy(dx: -tolerance, dy: -tolerance).contains(clip),
+          clip.insetBy(dx: -tolerance, dy: -tolerance).contains(localBounds) else { return }
+    context.concatenate(visibleToNative.concatenating(
+      CGAffineTransform(translationX: -nativeBounds.minX, y: -nativeBounds.minY)
+    ))
   }
 
   func transform(_ model: AnnotationModel, using transform: CGAffineTransform) -> AnnotationModel {

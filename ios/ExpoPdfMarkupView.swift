@@ -341,7 +341,8 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
             return annotation
           }
         }
-      } else if ((annotation as? AreaUnderlinePDFAnnotation)?.renderedBounds ?? annotation.bounds).contains(point) {
+      } else if ((annotation as? AreaUnderlinePDFAnnotation)?.renderedBounds ?? (annotation as? StampPDFAnnotation)?
+        .contentBounds ?? annotation.bounds).contains(point) {
         return annotation
       }
     }
