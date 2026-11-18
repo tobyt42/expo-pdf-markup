@@ -10,11 +10,22 @@ import PdfScreen, { type SampleDocument } from './screens/PdfScreen';
 
 const EMPTY_ANNOTATIONS = JSON.stringify({ version: 1, annotations: [] });
 
-// book-sample.pdf and single-page.pdf come from scripts/generate_sample_pdfs.py.
+// Book controls: scripts/generate_sample_pdfs.py.
+// Annotation controls: scripts/generate_annotation_pdfs.py.
 const DOCUMENTS: (SampleDocument & { module: number })[] = [
   { id: 'test', label: 'Test (2 pages)', module: require('./assets/test.pdf') },
   { id: 'book', label: 'Book sample (6 pages)', module: require('./assets/book-sample.pdf') },
   { id: 'single', label: 'Single page', module: require('./assets/single-page.pdf') },
+  {
+    id: 'annotation-scan',
+    label: 'Scan regression (6 pages)',
+    module: require('./assets/annotation-scan-regression.pdf'),
+  },
+  {
+    id: 'annotation-text',
+    label: 'Text regression (4 pages)',
+    module: require('./assets/annotation-text-regression.pdf'),
+  },
 ];
 
 type ScreenName = 'pdf' | 'annotations';

@@ -156,12 +156,13 @@ extension ExpoPdfMarkupView {
     annotation: PDFAnnotation?
   ) -> [String: Any] {
     let pageIndex = pdfView.document?.index(for: page) ?? 0
+    let visiblePoint = point.applying(AnnotationCoordinates(page: page).nativeToVisible)
     var payload: [String: Any] = [
       "mode": annotation == nil ? "create" : "edit",
       "page": pageIndex,
       "point": [
-        "x": point.x,
-        "y": point.y,
+        "x": visiblePoint.x,
+        "y": visiblePoint.y,
       ],
     ]
     if let contents = annotation?.contents {
@@ -177,7 +178,7 @@ extension ExpoPdfMarkupView {
     replacing annotation: PDFAnnotation?
   ) {
     if let annotation {
-      updateFreeTextAnnotation(annotation, text: text)
+      updateFreeTextAnnotation(annotation, text: text, on: page)
     } else {
       addFreeTextAnnotation(text: text, at: point, on: page)
     }
@@ -186,36 +187,33 @@ extension ExpoPdfMarkupView {
   private func addFreeTextAnnotation(text: String, at point: CGPoint, on page: PDFPage) {
     let fontSize: CGFloat = 16.0
     let font = UIFont(name: annotationFontFamily ?? "", size: fontSize) ?? UIFont.systemFont(ofSize: fontSize)
-    let color = AnnotationSerializer.colorFromHex(annotationColor) ?? .red
-    let bounds = measuredTextBounds(text: text, font: font, at: point)
-
-    let annotation = PDFAnnotation(bounds: bounds, forType: .freeText, withProperties: nil)
-    annotation.font = font
-    annotation.fontColor = color
-    annotation.color = .clear
-    annotation.contents = text
-
-    let id = UUID().uuidString
-    AnnotationSerializer.tagAsModuleManaged(annotation, id: id, createdAt: Date().timeIntervalSince1970)
+    let coordinates = AnnotationCoordinates(page: page)
+    let visiblePoint = point.applying(coordinates.nativeToVisible)
+    let model = AnnotationModel(
+      id: UUID().uuidString, type: "freeText", page: pdfView.document?.index(for: page) ?? 0,
+      color: annotationColor,
+      bounds: AnnotationBounds(measuredTextBounds(text: text, font: font, at: visiblePoint)),
+      contents: text, fontSize: fontSize, fontFamily: font.fontName,
+      createdAt: Date().timeIntervalSince1970
+    )
+    guard let annotation = AnnotationSerializer.toPDFAnnotation(
+      model, pageBounds: page.bounds(for: .cropBox), pageRotation: page.rotation
+    ) else { return }
     page.addAnnotation(annotation)
     emitAnnotationsChanged()
   }
 
-  private func updateFreeTextAnnotation(_ annotation: PDFAnnotation, text: String) {
-    let fontSize = annotation.font?.pointSize ?? 16.0
-    let font = annotation.font ??
-      UIFont(name: annotationFontFamily ?? "", size: fontSize) ??
-      UIFont.systemFont(ofSize: fontSize)
-    let bounds = measuredTextBounds(text: text, font: font, replacing: annotation.bounds)
-
-    annotation.font = font
-    annotation.bounds = bounds
-    annotation.contents = text
-    annotation.color = .clear
-    if annotation.fontColor == nil {
-      annotation.fontColor = AnnotationSerializer.colorFromHex(annotationColor) ?? .red
-    }
-
+  private func updateFreeTextAnnotation(_ annotation: PDFAnnotation, text: String, on page: PDFPage) {
+    guard var model = AnnotationSerializer.toModel(from: annotation, page: pdfView.document?.index(for: page) ?? 0),
+          let bounds = model.bounds else { return }
+    let font = annotation.font ?? UIFont.systemFont(ofSize: model.fontSize ?? 16)
+    model.contents = text
+    model.bounds = AnnotationBounds(measuredTextBounds(text: text, font: font, replacing: bounds.cgRect))
+    guard let replacement = AnnotationSerializer.toPDFAnnotation(
+      model, pageBounds: page.bounds(for: .cropBox), pageRotation: page.rotation
+    ) else { return }
+    page.removeAnnotation(annotation)
+    page.addAnnotation(replacement)
     emitAnnotationsChanged()
   }
 
@@ -243,7 +241,8 @@ extension ExpoPdfMarkupView {
   }
 
   private func measuredTextSize(text: String, font: UIFont) -> CGSize {
-    (text as NSString).size(withAttributes: [.font: font])
+    let size = (text as NSString).size(withAttributes: [.font: font])
+    return CGSize(width: ceil(size.width), height: ceil(size.height))
   }
 
   private func findViewController() -> UIViewController? {
