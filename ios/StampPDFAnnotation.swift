@@ -16,7 +16,18 @@ final class StampPDFAnnotation: PDFAnnotation {
   }
 
   override init(bounds: CGRect, forType type: PDFAnnotationSubtype, withProperties properties: [AnyHashable: Any]?) {
-    super.init(bounds: bounds, forType: type, withProperties: properties)
+    super.init(
+      bounds: bounds.insetBy(
+        dx: -AnnotationCoordinates.appearancePadding,
+        dy: -AnnotationCoordinates.appearancePadding
+      ),
+      forType: type,
+      withProperties: properties
+    )
+  }
+
+  var contentBounds: CGRect {
+    bounds.insetBy(dx: AnnotationCoordinates.appearancePadding, dy: AnnotationCoordinates.appearancePadding)
   }
 
   func setStampText(_ text: String) {
@@ -27,12 +38,19 @@ final class StampPDFAnnotation: PDFAnnotation {
     value(forAnnotationKey: Self.textKey) as? String
   }
 
-  override func draw(with _: PDFDisplayBox, in context: CGContext) {
+  override func draw(with box: PDFDisplayBox, in context: CGContext) {
     guard let text = stampText else { return }
     let colorHex = (value(forAnnotationKey: Self.colorKey) as? String) ?? "#000000"
     guard let cgImage = Self.image(forText: text, colorHex: colorHex) else { return }
 
-    context.draw(cgImage, in: bounds)
+    let coordinates = page.map {
+      AnnotationCoordinates(bounds: $0.bounds(for: box), rotation: $0.rotation)
+    } ?? AnnotationCoordinates(bounds: .zero)
+    let visibleBounds = contentBounds.applying(coordinates.nativeToVisible)
+    context.saveGState()
+    coordinates.prepareForDrawing(in: context, annotationBounds: bounds)
+    context.draw(cgImage, in: visibleBounds)
+    context.restoreGState()
   }
 
   private static func image(forText text: String, colorHex: String) -> CGImage? {
