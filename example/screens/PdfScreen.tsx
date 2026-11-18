@@ -39,6 +39,8 @@ const COLORS = [
 const STAMPS: StampDefinition[] = [
   { id: 'breath', label: 'Breath Mark', text: '’' },
   { id: 'note', label: 'Note', text: '♪' },
+  { id: 'star', label: 'Star', text: '★' },
+  { id: 'emoji', label: 'Emoji', text: '🎵' },
   { id: 'forte', label: 'Forte', text: 'f' },
   { id: 'crescendo', label: 'Crescendo', text: '<' },
 ];
