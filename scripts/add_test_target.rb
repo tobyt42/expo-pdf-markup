@@ -46,6 +46,15 @@ Dir.glob(File.join(tests_dir, '*.pdf')).each do |resource_file|
   test_target.resources_build_phase.add_file_reference(file_ref, true)
 end
 
+# Share the same v1 interchange fixture with web and Android tests.
+fixtures_group = proj.main_group.groups.find { |g| g.name == 'AnnotationFixtures' } ||
+                 proj.main_group.new_group('AnnotationFixtures', '../../fixtures')
+Dir.glob(File.join(__dir__, '../fixtures/*.json')).each do |resource_file|
+  file_ref = fixtures_group.files.find { |f| f.path == File.basename(resource_file) } ||
+             fixtures_group.new_file(File.basename(resource_file))
+  test_target.resources_build_phase.add_file_reference(file_ref, true)
+end
+
 # Add test target to the main scheme or create a scheme
 scheme = Xcodeproj::XCScheme.new
 scheme.configure_with_targets(app_target, test_target)
