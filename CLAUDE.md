@@ -49,7 +49,7 @@ npm run release             # publishes to npm, pushes git tag, creates GitHub r
 ## Testing
 
 ### TypeScript (Jest)
-Tests live in `src/__tests__/`. The jest preset (expo-module-scripts) runs 4 projects: iOS, Android, Web, Node.
+Tests live in `src/__tests__/`. `jest.config.cjs` uses jest-expo presets for 4 projects: iOS, Android, Web, Node.
 
 - Use `.test.native.ts` suffix for tests that only run on iOS/Android
 - Use `.test.web.tsx` suffix for tests that only run on Web/Node
@@ -74,7 +74,7 @@ Tests live in `android/src/test/`. Run with `npm run test:kotlin`.
 
 ### TypeScript
 - Prettier: 100 char width, single quotes, trailing commas (es5)
-- ESLint: extends expo-module-scripts flat config
+- ESLint: extends the public eslint-config-expo flat config
 - No unused locals (enforced by tsconfig `noUnusedLocals: true`)
 
 ### Swift

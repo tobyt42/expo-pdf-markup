@@ -1,9 +1,10 @@
 // Type-checks the test suites, including the compile-time type tests, which
-// Jest (Babel) and `expo-module typecheck` (tests excluded) never type-check.
+// Jest (Babel) and the library build (tests excluded) never type-check.
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "noEmit": true
+    "noEmit": true,
+    "types": ["jest", "node"]
   },
   "include": ["./src"],
   "exclude": []
