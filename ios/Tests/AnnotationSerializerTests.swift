@@ -112,7 +112,9 @@ final class AnnotationSerializerTests: XCTestCase {
     XCTAssertEqual(annotation?.type, "FreeText")
     XCTAssertEqual(annotation?.contents, "My note")
     XCTAssertEqual(annotation?.font?.pointSize, 16.0)
-    XCTAssertEqual(annotation?.color, .clear)
+    // PDFKit may normalize a transparent background to no color on newer iOS versions.
+    let backgroundColor: UIColor? = annotation?.color
+    XCTAssertEqual(backgroundColor?.cgColor.alpha ?? 0, 0)
   }
 
   func testCreateFreeTextAnnotationExpandsNarrowBoundsToFitText() throws {

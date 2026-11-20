@@ -136,6 +136,18 @@ annotation while the text tool is active.
 
 This module uses the [Expo Modules API](https://docs.expo.dev/modules/overview/). The `example` directory contains a test app.
 
+The library development environment and example use Expo SDK 58, React 19.3, and React Native
+0.88. Use Node.js 22.13+ or 24.3+ (even-numbered releases). Install dependencies with `npm ci`
+in both the root and `example` directories.
+
+The root package overrides the Jest presets and watch plugin from `expo-module-scripts@56.0.3`
+to use the SDK 58 / Jest 30 versions. Keep these overrides until the stable module scripts
+include compatible test dependencies. React and React DOM are pinned together for the web tests.
+
+`expo-doctor` in `example` reports duplicate copies of native dependencies from the separate
+root and example installs, including the library's peer dependencies. Their versions match;
+the native builds select the example's copies. Keep both installations aligned when upgrading.
+
 ```sh
 # Build the module
 npm run build
