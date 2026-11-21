@@ -62,5 +62,5 @@ A `v<version>` git tag on `main` that marks the merged Release PR commit and tri
 _Avoid_: Version tag
 
 **Snapshot**:
-A prerelease published automatically from `main` under the `next` dist-tag while there are Pending changesets. It never becomes `latest`.
+A prerelease published automatically from `main` under the `next` dist-tag while there are Pending changesets. Its version is `<latest Release version>-next.<UTC timestamp>` (e.g. `2.0.0-next.20261121190000`), so it sorts below `latest` and never becomes it.
 _Avoid_: Canary, nightly, beta, prerelease (when Snapshot is meant)

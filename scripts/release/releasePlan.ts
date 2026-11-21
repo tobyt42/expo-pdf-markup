@@ -15,7 +15,10 @@ export interface PendingChangeset {
 export interface ReleaseFacts {
   /** The full git ref that was pushed, e.g. `refs/heads/main` or `refs/tags/v2.1.0`. */
   ref: string;
-  /** The `version` field of `package.json` at the pushed commit. */
+  /**
+   * The `version` field of `package.json` at the pushed commit. On `main` it is the latest
+   * Release version, which Snapshots are based on.
+   */
   packageVersion: string;
   /** The Pending changesets at the pushed commit. */
   pendingChangesets: PendingChangeset[];
@@ -25,7 +28,7 @@ export interface ReleaseFacts {
   versionPublished: boolean;
   /** The text of `CHANGELOG.md` at the pushed commit. */
   changelog: string;
-  /** The current time; Snapshot versions (`0.0.0-next.<UTC timestamp>`) use it. */
+  /** The current time; Snapshot versions (`<packageVersion>-next.<UTC timestamp>`) use it. */
   now: Date;
 }
 
@@ -57,13 +60,8 @@ const MAIN_REF = 'refs/heads/main';
 const TAG_PREFIX = 'refs/tags/';
 /** Release tags are `v<version>`; other tags never publish. */
 const RELEASE_TAG_PREFIX = `${TAG_PREFIX}v`;
-
-/**
- * Every Snapshot is `0.0.0-next.<UTC timestamp>`. The bump types can still change in the
- * changeset review, so a Snapshot doesn't predict the next Release's version. The placeholder
- * also sorts below every Release, so a Snapshot can never outrank `latest`.
- */
-const SNAPSHOT_BASE = '0.0.0';
+/** A stable semver version, `X.Y.Z` with no prerelease or build metadata. */
+const STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 
 export function planRelease(facts: ReleaseFacts): ReleasePlan {
   if (facts.ref === MAIN_REF) return planSnapshot(facts);
@@ -127,6 +125,14 @@ export function releaseNotes(changelog: string, version: string): string | null 
   return notes === '' ? null : notes;
 }
 
+/**
+ * Every Snapshot is `<latest Release version>-next.<UTC timestamp>`, based on the `package.json`
+ * version on `main`. Only the Release PR bumps that version, and the Release PR's merge commit has
+ * no Pending changesets, so every Snapshot's base is a Release already on npm. The version
+ * therefore doesn't predict the next Release (the bump types can still change in the changeset
+ * review) and sorts below `latest`. A base of `0.0.0` is refused: CocoaPods' default `>= 0`
+ * requirement rejects a prerelease of `0.0.0`, so the Snapshot would not install on iOS.
+ */
 function planSnapshot(facts: ReleaseFacts): ReleasePlan {
   if (facts.pendingChangesets.length === 0) {
     return {
@@ -140,9 +146,21 @@ function planSnapshot(facts: ReleaseFacts): ReleasePlan {
       reason: 'the Pending changesets bump no version, so there is nothing to snapshot',
     };
   }
+  const base = facts.packageVersion;
+  const problem = !STABLE_VERSION.test(base)
+    ? 'is not a stable X.Y.Z Release version'
+    : base === '0.0.0'
+      ? 'has no Release yet, and CocoaPods rejects a prerelease of 0.0.0, so the Snapshot would not install on iOS'
+      : null;
+  if (problem !== null) {
+    return {
+      action: 'refuse',
+      reason: `Snapshot base check failed: package.json on main has ${base}, which ${problem}`,
+    };
+  }
   return {
     action: 'snapshot',
-    version: `${SNAPSHOT_BASE}-next.${utcTimestamp(facts.now)}`,
+    version: `${base}-next.${utcTimestamp(facts.now)}`,
     distTag: 'next',
   };
 }
