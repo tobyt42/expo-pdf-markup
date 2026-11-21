@@ -59,6 +59,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run typecheck:tests
       - run: npm test -- --ci --runInBand
+      - run: npm run test:scripts
       - run: npm run build
       - run: npm run docs -- --out site/api
       - name: Typecheck example

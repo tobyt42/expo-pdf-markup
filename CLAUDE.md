@@ -10,7 +10,7 @@ npm run qa
 ```
 
 Platform-specific QA:
-- `npm run qa:ts` — typecheck + test typecheck (`typecheck:tests`) + Prettier (auto-fix) + ESLint + actionlint + Jest tests
+- `npm run qa:ts` — typecheck + test typecheck (`typecheck:tests`) + Prettier (auto-fix) + ESLint + actionlint + Jest tests + script tests (`test:scripts`)
 - `npm run qa:ios` — SwiftLint + SwiftFormat (auto-fix) + XCTest (requires simulator)
 - `npm run qa:android` — ktlint + ktlint --format (auto-fix) + Gradle JUnit tests
 
@@ -22,6 +22,7 @@ Individual commands:
 - `npm run format` / `npm run format:swift` / `npm run format:kotlin` — auto-fix formatting
 - `npm run format:check` / `npm run format:swift:check` / `npm run format:kotlin:check` — check formatting
 - `npm run test` / `npm run test:swift` / `npm run test:kotlin` — tests per platform
+- `npm run test:scripts` — Node test runner (`node --test`) for `scripts/**/*.test.mjs`
 
 Always run `npm run qa` (or at minimum `npm run qa:ts`) before committing.
 
@@ -46,6 +47,24 @@ npm run release             # publishes to npm, pushes git tag, creates GitHub r
 - `npm` to be logged in (`npm whoami`)
 - `gh` to be authenticated (`gh auth status`)
 - A clean working tree on `main`
+
+## Repository settings
+
+The repository's security settings are code: `scripts/repo-settings.mjs` compares the live settings with the desired state in `scripts/repo-settings/desired-state.mjs` and can put them back. It manages:
+- the `main` ruleset (no deletion or force-push, pull request required with 0 approvals, the four validation job names above as required checks) and the Release tag ruleset on `refs/tags/v*` (creation, update and deletion restricted). Only the Repository admin role can bypass either
+- immutable releases
+- Actions: allowed actions limited to GitHub's own plus an explicit third-party list, read-only default workflow token that can't approve pull requests, approval required for workflows from all outside contributors
+- the `npm-publish` environment (no reviewer, admins can't bypass, deployments only from `main` and `v*` tags) and the `github-pages` deployment policy (`main` and `v*` tags)
+
+```
+npm run settings:check     # read-only: lists every difference, exits 1 on drift
+npm run settings:apply     # sends only the changes --check reports, then checks again
+node scripts/repo-settings.mjs --snapshot   # read-only: prints the live settings as JSON
+```
+- Needs `gh` authenticated as a repository admin. Add `-- --repo owner/name` to target another repository
+- `apply` changes live repository settings: agents run it only after the maintainer has explicitly approved it in chat. `--check` and `--snapshot` are safe to run at any time
+- Change a setting by editing `desired-state.mjs`, never in the web UI. Adding a third-party action to a workflow means adding it to `patterns_allowed` and applying, or the workflow won't run
+- The comparison is pure (`scripts/repo-settings/plan.mjs`) and tested against snapshots in `scripts/repo-settings/fixtures/` with `npm run test:scripts`. Only the fields listed in the desired state are compared; lists must match exactly, in any order
 
 ## Testing
 
@@ -92,7 +111,7 @@ Tests live in `android/src/test/`. Run with `npm run test:kotlin`.
 - Linted with actionlint (`npm run lint:workflows`); requires `brew install actionlint` (and `shellcheck` for `run:` steps)
 - `validate-web.yml`, `validate-ios.yml` and `validate-android.yml` run on pull requests and manual dispatch, and are reusable (`workflow_call`)
 - `release.yml` is the only workflow triggered by a push to `main`; it calls all three validate workflows, so each platform is validated exactly once per push. Don't add `push` triggers to the validate workflows
-- Job names are required status checks on `main`: don't rename `TypeScript, tests, and web builds`, `PDF browser rendering`, `iOS XCTest` or `Android JUnit` without updating the repository settings
+- Job names are required status checks on `main`: don't rename `TypeScript, tests, and web builds`, `PDF browser rendering`, `iOS XCTest` or `Android JUnit` without updating `scripts/repo-settings/desired-state.mjs` and running `npm run settings:apply`
 
 ## Project structure
 
