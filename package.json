@@ -42,7 +42,10 @@
     "@tobyt/expo-pdf-markup",
     "ExpoPdfMarkup"
   ],
-  "repository": "https://github.com/tobyt42/expo-pdf-markup",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tobyt42/expo-pdf-markup.git"
+  },
   "bugs": {
     "url": "https://github.com/tobyt42/expo-pdf-markup/issues"
   },
