@@ -1,6 +1,7 @@
 import type {
   Annotation,
   AnnotationMode,
+  AnnotationPointArray,
   AnnotationsData,
   ExpoPdfMarkupViewProps,
   HighlightAnnotation,
@@ -102,4 +103,20 @@ it('annotation discriminated union compiles correctly', () => {
   expect(data.version).toBe(1);
   expect(data.annotations).toHaveLength(5);
   expect(mode).toBe('move');
+});
+
+it('AnnotationPointArray is an [x, y] tuple and InkAnnotation paths stay in object form', () => {
+  const point: AnnotationPointArray = [1, 2];
+  // @ts-expect-error: array form needs exactly two numbers
+  const short: AnnotationPointArray = [1];
+  const ink: InkAnnotation = {
+    id: 'ink',
+    type: 'ink',
+    page: 0,
+    color: '#000000',
+    lineWidth: 1,
+    // @ts-expect-error: InkAnnotation paths hold object-form points only
+    paths: [[point]],
+  };
+  expect([short, ink]).toHaveLength(2);
 });

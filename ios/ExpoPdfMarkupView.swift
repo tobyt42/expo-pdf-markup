@@ -10,7 +10,10 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
   let onTextInputRequested = EventDispatcher()
 
   private var currentSource: String?
-  private var currentAnnotationsJSON: String?
+  /// The annotation set last loaded or sent in `onAnnotationsChanged`, used to skip reloading
+  /// the view's own write. Read-only outside the view (tests read it) so that only loading and
+  /// emitting can change it.
+  private(set) var currentAnnotationsJSON: String?
   private(set) var currentMode: String = "none"
   var annotationColor: String = "#FF0000" {
     didSet {
@@ -21,6 +24,8 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
   var annotationLineWidth: CGFloat = 2.0
   var annotationFontFamily: String?
   var useJsTextDialog: Bool = false
+  /// How ink points are written from the next edit on; changing it writes nothing.
+  var inkPointFormat: InkPointFormat = .object
   var stampText: String?
   var stampSize: CGFloat = 48.0
 
@@ -217,7 +222,8 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
     }
 
     let data = AnnotationsData(version: 1, annotations: models)
-    return AnnotationSerializer.serialize(data) ?? "{\"version\":1,\"annotations\":[]}"
+    return AnnotationSerializer.serialize(data, inkPointFormat: inkPointFormat)
+      ?? "{\"version\":1,\"annotations\":[]}"
   }
 
   func emitAnnotationsChanged() {
