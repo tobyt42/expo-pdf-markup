@@ -1,5 +1,6 @@
 package dev.terhoeven.expopdfmarkup
 
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -156,6 +157,64 @@ class AnnotationSerializerTest {
     }
 
     // MARK: - Edge cases
+
+    // MARK: - Ink point forms
+
+    @Test
+    fun testMalformedInkPointsAreSkippedAndTheRestOfTheSetLoads() {
+        val json = """
+            {"version":1,"annotations":[
+              {"id":"ink-1","type":"ink","page":0,"color":"#FF0000","lineWidth":2,"paths":[[
+                [1,2],
+                [3],
+                [4,5,6],
+                ["7",8],
+                [null,9],
+                {"x":10},
+                {"x":"11","y":12},
+                {"y":13},
+                14,
+                null,
+                "15,16",
+                [],
+                {},
+                {"x":17,"y":18}
+              ]]},
+              {"id":"hl-1","type":"highlight","page":0,"color":"#FFFF00",
+               "bounds":{"x":1,"y":2,"width":3,"height":4}}
+            ]}
+        """.trimIndent()
+
+        val result = AnnotationSerializer.deserialize(json)
+
+        assertNotNull(result)
+        assertEquals(listOf("ink-1", "hl-1"), result!!.annotations.map { it.id })
+        assertEquals(
+            listOf(listOf(AnnotationPoint(1f, 2f), AnnotationPoint(17f, 18f))),
+            result.annotations[0].paths
+        )
+    }
+
+    @Test
+    fun testInkReadFromArrayFormIsWrittenBackInObjectForm() {
+        val json = """
+            {"version":1,"annotations":[
+              {"id":"ink-1","type":"ink","page":0,"color":"#FF0000","lineWidth":2,
+               "paths":[[[1,2],{"x":3,"y":4},[5,6]]]}
+            ]}
+        """.trimIndent()
+
+        val written = AnnotationSerializer.serialize(AnnotationSerializer.deserialize(json)!!)
+
+        val stroke = JSONObject(written).getJSONArray("annotations").getJSONObject(0)
+            .getJSONArray("paths").getJSONArray(0)
+        assertEquals(3, stroke.length())
+        val points = (0 until stroke.length()).map {
+            val point = stroke.getJSONObject(it)
+            point.getDouble("x") to point.getDouble("y")
+        }
+        assertEquals(listOf(1.0 to 2.0, 3.0 to 4.0, 5.0 to 6.0), points)
+    }
 
     @Test
     fun testMalformedJsonReturnsNull() {

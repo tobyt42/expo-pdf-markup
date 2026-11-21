@@ -92,15 +92,30 @@ object AnnotationSerializer {
             val stroke = arr.getJSONArray(i)
             val points = mutableListOf<AnnotationPoint>()
             for (j in 0 until stroke.length()) {
-                val pt = stroke.getJSONObject(j)
-                points.add(
-                    AnnotationPoint(pt.getDouble("x").toFloat(), pt.getDouble("y").toFloat())
-                )
+                readInkPoint(stroke.opt(j))?.let { points.add(it) }
             }
             paths.add(points)
         }
         return paths
     }
+
+    /**
+     * Reads one ink point in object form (`{"x": …, "y": …}`) or array form (`[x, y]`).
+     * Anything else is malformed and returns null, so the caller skips just that point.
+     */
+    private fun readInkPoint(value: Any?): AnnotationPoint? {
+        val (x, y) = when (value) {
+            is JSONObject -> value.opt("x") to value.opt("y")
+            is JSONArray -> if (value.length() == 2) value.opt(0) to value.opt(1) else return null
+            else -> return null
+        }
+        val xd = finiteNumber(x) ?: return null
+        val yd = finiteNumber(y) ?: return null
+        return AnnotationPoint(xd.toFloat(), yd.toFloat())
+    }
+
+    private fun finiteNumber(value: Any?): Double? =
+        (value as? Number)?.toDouble()?.takeIf { it.isFinite() }
 
     private fun parseBounds(obj: JSONObject?): AnnotationBounds? {
         obj ?: return null
