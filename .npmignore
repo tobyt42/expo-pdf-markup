@@ -24,6 +24,9 @@ __tests__
 /docs/adr/
 /docs/agents/
 
+# iOS XCTest sources (the podspec only compiles ios/*.swift)
+/ios/Tests/
+
 # Android build artifacts and Gradle caches
 /android/.gradle/
 /android/src/androidTest/
