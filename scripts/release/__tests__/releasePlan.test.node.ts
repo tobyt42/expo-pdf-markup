@@ -18,10 +18,18 @@ function facts(overrides: Partial<ReleaseFacts> = {}): ReleaseFacts {
 }
 
 describe('planRelease on main', () => {
-  it('plans a Snapshot with a 0.0.0 placeholder version when there are Pending changesets', () => {
+  it('plans a Snapshot based on the latest Release version when there are Pending changesets', () => {
     expect(
       planRelease(facts({ pendingChangesets: [{ id: 'calm-dogs-sing', bump: 'patch' }] }))
-    ).toEqual({ action: 'snapshot', version: '0.0.0-next.20261121090507', distTag: 'next' });
+    ).toEqual({ action: 'snapshot', version: '2.0.0-next.20261121090507', distTag: 'next' });
+  });
+
+  it('bases the Snapshot on whatever Release package.json names', () => {
+    expect(
+      planRelease(
+        facts({ packageVersion: '0.0.1', pendingChangesets: [{ id: 'a', bump: 'minor' }] })
+      )
+    ).toEqual({ action: 'snapshot', version: '0.0.1-next.20261121090507', distTag: 'next' });
   });
 
   it('skips when there are no Pending changesets', () => {
@@ -45,7 +53,7 @@ describe('planRelease on main', () => {
     (_, pendingChangesets) => {
       expect(planRelease(facts({ pendingChangesets: [...pendingChangesets] }))).toEqual({
         action: 'snapshot',
-        version: '0.0.0-next.20261121090507',
+        version: '2.0.0-next.20261121090507',
         distTag: 'next',
       });
     }
@@ -75,8 +83,56 @@ describe('planRelease on main', () => {
       return plan.version;
     });
     expect([...versions].reverse().sort(semverCompare)).toEqual(versions);
-    // A Snapshot sorts below every Release, so it can never outrank latest.
-    expect(semverCompare(versions[versions.length - 1]!, '0.0.1')).toBe(-1);
+    // A Snapshot sorts below the Release it is based on, so it can never outrank latest.
+    expect(semverCompare(versions[versions.length - 1]!, '2.0.0')).toBe(-1);
+  });
+
+  it('sorts Snapshots taken after a Release above the earlier ones', () => {
+    const snapshot = (packageVersion: string, time: string) => {
+      const plan = planRelease(
+        facts({
+          packageVersion,
+          pendingChangesets: [{ id: 'a', bump: 'patch' }],
+          now: new Date(time),
+        })
+      );
+      if (plan.action !== 'snapshot') throw new Error(`expected a snapshot, got ${plan.action}`);
+      return plan.version;
+    };
+    const versions = [
+      '0.0.0-next.20261121170125', // published under the former 0.0.0 scheme
+      snapshot('2.0.0', '2026-11-21T19:00:00Z'),
+      snapshot('2.0.0', '2026-11-22T08:00:00Z'),
+      snapshot('2.1.0', '2026-11-22T09:00:00Z'),
+    ];
+    expect([...versions].reverse().sort(semverCompare)).toEqual(versions);
+    expect(semverCompare(versions[2]!, '2.0.0')).toBe(-1);
+    expect(semverCompare(versions[3]!, '2.1.0')).toBe(-1);
+  });
+
+  it.each(['2.1.0-next.1', '2.0.0-rc.0', '2.0', 'not-a-version'])(
+    'refuses a Snapshot when package.json has %s, not a stable Release version',
+    (packageVersion) => {
+      expect(
+        planRelease(facts({ packageVersion, pendingChangesets: [{ id: 'a', bump: 'patch' }] }))
+      ).toEqual({ action: 'refuse', reason: expect.stringContaining(packageVersion) });
+    }
+  );
+
+  it('refuses a Snapshot based on 0.0.0, which CocoaPods would reject', () => {
+    expect(
+      planRelease(
+        facts({ packageVersion: '0.0.0', pendingChangesets: [{ id: 'a', bump: 'patch' }] })
+      )
+    ).toEqual({ action: 'refuse', reason: expect.stringContaining('0.0.0') });
+  });
+
+  it('skips the merged Release PR, whose bumped version has no Release yet', () => {
+    // The Release PR consumes every Pending changeset, so its merge commit has none.
+    expect(planRelease(facts({ packageVersion: '2.1.0', pendingChangesets: [] }))).toEqual({
+      action: 'skip',
+      reason: expect.stringContaining('no Pending changesets'),
+    });
   });
 });
 
