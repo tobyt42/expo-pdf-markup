@@ -18,9 +18,11 @@ __tests__
 /AGENTS.md
 /scripts/
 
-# Repository docs (glossary, ADRs, agent docs, guides); README links to them on GitHub
+# Repository docs. The consumer guides in docs/ ship, because the README links to them;
+# the glossary, ADRs and agent docs stay out. Put any new internal doc in a folder listed here.
 /GLOSSARY.md
-/docs/
+/docs/adr/
+/docs/agents/
 
 # Android build artifacts and Gradle caches
 /android/.gradle/
