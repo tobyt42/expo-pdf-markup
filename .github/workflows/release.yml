@@ -4,14 +4,18 @@ name: Release
 # The npm trusted publisher is bound to this file name: do not rename or split it without
 # updating the trusted publisher on npmjs.com first.
 #
-# Every push to `main` runs web, iOS and Android validation here, exactly once each. The
-# validate workflows themselves only trigger on pull requests and manual dispatch. If `main`
-# has Pending changesets, the publish job then publishes a Snapshot under the `next`
-# dist-tag; the release plan module (scripts/release/) makes that decision.
+# Every push to `main` and every Release tag (`v*`) runs web, iOS and Android validation here,
+# exactly once each. The validate workflows themselves only trigger on pull requests and
+# manual dispatch. The release plan module (scripts/release/) then decides what to publish:
+# - on `main` with Pending changesets: a Snapshot under the `next` dist-tag;
+# - on a Release tag that passes the Release checks: the Release under `latest`, then the
+#   GitHub Release, then the docs site;
+# - otherwise nothing, and a failed Release check fails the run with the reason.
 
 on:
   push:
     branches: [main]
+    tags: ['v*']
 
 permissions:
   contents: read
@@ -40,10 +44,12 @@ jobs:
       action: ${{ steps.plan.outputs.action }}
       version: ${{ steps.plan.outputs.version }}
       dist-tag: ${{ steps.plan.outputs.dist-tag }}
+      notes: ${{ steps.plan.outputs.notes }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Full history, so the plan can check whether the commit is reachable from `main`.
+          # Full history, so the plan can check whether the commit is reachable from `main`
+          # (on a tag push too: the checkout fetches `origin/main` with the rest).
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -55,25 +61,38 @@ jobs:
         id: plan
         run: node scripts/release/plan.ts
 
-  # Publishes the Snapshot the plan asked for, only once web, iOS and Android validation
-  # have passed in this run. The only job with npm's trust (id-token) and the `npm-publish`
-  # environment the trusted publisher is bound to. The version bump happens only in this
-  # runner and is never committed: the checkout keeps no credentials to push with.
+  # Publishes the Snapshot or Release the plan asked for, only once web, iOS and Android
+  # validation have passed in this run. The only job with npm's trust (id-token) and the
+  # `npm-publish` environment the trusted publisher is bound to. A Snapshot's version bump
+  # happens only in this runner and is never committed: the checkout keeps no credentials.
   publish:
     name: Publish
     needs: [web, ios, android, plan]
-    if: needs.plan.outputs.action == 'snapshot'
+    if: needs.plan.outputs.action == 'snapshot' || needs.plan.outputs.action == 'release'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: npm-publish
     permissions:
       contents: read
       id-token: write
-    # One publish at a time across Snapshots and Releases. Deliberately not prefixed
-    # `validate-`, so it never shares a group with the validate workflows called above.
+    # One publish at a time, so a Snapshot and a Release never publish at the same time.
+    #
+    # With the default `queue: single`, GitHub keeps only ONE pending job per group and cancels
+    # it when a newer one arrives. A Release waiting behind a running Snapshot could then be
+    # replaced, i.e. cancelled, by a Snapshot pushed to `main` a moment later. `queue: max`
+    # keeps up to 100 pending jobs in arrival order instead, and `cancel-in-progress: false`
+    # never cancels the running one, so a Release is never cancelled or replaced: it waits
+    # its turn and then publishes. (GitHub refuses `queue: max` with `cancel-in-progress:
+    # true`.) .github/actionlint.yaml tells actionlint, which doesn't know `queue` yet, to
+    # accept it here.
+    #
+    # Only this job is serialised. The GitHub Release and docs jobs below don't touch npm.
+    # The group name is deliberately not prefixed `validate-`, so it never shares a group
+    # with the validate workflows called above.
     concurrency:
       group: release-publish
       cancel-in-progress: false
+      queue: max
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -84,15 +103,58 @@ jobs:
           node-version: 24
       - name: Install dependencies
         run: npm ci --ignore-scripts
+      # Trusted publishing (OIDC) needs npm >= 11.5.1, which Node 24 bundles. No token is
+      # used. `prepublishOnly` builds the package. Provenance links it to this run. Each
+      # dist-tag is fixed in its own step rather than taken from the plan, so a Snapshot can
+      # never reach `latest`.
       - name: Set the Snapshot version
+        if: needs.plan.outputs.action == 'snapshot'
         env:
           VERSION: ${{ needs.plan.outputs.version }}
         run: npm version "$VERSION" --no-git-tag-version --ignore-scripts
-      # Trusted publishing (OIDC) needs npm >= 11.5.1, which Node 24 bundles. No token is
-      # used. `prepublishOnly` builds the package. Provenance links it to this run. The
-      # dist-tag is fixed rather than taken from the plan, so a Snapshot can never reach
-      # `latest`.
       - name: Publish the Snapshot to npm
+        if: needs.plan.outputs.action == 'snapshot'
         run: |
           npm --version
           npm publish --provenance --tag next
+      # The plan has checked that the tag, package.json and npm agree on this version.
+      - name: Publish the Release to npm
+        if: needs.plan.outputs.action == 'release'
+        run: |
+          npm --version
+          npm publish --provenance --tag latest
+
+  # Creates the GitHub Release for the Release tag, titled `v<version>`, with the notes from
+  # the matching changelog section. The only job that can write to the repository, and it
+  # runs no repository code: no checkout, just `gh`.
+  github-release:
+    name: GitHub Release
+    needs: [plan, publish]
+    if: needs.plan.outputs.action == 'release'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ needs.plan.outputs.version }}
+          NOTES: ${{ needs.plan.outputs.notes }}
+        run: |
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "$TAG" --notes "$NOTES"
+
+  # Deploys the docs site and web demo for the Release, only after it is on npm and has its
+  # GitHub Release, so the docs match `latest`. Pages needs `pages: write` and `id-token:
+  # write`; docs.yml grants them only to its deploy job, which runs in the `github-pages`
+  # environment, not `npm-publish`, so it can't publish to npm. No `contents: write`.
+  docs:
+    name: Docs
+    needs: [plan, github-release]
+    if: needs.plan.outputs.action == 'release'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/docs.yml

@@ -2,13 +2,15 @@
 // to do and reports the answer. It holds no decisions of its own.
 //
 // Run by the `plan` job in .github/workflows/release.yml (Node runs this file directly with
-// type stripping). Writes `action`, `version` and `dist-tag` to $GITHUB_OUTPUT for the publish
-// job, prints the plan and exits non-zero on a refusal.
+// type stripping). Writes `action`, `version`, `dist-tag` and, for a Release, `notes` to
+// $GITHUB_OUTPUT for the later jobs, prints the plan and exits non-zero on a refusal.
 //
 // Local dry run (read-only; needs a fetched `origin/main`):
 //   GITHUB_REF=refs/heads/main node scripts/release/plan.ts
+//   GITHUB_REF=refs/tags/v2.0.0 node scripts/release/plan.ts
 import { readChangesets } from '@changesets/read';
 import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -83,8 +85,13 @@ function report(facts: ReleaseFacts, plan: ReleasePlan): void {
     outputs.version = plan.version;
     outputs['dist-tag'] = plan.distTag;
   }
+  if (plan.action === 'release') outputs.notes = plan.notes;
   if (process.env.GITHUB_OUTPUT) {
-    const lines = Object.entries(outputs).map(([key, value]) => `${key}=${value}\n`);
+    // Multiline values use GitHub's heredoc form, with a delimiter no changelog can contain.
+    const delimiter = `EOF_${randomUUID()}`;
+    const lines = Object.entries(outputs).map(([key, value]) =>
+      value.includes('\n') ? `${key}<<${delimiter}\n${value}\n${delimiter}\n` : `${key}=${value}\n`
+    );
     appendFileSync(process.env.GITHUB_OUTPUT, lines.join(''));
   }
   if (process.env.GITHUB_STEP_SUMMARY) {
@@ -92,9 +99,10 @@ function report(facts: ReleaseFacts, plan: ReleasePlan): void {
       plan.action === 'skip' || plan.action === 'refuse'
         ? plan.reason
         : `${plan.version} under the \`${plan.distTag}\` dist-tag`;
+    const notes = plan.action === 'release' ? `\n#### Release notes\n\n${plan.notes}\n` : '';
     appendFileSync(
       process.env.GITHUB_STEP_SUMMARY,
-      `### Release plan: ${plan.action}\n\n${detail}\n`
+      `### Release plan: ${plan.action}\n\n${detail}\n${notes}`
     );
   }
 }

@@ -1,0 +1,7 @@
+# actionlint configuration (run by `npm run lint:workflows`).
+paths:
+  .github/workflows/release.yml:
+    ignore:
+      # GitHub supports `queue: max` in a concurrency section (see the comment on the publish
+      # job), but actionlint 1.7.12 doesn't know the key yet. Drop this once it does.
+      - 'unexpected key "queue" for "concurrency" section'

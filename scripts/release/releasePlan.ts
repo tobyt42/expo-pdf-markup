@@ -40,20 +40,72 @@ export type ReleasePlan =
 
 const MAIN_REF = 'refs/heads/main';
 const TAG_PREFIX = 'refs/tags/';
+/** Release tags are `v<version>`; other tags never publish. */
+const RELEASE_TAG_PREFIX = `${TAG_PREFIX}v`;
 
 /** Changesets' order of bump types: the highest one across the Pending changesets wins. */
 const BUMP_ORDER: readonly BumpType[] = ['none', 'patch', 'minor', 'major'];
 
 export function planRelease(facts: ReleaseFacts): ReleasePlan {
   if (facts.ref === MAIN_REF) return planSnapshot(facts);
-  if (facts.ref.startsWith(TAG_PREFIX)) {
-    // Release decisions (tag/version/main/Pending changesets/npm checks) come with #147.
+  if (facts.ref.startsWith(RELEASE_TAG_PREFIX)) return planFromReleaseTag(facts);
+  return {
+    action: 'skip',
+    reason: `${facts.ref} is not main or a Release tag, so there is nothing to publish`,
+  };
+}
+
+/** The Release checks, in order; the first one that fails refuses the Release. */
+function planFromReleaseTag(facts: ReleaseFacts): ReleasePlan {
+  const tag = facts.ref.slice(TAG_PREFIX.length);
+  const version = facts.packageVersion;
+  if (tag !== `v${version}`) {
     return {
       action: 'refuse',
-      reason: `ref check failed: Releases from ${facts.ref} are not supported yet`,
+      reason: `tag check failed: ${tag} does not match package.json, whose version ${version} needs the tag v${version}`,
     };
   }
-  return { action: 'skip', reason: `${facts.ref} is not main, so there is nothing to publish` };
+  if (!facts.commitOnMain) {
+    return {
+      action: 'refuse',
+      reason: `main check failed: the commit tagged ${tag} is not on main`,
+    };
+  }
+  if (facts.pendingChangesets.length > 0) {
+    const ids = facts.pendingChangesets.map(({ id }) => id).join(', ');
+    return {
+      action: 'refuse',
+      reason: `Pending changesets check failed: run the version step first, these remain: ${ids}`,
+    };
+  }
+  if (facts.versionPublished) {
+    return {
+      action: 'refuse',
+      reason: `npm check failed: ${version} is already on npm; never reuse a version, release a new one`,
+    };
+  }
+  const notes = releaseNotes(facts.changelog, version);
+  if (notes === null) {
+    return {
+      action: 'refuse',
+      reason: `changelog check failed: CHANGELOG.md has no "## ${version}" section with release notes`,
+    };
+  }
+  return { action: 'release', version, distTag: 'latest', notes };
+}
+
+/**
+ * The body of the changelog section headed `## <version>`, up to the next `## ` heading,
+ * without the blank lines around it. Null when there is no such section or it is empty.
+ */
+function releaseNotes(changelog: string, version: string): string | null {
+  const lines = changelog.split(/\r?\n/);
+  const start = lines.findIndex((line) => line.trim() === `## ${version}`);
+  if (start === -1) return null;
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex((line) => /^## /.test(line));
+  const notes = (end === -1 ? rest : rest.slice(0, end)).join('\n').trim();
+  return notes === '' ? null : notes;
 }
 
 function planSnapshot(facts: ReleaseFacts): ReleasePlan {

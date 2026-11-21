@@ -99,13 +99,11 @@ export const desiredState = {
       ],
     },
     {
-      // Docs deploy from Releases (v* tags); `main` stays until docs.yml stops deploying from it.
+      // Docs deploy only from Releases: release.yml calls docs.yml after a Release tag (v*)
+      // publishes. docs.yml has no other trigger, so no branch may deploy.
       name: 'github-pages',
       settings: {},
-      deploymentPolicies: [
-        { name: 'main', type: 'branch' },
-        { name: 'v*', type: 'tag' },
-      ],
+      deploymentPolicies: [{ name: 'v*', type: 'tag' }],
     },
   ],
 };

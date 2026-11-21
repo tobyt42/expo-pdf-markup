@@ -35,8 +35,7 @@
     "settings:apply": "node scripts/repo-settings.mjs apply",
     "changeset": "changeset",
     "changeset:add": "changeset add",
-    "changeset:version": "changeset version",
-    "release": "bash scripts/release.sh"
+    "changeset:version": "changeset version"
   },
   "keywords": [
     "react-native",
