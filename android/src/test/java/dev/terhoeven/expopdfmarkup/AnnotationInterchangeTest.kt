@@ -60,6 +60,43 @@ class AnnotationInterchangeTest {
     }
 
     @Test
+    fun sharedCleanUpFixtureIsWrittenExactlyAsExpectedInArrayForm() {
+        val input = AnnotationSerializer.deserialize(resource("/ink-cleanup-input.json"))!!
+        assertEquals(
+            jsonValue(JSONObject(resource("/ink-cleanup-expected-array.json"))),
+            jsonValue(JSONObject(AnnotationSerializer.serialize(input, InkPointFormat.ARRAY)))
+        )
+    }
+
+    @Test
+    fun arrayFormInkCoordinatesAreWrittenAsTheSameTextsAsObjectForm() {
+        val input = AnnotationSerializer.deserialize(resource("/ink-cleanup-input.json"))!!
+        val arrayTexts =
+            inkCoordinateTexts(AnnotationSerializer.serialize(input, InkPointFormat.ARRAY))
+        assertEquals(26, arrayTexts.size)
+        assertEquals(inkCoordinateTexts(AnnotationSerializer.serialize(input)), arrayTexts)
+    }
+
+    @Test
+    fun arrayFormOutputReadsBackAsTheSameAnnotationsAsObjectFormOutput() {
+        val input = AnnotationSerializer.deserialize(resource("/ink-cleanup-input.json"))!!
+        assertEquals(
+            AnnotationSerializer.deserialize(AnnotationSerializer.serialize(input)),
+            AnnotationSerializer.deserialize(
+                AnnotationSerializer.serialize(input, InkPointFormat.ARRAY)
+            )
+        )
+    }
+
+    @Test
+    fun inkPointFormatPropIsArrayOnlyForArray() {
+        assertEquals(InkPointFormat.ARRAY, InkPointFormat.fromProp("array"))
+        assertEquals(InkPointFormat.OBJECT, InkPointFormat.fromProp("object"))
+        assertEquals(InkPointFormat.OBJECT, InkPointFormat.fromProp(null))
+        assertEquals(InkPointFormat.OBJECT, InkPointFormat.fromProp("tuple"))
+    }
+
+    @Test
     fun everyWrittenInkCoordinateHasAtMostOneDecimalDigitAndNoTrailingZero() {
         val input = AnnotationSerializer.deserialize(resource("/ink-cleanup-input.json"))!!
         val written = AnnotationSerializer.serialize(input)

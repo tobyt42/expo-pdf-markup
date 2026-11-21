@@ -2,7 +2,9 @@ import type {
   Annotation,
   AnnotationBounds,
   AnnotationPoint,
+  AnnotationPointArray,
   AnnotationsData,
+  InkPointFormat,
 } from '../ExpoPdfMarkup.types';
 import { parseAnnotations as parsePublicAnnotations } from '../parseAnnotations';
 import type { PdfPageMeta } from './types';
@@ -413,16 +415,30 @@ function cleanUpInkStroke(stroke: AnnotationPoint[]): AnnotationPoint[] {
   return cleaned;
 }
 
+export type SerializeOptions = {
+  /** How ink points are written; defaults to object form. */
+  inkPointFormat?: InkPointFormat;
+};
+
 /**
  * Write an annotation set. Ink points are cleaned up here, and only here: in memory
  * they keep full precision. Bounds and every non-ink field are written unchanged.
  */
-export function serializeAnnotations(data: AnnotationsData): string {
+export function serializeAnnotations(
+  data: AnnotationsData,
+  { inkPointFormat = 'object' }: SerializeOptions = {}
+): string {
+  const writeStroke = (stroke: AnnotationPoint[]): (AnnotationPoint | AnnotationPointArray)[] => {
+    const cleaned = cleanUpInkStroke(stroke);
+    return inkPointFormat === 'array'
+      ? cleaned.map((p): AnnotationPointArray => [p.x, p.y])
+      : cleaned;
+  };
   return JSON.stringify({
     ...data,
     annotations: data.annotations.map((annotation) =>
       annotation.type === 'ink'
-        ? { ...annotation, paths: (annotation.paths ?? []).map(cleanUpInkStroke) }
+        ? { ...annotation, paths: (annotation.paths ?? []).map(writeStroke) }
         : annotation
     ),
   });

@@ -11,8 +11,10 @@ enum AnnotationSerializer {
     return try? JSONDecoder().decode(AnnotationsData.self, from: data)
   }
 
-  static func serialize(_ annotationsData: AnnotationsData) -> String? {
-    guard let data = try? JSONEncoder().encode(annotationsData) else { return nil }
+  static func serialize(_ annotationsData: AnnotationsData, inkPointFormat: InkPointFormat = .object) -> String? {
+    let encoder = JSONEncoder()
+    encoder.userInfo[InkPointFormat.userInfoKey] = inkPointFormat
+    guard let data = try? encoder.encode(annotationsData) else { return nil }
     return String(data: data, encoding: .utf8)
   }
 

@@ -34,6 +34,14 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
     private var savedScrollState: ContinuousPdfView.ScrollState? = null
     var useJsTextDialog: Boolean = false
 
+    private val annotationsChangeEmitter = AnnotationsChangeEmitter { json ->
+        pendingAnnotationsJson = json
+        onAnnotationsChanged(mapOf("annotations" to json))
+    }
+
+    /** How ink points are written from the next edit on; changing it writes nothing. */
+    var inkPointFormat: InkPointFormat by annotationsChangeEmitter::inkPointFormat
+
     private var pendingTextPage: Int = -1
     private var pendingTextPoint: AnnotationPoint? = null
     private var pendingTextAnnotationId: String? = null
@@ -226,10 +234,7 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
     }
 
     private fun emitAnnotationsChanged() {
-        val data = AnnotationsData(version = 1, annotations = pdfView.annotations)
-        val json = AnnotationSerializer.serialize(data)
-        pendingAnnotationsJson = json
-        onAnnotationsChanged(mapOf("annotations" to json))
+        annotationsChangeEmitter.annotationsChanged(pdfView.annotations)
     }
 
     fun provideTextInput(text: String?) {

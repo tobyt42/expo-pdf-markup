@@ -198,6 +198,33 @@ Malformed ink points are skipped. `parseAnnotations` throws if the JSON can't be
 no `annotations` array, so lost data isn't mistaken for an empty set. It doesn't round values.
 `AnnotationPointArray` (`[number, number]`) types raw array-form ink points.
 
+### Writing ink points in array form (`inkPointFormat`)
+
+Whenever an annotation set is written, each ink coordinate is rounded to 0.1 pt and consecutive
+duplicate ink points are dropped. By default ink points are still written in object form, which
+every release can read. Set `inkPointFormat="array"` to write them in the shorter array form
+instead; the clean-up is the same, the output is identical on iOS, Android and web, and
+`version` stays at 1.
+
+```tsx
+<ExpoPdfMarkupView
+  source={pdfPath}
+  annotations={annotations}
+  inkPointFormat="array"
+  onAnnotationsChanged={({ nativeEvent }) => setAnnotations(nativeEvent.annotations)}
+/>
+```
+
+**Rollout rule:** only choose `'array'` once every version of your app that might read the
+annotation set includes the release of this library with the array-form readers. Earlier
+releases can't read array form: iOS rejects the whole annotation set, Android throws and web
+draws `NaN`. So ship a version of your app with this release first,
+and switch to `'array'` once that is the oldest version still in use.
+
+Changing `inkPointFormat` writes nothing and doesn't fire `onAnnotationsChanged`. It applies from
+the next edit, when the whole annotation set is written in the chosen form, whichever form it was
+loaded in. Loading an annotation set never rewrites it.
+
 ### Highlighting and underlining on iOS
 
 With `annotationMode="highlight"` or `"underline"`, drag one finger to mark a rectangular area on

@@ -120,6 +120,19 @@ extension AnnotationModel {
 /// platform): each coordinate is rounded to 0.1 pt (the double `value * 10` rounded to the
 /// nearest integer, ties away from zero), consecutive duplicates within a stroke are dropped,
 /// and a stroke of 2+ points that collapses to one point is written as that point twice.
+/// How ink points are written: object form `{"x": …, "y": …}` (the default) or array form `[x, y]`.
+enum InkPointFormat: String {
+  case object
+  case array
+
+  static let userInfoKey = CodingUserInfoKey(rawValue: "inkPointFormat")!
+
+  /// Maps the `inkPointFormat` view prop; anything other than `"array"` is object form.
+  init(prop: String?) {
+    self = prop == "array" ? .array : .object
+  }
+}
+
 enum InkPointCleanup {
   /// A rounded coordinate held as the integer number of tenths, so it is written from the
   /// integer (`307.7`, `100`, `-1.3`, never `.0`, `-0` or long trailing digits).
@@ -147,6 +160,19 @@ enum InkPointCleanup {
   struct Point: Encodable, Equatable {
     let x: Coordinate
     let y: Coordinate
+
+    /// Object form (`{"x": …, "y": …}`) unless the encoder asks for array form (`[x, y]`).
+    func encode(to encoder: Encoder) throws {
+      if encoder.userInfo[InkPointFormat.userInfoKey] as? InkPointFormat == .array {
+        var container = encoder.unkeyedContainer()
+        try container.encode(x)
+        try container.encode(y)
+      } else {
+        var container = encoder.container(keyedBy: InkPointKeys.self)
+        try container.encode(x, forKey: .x)
+        try container.encode(y, forKey: .y)
+      }
+    }
   }
 
   static func cleanedPaths(_ paths: [[AnnotationPoint]]) -> [[Point]] {
@@ -164,15 +190,16 @@ enum InkPointCleanup {
   }
 }
 
+/// The keys of an ink point in object form.
+private enum InkPointKeys: String, CodingKey { case x, y }
+
 /// Reads one ink point in object form (`{"x": …, "y": …}`) or array form (`[x, y]`).
 /// Anything else decodes to a nil `point` instead of throwing.
 private struct InkPointReader: Decodable {
   let point: AnnotationPoint?
 
-  private enum Keys: String, CodingKey { case x, y }
-
   init(from decoder: Decoder) {
-    if let object = try? decoder.container(keyedBy: Keys.self),
+    if let object = try? decoder.container(keyedBy: InkPointKeys.self),
        let x = try? object.decode(CGFloat.self, forKey: .x),
        let y = try? object.decode(CGFloat.self, forKey: .y) {
       point = AnnotationPoint(x: x, y: y)
