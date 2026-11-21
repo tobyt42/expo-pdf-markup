@@ -390,6 +390,40 @@ final class AnnotationSerializerTests: XCTestCase {
     }
   }
 
+  func testWritingInArrayFormCleansUpInkExactlyAsTheSharedArrayFixtureExpects() throws {
+    let input = try sharedFixture("ink-cleanup-input")
+    let written = try XCTUnwrap(AnnotationSerializer.serialize(input, inkPointFormat: .array))
+    XCTAssertEqual(try jsonObject(written), try jsonObject(fixtureText("ink-cleanup-expected-array")))
+  }
+
+  func testArrayFormInkCoordinatesHaveAtMostOneDecimalDigitAndNoTrailingZero() throws {
+    let input = try sharedFixture("ink-cleanup-input")
+    let arrayForm = try XCTUnwrap(AnnotationSerializer.serialize(input, inkPointFormat: .array))
+    XCTAssertEqual(arrayInkCoordinateTokens(in: arrayForm), [
+      "307.7", "462.6", "1.8", "12.3", "100", "100", "0", "-1.3", "0.1", "2.7",
+      "50", "60", "50", "60", "5", "5", "5", "5", "10.1", "21",
+      "200.1", "301", "200.2", "300.9", "200.1", "301",
+    ])
+    XCTAssertEqual(inkCoordinateTokens(in: arrayForm), [], arrayForm)
+  }
+
+  func testInkPointFormatPropIsArrayOnlyForArray() {
+    XCTAssertEqual(InkPointFormat(prop: "array"), .array)
+    XCTAssertEqual(InkPointFormat(prop: "object"), .object)
+    XCTAssertEqual(InkPointFormat(prop: nil), .object)
+    XCTAssertEqual(InkPointFormat(prop: "tuple"), .object)
+  }
+
+  /// Number tokens of every two-number `[x, y]` array in the written JSON, i.e. array-form ink points.
+  private func arrayInkCoordinateTokens(in json: String) -> [String] {
+    let pattern = #"\[([^,{}\[\]]+),([^,{}\[\]]+)\]"#
+    let regex = try? NSRegularExpression(pattern: pattern)
+    let range = NSRange(json.startIndex..., in: json)
+    return (regex?.matches(in: json, range: range) ?? []).flatMap { match in
+      [1, 2].compactMap { Range(match.range(at: $0), in: json).map { String(json[$0]) } }
+    }
+  }
+
   /// Number tokens of every two-key `{x, y}` object in the written JSON, i.e. ink points
   /// (bounds have four keys and are not matched).
   private func inkCoordinateTokens(in json: String) -> [String] {

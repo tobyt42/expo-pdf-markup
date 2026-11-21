@@ -55,3 +55,14 @@ it('accepts the continuous and book display modes only', () => {
 
   expect(true).toBe(true);
 });
+
+it('accepts object and array as the ink point format only', () => {
+  // inkPointFormat is optional (defaults to 'object')
+  accept({ source: 'test.pdf', inkPointFormat: 'object' });
+  accept({ source: 'test.pdf', inkPointFormat: 'array' });
+
+  // @ts-expect-error: only 'object' and 'array' are valid ink point formats
+  accept({ source: 'test.pdf', inkPointFormat: 'tuple' });
+
+  expect(true).toBe(true);
+});

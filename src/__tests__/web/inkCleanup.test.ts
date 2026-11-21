@@ -1,3 +1,4 @@
+import expectedArrayForm from '../../../fixtures/ink-cleanup-expected-array.json';
 import expectedObjectForm from '../../../fixtures/ink-cleanup-expected-object.json';
 import cleanupInput from '../../../fixtures/ink-cleanup-input.json';
 import v1Fixture from '../../../fixtures/annotations-v1.json';
@@ -24,6 +25,28 @@ const inkCoordinateTexts = (json: string): string[] =>
 describe('ink point clean-up when writing an annotation set', () => {
   it('writes the shared clean-up fixture exactly as expected in object form', () => {
     expect(JSON.parse(serializeAnnotations(input()))).toEqual(expectedObjectForm);
+  });
+
+  it('writes the shared clean-up fixture exactly as expected in array form', () => {
+    expect(JSON.parse(serializeAnnotations(input(), { inkPointFormat: 'array' }))).toEqual(
+      expectedArrayForm
+    );
+  });
+
+  it('writes object form when asked for it explicitly', () => {
+    expect(JSON.parse(serializeAnnotations(input(), { inkPointFormat: 'object' }))).toEqual(
+      expectedObjectForm
+    );
+  });
+
+  it('writes array-form ink coordinates with at most one decimal digit', () => {
+    const json = serializeAnnotations(input(), { inkPointFormat: 'array' });
+    const texts = Array.from(json.matchAll(/"paths":(\[(?:\[(?:\[[^\]]*\],?)*\],?)*\])/g)).flatMap(
+      (match) => Array.from(match[1]!.matchAll(/-?[0-9][0-9.eE+-]*/g), (m) => m[0])
+    );
+
+    expect(texts).toEqual(inkCoordinateTexts(serializeAnnotations(input())));
+    expect(texts).toHaveLength(26);
   });
 
   it('writes every ink coordinate as its 0.1 pt rounding with at most one decimal digit', () => {
