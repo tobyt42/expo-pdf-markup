@@ -42,6 +42,14 @@ class AnnotationInterchangeTest {
     }
 
     @Test
+    fun sharedArrayFormFixtureDecodesToTheSameAnnotationsAsTheObjectFormFixture() {
+        val arrayJson = requireNotNull(
+            javaClass.getResource("/annotations-v1-array.json")
+        ).readText()
+        assertEquals(fixture(), AnnotationSerializer.deserialize(arrayJson))
+    }
+
+    @Test
     fun sharedV1MarksHaveMatchingMoveAndEraseTargetsOnTheVisiblePage() {
         val annotations = fixture().annotations
         val targets = listOf(
