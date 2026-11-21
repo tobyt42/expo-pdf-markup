@@ -47,6 +47,10 @@ struct AnnotationModel: Codable, Equatable {
   var createdAt: Double?
   var text: String?
 
+  enum CodingKeys: String, CodingKey {
+    case id, type, page, color, lineWidth, alpha, paths, bounds, contents, fontSize, fontFamily, createdAt, text
+  }
+
   var decodedPaths: [[AnnotationPoint]] {
     guard let paths else { return [] }
     return paths.map { path in
@@ -86,6 +90,77 @@ extension AnnotationModel {
     fontFamily = try container.decodeIfPresent(String.self, forKey: .fontFamily)
     createdAt = try container.decodeIfPresent(Double.self, forKey: .createdAt)
     text = try container.decodeIfPresent(String.self, forKey: .text)
+  }
+}
+
+extension AnnotationModel {
+  /// Writes every field as the synthesised encoder did, except that ink points are cleaned
+  /// up (see `InkPointCleanup`). The model itself keeps full precision.
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(id, forKey: .id)
+    try container.encode(type, forKey: .type)
+    try container.encode(page, forKey: .page)
+    try container.encode(color, forKey: .color)
+    try container.encodeIfPresent(lineWidth, forKey: .lineWidth)
+    try container.encodeIfPresent(alpha, forKey: .alpha)
+    if paths != nil {
+      try container.encode(InkPointCleanup.cleanedPaths(decodedPaths), forKey: .paths)
+    }
+    try container.encodeIfPresent(bounds, forKey: .bounds)
+    try container.encodeIfPresent(contents, forKey: .contents)
+    try container.encodeIfPresent(fontSize, forKey: .fontSize)
+    try container.encodeIfPresent(fontFamily, forKey: .fontFamily)
+    try container.encodeIfPresent(createdAt, forKey: .createdAt)
+    try container.encodeIfPresent(text, forKey: .text)
+  }
+}
+
+/// Ink point clean-up applied only when an annotation set is written (same rule on every
+/// platform): each coordinate is rounded to 0.1 pt (the double `value * 10` rounded to the
+/// nearest integer, ties away from zero), consecutive duplicates within a stroke are dropped,
+/// and a stroke of 2+ points that collapses to one point is written as that point twice.
+enum InkPointCleanup {
+  /// A rounded coordinate held as the integer number of tenths, so it is written from the
+  /// integer (`307.7`, `100`, `-1.3`, never `.0`, `-0` or long trailing digits).
+  struct Coordinate: Encodable, Equatable {
+    let tenths: Int
+
+    init(_ value: CGFloat) {
+      let rounded = Int((Double(value) * 10).rounded())
+      tenths = rounded == 0 ? 0 : rounded
+    }
+
+    func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      if tenths % 10 == 0 {
+        try container.encode(tenths / 10)
+      } else {
+        // Decimal is written from its exact digits, unlike Double which JSONSerialization
+        // may print with long trailing digits.
+        try container.encode(Decimal(sign: tenths < 0 ? .minus : .plus, exponent: -1,
+                                     significand: Decimal(abs(tenths))))
+      }
+    }
+  }
+
+  struct Point: Encodable, Equatable {
+    let x: Coordinate
+    let y: Coordinate
+  }
+
+  static func cleanedPaths(_ paths: [[AnnotationPoint]]) -> [[Point]] {
+    paths.map(cleanedStroke)
+  }
+
+  static func cleanedStroke(_ stroke: [AnnotationPoint]) -> [Point] {
+    var kept: [Point] = []
+    for point in stroke {
+      let rounded = Point(x: Coordinate(point.x), y: Coordinate(point.y))
+      if rounded != kept.last { kept.append(rounded) }
+    }
+    if stroke.count >= 2, kept.count == 1 { kept.append(kept[0]) }
+    return kept
   }
 }
 

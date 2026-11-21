@@ -360,6 +360,53 @@ final class AnnotationSerializerTests: XCTestCase {
     XCTAssertEqual(stroke, [["x": 40, "y": 100], ["x": 120, "y": 160], ["x": 180, "y": 130]])
   }
 
+  // MARK: - Ink clean-up when writing
+
+  private func fixtureText(_ name: String) throws -> String {
+    let url = try XCTUnwrap(Bundle(for: type(of: self)).url(forResource: name, withExtension: "json"))
+    return try String(contentsOf: url, encoding: .utf8)
+  }
+
+  private func jsonObject(_ text: String) throws -> NSDictionary {
+    try XCTUnwrap(JSONSerialization.jsonObject(with: Data(text.utf8)) as? NSDictionary)
+  }
+
+  func testWritingCleansUpInkExactlyAsTheSharedFixtureExpects() throws {
+    let input = try sharedFixture("ink-cleanup-input")
+    let written = try XCTUnwrap(AnnotationSerializer.serialize(input))
+    XCTAssertEqual(try jsonObject(written), try jsonObject(fixtureText("ink-cleanup-expected-object")))
+  }
+
+  func testWrittenInkCoordinatesHaveAtMostOneDecimalDigitAndNoTrailingZero() throws {
+    let written = try XCTUnwrap(AnnotationSerializer.serialize(sharedFixture("ink-cleanup-input")))
+    let tokens = inkCoordinateTokens(in: written)
+    XCTAssertEqual(tokens.count, 2 * 13, written)
+    for token in tokens {
+      XCTAssertNotNil(token.range(of: #"^-?(0|[1-9][0-9]*)(\.[1-9])?$"#, options: .regularExpression), token)
+      XCTAssertNotEqual(token, "-0")
+    }
+    for expected in ["307.7", "462.6", "1.8", "12.3", "100", "0", "-1.3", "0.1", "2.7", "10.1", "21", "200.2"] {
+      XCTAssertTrue(tokens.contains(expected), "missing \(expected) in \(tokens)")
+    }
+  }
+
+  /// Number tokens of every two-key `{x, y}` object in the written JSON, i.e. ink points
+  /// (bounds have four keys and are not matched).
+  private func inkCoordinateTokens(in json: String) -> [String] {
+    let pattern = #"\{"[xy]":([^,{}\[\]]+),"[xy]":([^,{}\[\]]+)\}"#
+    let regex = try? NSRegularExpression(pattern: pattern)
+    let range = NSRange(json.startIndex..., in: json)
+    return (regex?.matches(in: json, range: range) ?? []).flatMap { match in
+      [1, 2].compactMap { Range(match.range(at: $0), in: json).map { String(json[$0]) } }
+    }
+  }
+
+  func testInMemoryInkKeepsFullPrecisionAfterWriting() throws {
+    let input = try sharedFixture("ink-cleanup-input")
+    _ = AnnotationSerializer.serialize(input)
+    XCTAssertEqual(input.annotations[0].decodedPaths[0][0], AnnotationPoint(x: 307.6921296296296, y: 462.6087962962961))
+  }
+
   func testHexRoundTrip() {
     let original = "#3366CC"
     guard let color = AnnotationSerializer.colorFromHex(original) else {

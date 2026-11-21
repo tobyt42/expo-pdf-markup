@@ -10,7 +10,7 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
   let onTextInputRequested = EventDispatcher()
 
   private var currentSource: String?
-  private var currentAnnotationsJSON: String?
+  private(set) var currentAnnotationsJSON: String?
   private(set) var currentMode: String = "none"
   var annotationColor: String = "#FF0000" {
     didSet {

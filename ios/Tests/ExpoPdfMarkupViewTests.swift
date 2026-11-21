@@ -44,6 +44,41 @@ final class ExpoPdfMarkupViewTests: XCTestCase {
     window.isHidden = true
   }
 
+  @MainActor func testDrawnInkStrokeIsCleanedUpInAnnotationsChange() throws {
+    let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 800, height: 1000))
+    let document = try XCTUnwrap(PDFDocument(data: renderer.pdfData { context in context.beginPage() }))
+    let page = try XCTUnwrap(document.page(at: 0))
+    page.setBounds(CGRect(x: 100, y: 80, width: 600, height: 840), for: .cropBox)
+    let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 400, height: 700))
+    let controller = UIViewController()
+    window.rootViewController = controller
+    window.makeKeyAndVisible()
+    defer { window.isHidden = true }
+    view.frame = controller.view.bounds
+    controller.view.addSubview(view)
+    view.pdfView.document = document
+    view.layoutIfNeeded()
+    view.pdfView.layoutDocumentView()
+    view.setAnnotationMode("ink")
+    let overlay = try XCTUnwrap(view.inkOverlayView)
+    func touch(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+      view.convert(view.pdfView.convert(CGPoint(x: x, y: y), from: page), from: view.pdfView)
+    }
+    // Page points; visible points are these minus the crop origin (100, 80).
+    overlay.onBegan?(touch(180.0123, 200.0187))
+    overlay.onMoved?(touch(180.0391, 199.9822)) // same as the first point once rounded
+    overlay.onMoved?(touch(230.3317, 250.6871))
+    overlay.onEnded?()
+
+    let json = try XCTUnwrap(view.currentAnnotationsJSON)
+    let written = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+    let annotation = try XCTUnwrap((written["annotations"] as? [[String: Any]])?.first)
+    let stroke = try XCTUnwrap((annotation["paths"] as? [[Any]])?.first as? [[String: Double]])
+    XCTAssertEqual(stroke, [["x": 80, "y": 120], ["x": 130.3, "y": 170.7]])
+    XCTAssertTrue(json.contains(#""x":80"#) && json.contains(#""y":120"#), json)
+    XCTAssertTrue(json.contains(#""x":130.3"#) && json.contains(#""y":170.7"#), json)
+  }
+
   // MARK: - Initial state
 
   func testInitialState() {
