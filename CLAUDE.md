@@ -28,25 +28,32 @@ Always run `npm run qa` (or at minimum `npm run qa:ts`) before committing.
 
 ## Releasing
 
-This project uses [Changesets](https://github.com/changesets/changesets) to manage versioning and changelogs.
+This project uses [Changesets](https://github.com/changesets/changesets) to manage versioning and changelogs. Only CI publishes to npm, from `.github/workflows/release.yml`, using npm trusted publishing: there is no npm token and no local publish (see `docs/adr/0001-ci-only-trusted-publishing.md`). Terms (Changeset, Pending changesets, Release, Release PR, Release tag, Snapshot) are defined in `GLOSSARY.md`.
 
-**When making a change that should be released:**
+**When making a Consumer-visible change:**
 ```
 npm run changeset:add
 ```
 Follow the prompts to describe the change and select the semver bump type. Commit the generated `.changeset/*.md` file with your code changes.
 
-**When ready to cut a release:**
-```
-npm run changeset:version   # bumps package.json, updates CHANGELOG.md, deletes the changeset files
-git add -A && git commit -m "chore: release vX.Y.Z"
-npm run release             # publishes to npm, pushes git tag, creates GitHub release
-```
+**Snapshots:** every push to `main` runs web, iOS and Android validation in `release.yml`. If `main` has Pending changesets, it then publishes a Snapshot (`<next version>-next.<UTC timestamp>`) under the `next` dist-tag. Snapshots never become `latest` and never commit anything back.
 
-`npm run release` requires:
-- `npm` to be logged in (`npm whoami`)
-- `gh` to be authenticated (`gh auth status`)
-- A clean working tree on `main`
+**Cutting a Release:**
+1. Open a Release PR from a branch off `main`: `npm run changeset:version` (consumes the Pending changesets, bumps `package.json`, updates `CHANGELOG.md`), commit as `chore: release vX.Y.Z`
+2. The maintainer merges the Release PR; merging is the approval
+3. Tag the merge commit on `main` and push the tag (only the maintainer can create Release tags):
+   ```
+   git tag -a vX.Y.Z -m vX.Y.Z <merge commit> && git push origin vX.Y.Z
+   ```
+4. `release.yml` runs validation, then the release checks. It refuses, naming the failed check, when the tag isn't `v` + the `package.json` version, the commit isn't on `main`, Pending changesets remain, the version is already on npm or `CHANGELOG.md` has no section for it. Otherwise it publishes to `latest` with provenance, creates the GitHub Release (title `vX.Y.Z`, notes from the changelog section) and deploys the docs site and web demo to GitHub Pages. Docs deploy only from Releases, never from pushes to `main`
+5. Check that `npm view @tobyt/expo-pdf-markup dist-tags.latest` shows the version and that the GitHub Release exists
+
+The decisions live in the release plan module (`scripts/release/releasePlan.ts`, Jest-tested). Dry run it read-only, after `git fetch origin`: `GITHUB_REF=refs/tags/vX.Y.Z node scripts/release/plan.ts`.
+
+**Recovery:**
+- **Release tag pushed but the publish failed before reaching npm:** fix the cause if needed, then re-run the failed jobs of the release run (`gh run rerun <run-id> --failed`). Don't move the tag
+- **Release tag on the wrong commit and nothing published:** the maintainer deletes the tag using the admin bypass (`git push origin :refs/tags/vX.Y.Z`, then `git tag -d vX.Y.Z` locally) and tags the right commit again
+- **Bad version already on npm:** never reuse or unpublish it. Fix forward with a patch Release, and `npm deprecate @tobyt/expo-pdf-markup@X.Y.Z "<reason>"` the bad version if needed
 
 ## Repository settings
 
@@ -54,7 +61,7 @@ The repository's security settings are code: `scripts/repo-settings.mjs` compare
 - the `main` ruleset (no deletion or force-push, pull request required with 0 approvals, the four validation job names above as required checks) and the Release tag ruleset on `refs/tags/v*` (creation, update and deletion restricted). Only the Repository admin role can bypass either
 - immutable releases
 - Actions: allowed actions limited to GitHub's own plus an explicit third-party list, read-only default workflow token that can't approve pull requests, approval required for workflows from all outside contributors
-- the `npm-publish` environment (no reviewer, admins can't bypass, deployments only from `main` and `v*` tags) and the `github-pages` deployment policy (`main` and `v*` tags)
+- the `npm-publish` environment (no reviewer, admins can't bypass, deployments only from `main` and `v*` tags) and the `github-pages` deployment policy (`v*` tags only, as docs deploy only from Releases)
 
 ```
 npm run settings:check     # read-only: lists every difference, exits 1 on drift

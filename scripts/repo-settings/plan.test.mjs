@@ -139,14 +139,21 @@ describe('planChanges against the settings before the lockdown', () => {
     ]);
   });
 
-  it('adds v* tags to the github-pages deployment policy without touching the rest', () => {
+  it('limits the github-pages deployment policy to v* tags, adding them before removing main', () => {
     const change = plan.find((c) => c.setting === 'Environment "github-pages"');
-    assert.deepEqual(change.differences, ['deployment policy: missing tag "v*"']);
+    assert.deepEqual(change.differences, [
+      'deployment policy: missing tag "v*"',
+      'deployment policy: unexpected branch "main"',
+    ]);
     assert.deepEqual(change.requests, [
       {
         method: 'POST',
         path: 'environments/github-pages/deployment-branch-policies',
         body: { name: 'v*', type: 'tag' },
+      },
+      {
+        method: 'DELETE',
+        path: 'environments/github-pages/deployment-branch-policies/44390415',
       },
     ]);
   });

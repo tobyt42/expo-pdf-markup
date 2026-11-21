@@ -190,12 +190,6 @@
       },
       "branchPolicies": [
         {
-          "id": 44390415,
-          "node_id": "MDE2OkdhdGVCcmFuY2hQb2xpY3k0NDM5MDQxNQ==",
-          "name": "main",
-          "type": "branch"
-        },
-        {
           "id": 44400001,
           "node_id": "MDE2OkdhdGVCcmFuY2hQb2xpY3k0NDQwMDAwMQ==",
           "name": "v*",

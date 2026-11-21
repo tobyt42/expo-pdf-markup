@@ -107,10 +107,113 @@ describe('planRelease elsewhere', () => {
     ).toEqual({ action: 'skip', reason: expect.stringContaining('refs/heads/feature') });
   });
 
-  it('refuses a tag push until Releases are planned', () => {
-    expect(planRelease(facts({ ref: 'refs/tags/v2.0.0' }))).toEqual({
+  it('skips a tag that is not a Release tag', () => {
+    expect(planRelease(facts({ ref: 'refs/tags/docs-2026' }))).toEqual({
+      action: 'skip',
+      reason: expect.stringContaining('refs/tags/docs-2026'),
+    });
+  });
+});
+
+describe('planRelease on a Release tag', () => {
+  const changelog = [
+    '# @tobyt/expo-pdf-markup',
+    '',
+    '## 2.1.0',
+    '',
+    '',
+    '### Minor Changes',
+    '',
+    '- abc1234: Add a thing.',
+    '',
+    '  Rebuild your native iOS app to use it.',
+    '',
+    '### Patch Changes',
+    '',
+    '- def5678: Fix another thing.',
+    '',
+    '',
+    '## 2.0.0',
+    '',
+    '### Major Changes',
+    '',
+    '- 0123456: Something older.',
+    '',
+  ].join('\n');
+
+  const release = (overrides: Partial<ReleaseFacts> = {}) =>
+    facts({
+      ref: 'refs/tags/v2.1.0',
+      packageVersion: '2.1.0',
+      versionPublished: false,
+      changelog,
+      ...overrides,
+    });
+
+  it('plans a Release under latest with the notes of the matching changelog section', () => {
+    expect(planRelease(release())).toEqual({
+      action: 'release',
+      version: '2.1.0',
+      distTag: 'latest',
+      notes: [
+        '### Minor Changes',
+        '',
+        '- abc1234: Add a thing.',
+        '',
+        '  Rebuild your native iOS app to use it.',
+        '',
+        '### Patch Changes',
+        '',
+        '- def5678: Fix another thing.',
+      ].join('\n'),
+    });
+  });
+
+  it.each(['refs/tags/v2.1.1', 'refs/tags/v2.1', 'refs/tags/v2.1.0-rc.1', 'refs/tags/vnext'])(
+    'refuses %s when package.json says 2.1.0',
+    (ref) => {
+      expect(planRelease(release({ ref }))).toEqual({
+        action: 'refuse',
+        reason: expect.stringMatching(/^tag check failed: .*v2\.1\.0/),
+      });
+    }
+  );
+
+  it('refuses a tagged commit that is not on main', () => {
+    expect(planRelease(release({ commitOnMain: false }))).toEqual({
       action: 'refuse',
-      reason: expect.stringContaining('refs/tags/v2.0.0'),
+      reason: expect.stringMatching(/^main check failed: /),
+    });
+  });
+
+  it('refuses while Pending changesets remain, naming them', () => {
+    expect(
+      planRelease(release({ pendingChangesets: [{ id: 'calm-dogs-sing', bump: 'patch' }] }))
+    ).toEqual({
+      action: 'refuse',
+      reason: expect.stringMatching(/^Pending changesets check failed: .*calm-dogs-sing/),
+    });
+  });
+
+  it('refuses a version that is already on npm', () => {
+    expect(planRelease(release({ versionPublished: true }))).toEqual({
+      action: 'refuse',
+      reason: expect.stringMatching(/^npm check failed: .*2\.1\.0/),
+    });
+  });
+
+  it('refuses when the changelog has no section for the version', () => {
+    expect(planRelease(release({ ref: 'refs/tags/v2.2.0', packageVersion: '2.2.0' }))).toEqual({
+      action: 'refuse',
+      reason: expect.stringMatching(/^changelog check failed: .*2\.2\.0/),
+    });
+  });
+
+  it('takes the notes of an older section up to the next heading', () => {
+    const plan = planRelease(release({ ref: 'refs/tags/v2.0.0', packageVersion: '2.0.0' }));
+    expect(plan).toMatchObject({
+      action: 'release',
+      notes: '### Major Changes\n\n- 0123456: Something older.',
     });
   });
 });
