@@ -1,13 +1,20 @@
 name: Deploy docs
 
+# Builds the docs site (TypeDoc API reference plus the example app's web demo) and deploys it
+# to GitHub Pages. Called only by release.yml after a successful Release, so the docs always
+# match `latest`. It no longer runs on pushes to `main`, and the `github-pages` environment
+# only accepts deployments from Release tags (`v*`).
+#
+# Only the deploy job gets `pages: write` and `id-token: write`, and it runs nothing but
+# actions/deploy-pages. Its OIDC token names the `github-pages` environment, while npm's trusted
+# publisher only trusts the `npm-publish` environment, so it can't publish to npm. The build job,
+# which installs and runs dependencies, stays read-only.
+
 on:
-  push:
-    branches: [main]
+  workflow_call:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -16,13 +23,18 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v7
+      # No `cache:`: this runs inside the release workflow, where a poisoned cache could
+      # change the published site.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-          cache: npm
 
       # Install root dependencies (needed for typedoc and the module source)
       - run: npm ci
@@ -48,16 +60,19 @@ jobs:
           cp .github/pages/index.html site/index.html
           touch site/.nojekyll
 
-      - uses: actions/upload-pages-artifact@v5
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

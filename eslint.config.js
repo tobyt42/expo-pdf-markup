@@ -8,7 +8,7 @@ module.exports = defineConfig([
     ignores: ['build/'],
   },
   {
-    files: ['src/**/__tests__/**/*.{ts,tsx}'],
+    files: ['src/**/__tests__/**/*.{ts,tsx}', 'scripts/*/__tests__/**/*.ts'],
     languageOptions: {
       globals: globals.jest,
     },

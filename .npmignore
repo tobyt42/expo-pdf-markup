@@ -18,6 +18,10 @@ __tests__
 /AGENTS.md
 /scripts/
 
+# Repository docs (glossary, ADRs, agent docs, guides); README links to them on GitHub
+/GLOSSARY.md
+/docs/
+
 # Android build artifacts and Gradle caches
 /android/.gradle/
 /android/src/androidTest/

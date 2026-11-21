@@ -1,0 +1,238 @@
+{
+  "rulesets": [
+    {
+      "id": 21795519,
+      "name": "Protect main from accidents",
+      "target": "branch",
+      "source_type": "Repository",
+      "source": "tobyt42/expo-pdf-markup",
+      "enforcement": "active",
+      "conditions": {
+        "ref_name": {
+          "exclude": [],
+          "include": [
+            "~DEFAULT_BRANCH"
+          ]
+        }
+      },
+      "rules": [
+        {
+          "type": "deletion"
+        },
+        {
+          "type": "non_fast_forward"
+        },
+        {
+          "type": "pull_request",
+          "parameters": {
+            "required_approving_review_count": 0,
+            "dismiss_stale_reviews_on_push": false,
+            "required_reviewers": [],
+            "require_code_owner_review": false,
+            "require_last_push_approval": false,
+            "required_review_thread_resolution": false,
+            "automatic_copilot_code_review_enabled": false,
+            "allowed_merge_methods": [
+              "merge",
+              "squash",
+              "rebase"
+            ]
+          }
+        },
+        {
+          "type": "required_status_checks",
+          "parameters": {
+            "strict_required_status_checks_policy": false,
+            "do_not_enforce_on_create": false,
+            "required_status_checks": [
+              {
+                "context": "Android JUnit",
+                "integration_id": 15368
+              },
+              {
+                "context": "iOS XCTest",
+                "integration_id": 15368
+              },
+              {
+                "context": "PDF browser rendering",
+                "integration_id": 15368
+              },
+              {
+                "context": "TypeScript, tests, and web builds",
+                "integration_id": 15368
+              }
+            ]
+          }
+        }
+      ],
+      "node_id": "RRS_lACqUmVwb3NpdG9yec5GDNnGzgFMkr8",
+      "created_at": "2026-08-29T10:54:53.909+01:00",
+      "updated_at": "2026-08-29T10:54:53.933+01:00",
+      "bypass_actors": [
+        {
+          "actor_id": 5,
+          "actor_type": "RepositoryRole",
+          "bypass_mode": "always"
+        }
+      ],
+      "current_user_can_bypass": "always",
+      "_links": {
+        "self": {
+          "href": "https://api.github.com/repos/tobyt42/expo-pdf-markup/rulesets/21795519"
+        },
+        "html": {
+          "href": "https://github.com/tobyt42/expo-pdf-markup/rules/21795519"
+        }
+      }
+    },
+    {
+      "id": 21900001,
+      "name": "Release tags",
+      "target": "tag",
+      "source_type": "Repository",
+      "source": "tobyt42/expo-pdf-markup",
+      "enforcement": "active",
+      "conditions": {
+        "ref_name": {
+          "exclude": [],
+          "include": [
+            "refs/tags/v*"
+          ]
+        }
+      },
+      "rules": [
+        {
+          "type": "creation"
+        },
+        {
+          "type": "update"
+        },
+        {
+          "type": "deletion"
+        }
+      ],
+      "node_id": "RRS_example",
+      "created_at": "2026-11-22T10:00:00.000+00:00",
+      "updated_at": "2026-11-22T10:00:00.000+00:00",
+      "bypass_actors": [
+        {
+          "actor_id": 5,
+          "actor_type": "RepositoryRole",
+          "bypass_mode": "always"
+        }
+      ],
+      "current_user_can_bypass": "always"
+    }
+  ],
+  "actionsPermissions": {
+    "enabled": true,
+    "allowed_actions": "selected",
+    "selected_actions_url": "https://api.github.com/repos/tobyt42/expo-pdf-markup/actions/permissions/selected-actions",
+    "sha_pinning_required": false
+  },
+  "selectedActions": {
+    "github_owned_allowed": true,
+    "verified_allowed": false,
+    "patterns_allowed": [
+      "android-actions/setup-android@*",
+      "gradle/actions/setup-gradle@*",
+      "ruby/setup-ruby@*"
+    ]
+  },
+  "workflowPermissions": {
+    "default_workflow_permissions": "read",
+    "can_approve_pull_request_reviews": false
+  },
+  "forkPrApproval": {
+    "approval_policy": "all_external_contributors"
+  },
+  "immutableReleases": {
+    "enabled": true,
+    "enforced_by_owner": false
+  },
+  "environments": {
+    "copilot": {
+      "environment": {
+        "id": 16584208552,
+        "node_id": "EN_kwDORgzZxs8AAAAD3H7wqA",
+        "name": "copilot",
+        "url": "https://api.github.com/repos/tobyt42/expo-pdf-markup/environments/copilot",
+        "html_url": "https://github.com/tobyt42/expo-pdf-markup/deployments/activity_log?environments_filter=copilot",
+        "created_at": "2026-06-11T21:35:42Z",
+        "updated_at": "2026-06-11T21:35:42Z",
+        "can_admins_bypass": true,
+        "protection_rules": [],
+        "deployment_branch_policy": null
+      },
+      "branchPolicies": []
+    },
+    "github-pages": {
+      "environment": {
+        "id": 12782423557,
+        "node_id": "EN_kwDORgzZxs8AAAAC-eROBQ",
+        "name": "github-pages",
+        "url": "https://api.github.com/repos/tobyt42/expo-pdf-markup/environments/github-pages",
+        "html_url": "https://github.com/tobyt42/expo-pdf-markup/deployments/activity_log?environments_filter=github-pages",
+        "created_at": "2026-03-08T08:59:28Z",
+        "updated_at": "2026-03-08T08:59:28Z",
+        "can_admins_bypass": true,
+        "protection_rules": [
+          {
+            "id": 49434779,
+            "node_id": "GA_kwDORgzZxs4C8lCb",
+            "type": "branch_policy"
+          }
+        ],
+        "deployment_branch_policy": {
+          "protected_branches": false,
+          "custom_branch_policies": true
+        }
+      },
+      "branchPolicies": [
+        {
+          "id": 44400001,
+          "node_id": "MDE2OkdhdGVCcmFuY2hQb2xpY3k0NDQwMDAwMQ==",
+          "name": "v*",
+          "type": "tag"
+        }
+      ]
+    },
+    "npm-publish": {
+      "environment": {
+        "id": 16600000001,
+        "node_id": "EN_example",
+        "name": "npm-publish",
+        "url": "https://api.github.com/repos/tobyt42/expo-pdf-markup/environments/npm-publish",
+        "html_url": "https://github.com/tobyt42/expo-pdf-markup/deployments/activity_log?environments_filter=npm-publish",
+        "created_at": "2026-11-22T10:00:00Z",
+        "updated_at": "2026-11-22T10:00:00Z",
+        "can_admins_bypass": false,
+        "protection_rules": [
+          {
+            "id": 49500001,
+            "node_id": "GA_example",
+            "type": "branch_policy"
+          }
+        ],
+        "deployment_branch_policy": {
+          "protected_branches": false,
+          "custom_branch_policies": true
+        }
+      },
+      "branchPolicies": [
+        {
+          "id": 44400002,
+          "node_id": "x",
+          "name": "main",
+          "type": "branch"
+        },
+        {
+          "id": 44400003,
+          "node_id": "y",
+          "name": "v*",
+          "type": "tag"
+        }
+      ]
+    }
+  }
+}

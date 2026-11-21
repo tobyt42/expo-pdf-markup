@@ -3,13 +3,17 @@ name: Validate TypeScript and web
 on:
   pull_request:
   workflow_dispatch:
+  # Called by release.yml on every push to `main` and on Release tags.
+  workflow_call:
 
 permissions:
   contents: read
 
+# Pull requests cancel superseded runs. Every other run (manual dispatch, or a call from
+# release.yml) gets its own group, so validation of each push to `main` always completes.
 concurrency:
-  group: validate-web-${{ github.ref }}
-  cancel-in-progress: true
+  group: validate-web-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CI: '1'
@@ -20,8 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -30,6 +34,23 @@ jobs:
             example/package-lock.json
       - name: Install library dependencies
         run: npm ci
+      # Downloaded from the release and checked against its published SHA-256, so no
+      # third-party action is needed. To upgrade, update both the version and the checksum
+      # (from actionlint_<version>_checksums.txt on the release page).
+      - name: Install actionlint
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -sSfL -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/$archive"
+          echo "$ACTIONLINT_SHA256  $RUNNER_TEMP/$archive" | sha256sum --check --strict
+          mkdir -p "$RUNNER_TEMP/actionlint"
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/actionlint" actionlint
+          echo "$RUNNER_TEMP/actionlint" >> "$GITHUB_PATH"
+      - name: Lint workflows
+        run: npm run lint:workflows
       - name: Install example dependencies
         run: npm ci
         working-directory: example
@@ -47,7 +68,7 @@ jobs:
         run: npx --no-install expo export --platform web --output-dir ../site/example
         working-directory: example
       - name: Save exported example for browser validation
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: example-web
           path: site/example
@@ -60,13 +81,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: scripts/browser/package-lock.json
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: example-web
           path: site/example
@@ -78,7 +99,7 @@ jobs:
         working-directory: scripts/browser
       - name: Save browser failure diagnostics
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pdf-browser-failure
           path: scripts/browser/test-results

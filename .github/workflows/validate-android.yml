@@ -3,13 +3,17 @@ name: Validate Android
 on:
   pull_request:
   workflow_dispatch:
+  # Called by release.yml on every push to `main` and on Release tags.
+  workflow_call:
 
 permissions:
   contents: read
 
+# Pull requests cancel superseded runs. Every other run (manual dispatch, or a call from
+# release.yml) gets its own group, so validation of each push to `main` always completes.
 concurrency:
-  group: android-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: validate-android-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   junit:
@@ -19,23 +23,23 @@ jobs:
     env:
       CI: '1'
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: |
             package-lock.json
             example/package-lock.json
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v4
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           cache-provider: basic
           cache-read-only: ${{ github.event_name == 'pull_request' }}
@@ -52,7 +56,7 @@ jobs:
         working-directory: example/android
       - name: Upload JUnit results
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: android-junit-results
           path: |
