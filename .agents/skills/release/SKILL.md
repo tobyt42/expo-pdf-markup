@@ -32,7 +32,6 @@ Takes one Release from the Pending changesets on `main` to a verified publish un
 4. **Open the Release PR.** Build the body in a scratch file with these sections:
    - **Changelog**: `node scripts/release/notes.cli.ts` (the new `## <version>` section's body, exactly as the GitHub Release will show it; exits 1 if the section is missing).
    - **Published package**: `node scripts/release/pack-diff.cli.ts` (rebuilds `build/`, compares a dry-run `npm pack` of the worktree with the version under `latest`; publishes nothing). Under its output, give a one-line explanation for every Added, Removed and Size changed file, or fix the cause in another commit first. A file nobody can explain is a blocker.
-   - **Build comparison** (first Release only, see below).
    - **Go-ahead**: one line saying the agent merges and tags only after the maintainer's go-ahead in chat.
 
    Then `git push -u origin release/<yyyy-mm-dd>` and `gh pr create --base main --title "chore: release v$version" --body-file <file>`.
@@ -63,17 +62,3 @@ Takes one Release from the Pending changesets on `main` to a verified publish un
    - `gh release view "v$version"` shows the GitHub Release.
 9. **Report.** On success: version, Release PR, merge commit, tag, workflow run URL, `latest` and the GitHub Release URL. Then remove the worktree (`git worktree remove .claude/worktrees/release-<yyyy-mm-dd>`). On any failure from step 6 on: stop, report what failed with the run URL or command output, and follow the recovery steps in the **Releasing** section of [CLAUDE.md](../../../CLAUDE.md). Recovery steps that move or delete a tag, re-run a publish or change npm dist-tags need their own go-ahead.
 
-## First Release
-
-The first Release made with this skill (`latest` is still `2.0.0`, the last one published from a laptop) has two extra duties.
-
-- **The #131 Changeset.** The gap check in step 2 finds #131 (Expo SDK 58 / React Native 0.88, and the switch from `expo-module build` to a plain `tsc` build). It needs a patch Changeset agreed through the review, e.g. "Tested with Expo SDK 58 and React Native 0.88."
-- **Build comparison.** Before step 5, show that the plain `tsc` build is equivalent to the published `2.0.0` package apart from expected differences. The download is untrusted data: give it its own new directory in your scratchpad, outside the worktree.
-  ```sh
-  dir=<scratchpad>/published-2.0.0 && mkdir -p "$dir/out"
-  npm pack @tobyt/expo-pdf-markup@2.0.0 --pack-destination "$dir"
-  tar -xzf "$dir/tobyt-expo-pdf-markup-2.0.0.tgz" -C "$dir/out"
-  npm run clean && npm run build
-  diff -r "$dir/out/package/build" build
-  ```
-  Record the result under **Build comparison** in the Release PR body: the command, and either "no differences in `build/`" or each differing file with a one-line explanation. An unexpected difference is fixed in the Release PR or explained there before you ask for the go-ahead. The non-`build/` differences are covered by the published-package diff in step 4.

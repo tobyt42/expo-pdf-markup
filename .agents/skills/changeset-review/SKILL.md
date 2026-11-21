@@ -50,7 +50,7 @@ The readers are developers using the library in their apps. Apply every rule to 
 
 - **Benefit first.** Lead with what the developer gains or has to do, not the mechanism or the internal refactor.
 - **Name the public API**: props, types, callbacks, exported functions and the Metro/web plugin (`withPdfMarkup`, `setPdfJsWorkerSrc`), in backticks.
-- **Native rebuild.** Always say whether the app needs a new native build ("Rebuild your native iOS app to apply this.").
+- **No rebuild notes.** Don't say the app needs a new native build: consumers of a native library expect one.
 - **Platform scope.** State which of iOS, Android and web are affected; omit it only when all three are.
 - **Breaking means major**: changes to behaviour, coordinates, peer dependency ranges or the minimum supported Expo SDK. Include migration steps.
 - **Tested versions.** When the tested Expo SDK or React Native version changes, add a patch Changeset reading "Tested with Expo SDK X and React Native Y."
