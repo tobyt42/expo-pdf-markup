@@ -151,20 +151,52 @@ object AnnotationSerializer {
         return obj
     }
 
+    /**
+     * Writes ink strokes cleaned up: every coordinate rounded to 0.1 pt, consecutive duplicate
+     * points (after rounding) dropped, and a stroke that collapses from 2+ points to one kept
+     * as two identical points so it still draws as a dot. In-memory points are untouched.
+     */
     private fun pathsToJson(paths: List<List<AnnotationPoint>>): JSONArray {
         val arr = JSONArray()
         for (stroke in paths) {
             val strokeArr = JSONArray()
-            for (pt in stroke) {
+            for ((x, y) in cleanUpStroke(stroke)) {
                 val ptObj = JSONObject()
-                ptObj.put("x", pt.x.toDouble())
-                ptObj.put("y", pt.y.toDouble())
+                ptObj.put("x", tenthsToJsonNumber(x))
+                ptObj.put("y", tenthsToJsonNumber(y))
                 strokeArr.put(ptObj)
             }
             arr.put(strokeArr)
         }
         return arr
     }
+
+    /** Rounds a stroke to whole tenths of a point and drops consecutive duplicates. */
+    private fun cleanUpStroke(stroke: List<AnnotationPoint>): List<Pair<Long, Long>> {
+        val kept = mutableListOf<Pair<Long, Long>>()
+        for (pt in stroke) {
+            val rounded = toTenths(pt.x) to toTenths(pt.y)
+            if (kept.lastOrNull() != rounded) kept.add(rounded)
+        }
+        if (stroke.size >= 2 && kept.size == 1) kept.add(kept[0])
+        return kept
+    }
+
+    /**
+     * Nearest whole number of tenths, rounding the Double product with ties away from zero.
+     * The Float is widened to Double first; `kotlin.math.round` is half-even, so it isn't used.
+     */
+    private fun toTenths(value: Float): Long {
+        val scaled = value.toDouble() * 10
+        return (Math.signum(scaled) * Math.round(Math.abs(scaled))).toLong()
+    }
+
+    /**
+     * Whole numbers go in as Long so they print without `.0` (and negative zero as `0`);
+     * anything else is n / 10.0, whose shortest decimal has a single digit after the point.
+     */
+    private fun tenthsToJsonNumber(tenths: Long): Number =
+        if (tenths % 10 == 0L) tenths / 10 else tenths / 10.0
 
     private fun boundsToJson(bounds: AnnotationBounds): JSONObject {
         val obj = JSONObject()
