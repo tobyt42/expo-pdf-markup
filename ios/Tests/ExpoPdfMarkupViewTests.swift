@@ -107,14 +107,43 @@ final class ExpoPdfMarkupViewTests: XCTestCase {
     XCTAssertTrue(json.contains("[[80,120],[130.3,170.7]]"), json)
   }
 
+  /// Records every payload actually dispatched through `onAnnotationsChanged`.
+  private func recordAnnotationsChangedEvents() -> () -> [[String: Any]] {
+    var events: [[String: Any]] = []
+    view.onAnnotationsChanged.onEventSent = { events.append($0) }
+    return { events }
+  }
+
   @MainActor func testChangingInkPointFormatAloneWritesNothing() throws {
-    let (window, _) = try showCroppedPage()
+    let (window, touch) = try showCroppedPage()
     defer { window.isHidden = true }
+    let events = recordAnnotationsChangedEvents()
 
     view.inkPointFormat = .array
     view.inkPointFormat = .object
+    XCTAssertEqual(events().count, 0)
 
-    XCTAssertNil(view.currentAnnotationsJSON)
+    try drawUncleanStroke(touch)
+    XCTAssertEqual(events().count, 1)
+    let written = view.currentAnnotationsJSON
+
+    view.inkPointFormat = .array
+    XCTAssertEqual(events().count, 1)
+    XCTAssertEqual(view.currentAnnotationsJSON, written)
+  }
+
+  @MainActor func testLoadingAnAnnotationSetWritesNothing() throws {
+    let (window, _) = try showCroppedPage()
+    defer { window.isHidden = true }
+    let events = recordAnnotationsChangedEvents()
+    view.inkPointFormat = .array
+
+    for fixture in ["ink-cleanup-input", "annotations-v1-array"] {
+      let url = try XCTUnwrap(Bundle(for: type(of: self)).url(forResource: fixture, withExtension: "json"))
+      try view.loadAnnotations(from: String(contentsOf: url, encoding: .utf8))
+    }
+
+    XCTAssertEqual(events().count, 0)
   }
 
   @MainActor func testSetsLoadedInEitherFormAreWrittenInTheChosenFormOnTheNextEdit() throws {

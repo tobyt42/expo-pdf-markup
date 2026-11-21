@@ -20,6 +20,10 @@ _Avoid_: path (when meaning a single stroke), line
 One position on an ink stroke, in visible-page PDF points with y increasing upwards.
 _Avoid_: vertex, coordinate pair
 
+**Clean-up**:
+What happens to ink points only when an annotation set is written: each coordinate is rounded to 0.1 pt, consecutive duplicate ink points in an ink stroke are dropped, and a stroke of two or more points keeps at least two. Ink points in memory, and every other field, are untouched.
+_Avoid_: compression, simplification, normalisation
+
 **Ink point format**:
 How an ink point is written in an annotation set: object form or array form. Readers accept either, point by point.
 _Avoid_: compact encoding, ink encoding

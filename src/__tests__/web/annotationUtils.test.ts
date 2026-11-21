@@ -12,7 +12,7 @@ import {
   drawAnnotationsOnCanvas,
   getAnnotationOutlineBounds,
   hitTestAnnotation,
-  parseAnnotations,
+  parseAnnotationsOrEmpty,
   pdfBoundsToCanvas,
   pdfToCanvas,
   serializeAnnotations,
@@ -286,27 +286,27 @@ describe('clampAnnotationTranslation', () => {
 });
 
 // ---------------------------------------------------------------------------
-// parseAnnotations
+// parseAnnotationsOrEmpty
 // ---------------------------------------------------------------------------
 
-describe('parseAnnotations', () => {
+describe('parseAnnotationsOrEmpty', () => {
   it('returns empty data for undefined', () => {
-    const result = parseAnnotations(undefined);
+    const result = parseAnnotationsOrEmpty(undefined);
     expect(result.annotations).toHaveLength(0);
     expect(result.version).toBe(1);
   });
 
   it('returns empty data for empty string', () => {
-    expect(parseAnnotations('').annotations).toHaveLength(0);
+    expect(parseAnnotationsOrEmpty('').annotations).toHaveLength(0);
   });
 
   it('returns empty data for malformed JSON', () => {
-    expect(parseAnnotations('{not json}').annotations).toHaveLength(0);
+    expect(parseAnnotationsOrEmpty('{not json}').annotations).toHaveLength(0);
   });
 
   it('parses valid annotations JSON', () => {
     const data = serializeAnnotations({ version: 1, annotations: [highlightAnnotation] });
-    const result = parseAnnotations(data);
+    const result = parseAnnotationsOrEmpty(data);
     expect(result.annotations).toHaveLength(1);
     expect(result.annotations[0]!.id).toBe('hl1');
   });
@@ -315,13 +315,13 @@ describe('parseAnnotations', () => {
     const a1: Annotation = { ...highlightAnnotation, color: '#FF0000' };
     const a2: Annotation = { ...highlightAnnotation, color: '#00FF00' };
     const data = serializeAnnotations({ version: 1, annotations: [a1, a2] });
-    const result = parseAnnotations(data);
+    const result = parseAnnotationsOrEmpty(data);
     expect(result.annotations).toHaveLength(1);
     expect(result.annotations[0]!.color).toBe('#00FF00');
   });
 
   it('returns empty data when there is no annotations array', () => {
-    expect(parseAnnotations('{"version":1}').annotations).toHaveLength(0);
+    expect(parseAnnotationsOrEmpty('{"version":1}').annotations).toHaveLength(0);
   });
 
   it('skips malformed ink points and keeps the rest of the stroke and set', () => {
@@ -351,7 +351,7 @@ describe('parseAnnotations', () => {
         highlightAnnotation,
       ],
     });
-    const result = parseAnnotations(json);
+    const result = parseAnnotationsOrEmpty(json);
     expect(result.annotations).toHaveLength(2);
     expect((result.annotations[0] as InkAnnotation).paths).toEqual([
       [
@@ -361,6 +361,26 @@ describe('parseAnnotations', () => {
       ],
     ]);
     expect(result.annotations[1]!.id).toBe('hl1');
+  });
+
+  it('skips a stroke that is not an array and keeps the other strokes', () => {
+    const json = JSON.stringify({
+      version: 1,
+      annotations: [
+        {
+          id: 'ink1',
+          type: 'ink',
+          page: 0,
+          color: '#000000',
+          lineWidth: 2,
+          paths: [[[1, 2]], { x: 3, y: 4 }, [{ x: 5, y: 6 }]],
+        },
+      ],
+    });
+    expect((parseAnnotationsOrEmpty(json).annotations[0] as InkAnnotation).paths).toEqual([
+      [{ x: 1, y: 2 }],
+      [{ x: 5, y: 6 }],
+    ]);
   });
 });
 

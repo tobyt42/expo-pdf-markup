@@ -131,15 +131,7 @@ class ExpoPdfMarkupView(context: Context, appContext: AppContext) : ExpoView(con
 
     fun loadAnnotations(json: String?) {
         pendingAnnotationsJson = json
-        if (json.isNullOrEmpty()) {
-            pdfView.annotations = emptyList()
-            return
-        }
-        val data = AnnotationSerializer.deserialize(json) ?: return
-        // Dedup by id — keep last occurrence
-        val seen = mutableSetOf<String>()
-        val deduped = data.annotations.reversed().filter { seen.add(it.id) }.reversed()
-        pdfView.annotations = deduped
+        annotationsChangeEmitter.annotationsLoaded(json)?.let { pdfView.annotations = it }
     }
 
     /** `"continuous"` (default) or `"book"`: one page at a time, turned sideways. */

@@ -10,6 +10,9 @@ class ExpoPdfMarkupView: ExpoView, UIGestureRecognizerDelegate {
   let onTextInputRequested = EventDispatcher()
 
   private var currentSource: String?
+  /// The annotation set last loaded or sent in `onAnnotationsChanged`, used to skip reloading
+  /// the view's own write. Read-only outside the view (tests read it) so that only loading and
+  /// emitting can change it.
   private(set) var currentAnnotationsJSON: String?
   private(set) var currentMode: String = "none"
   var annotationColor: String = "#FF0000" {

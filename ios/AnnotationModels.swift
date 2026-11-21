@@ -71,9 +71,9 @@ struct AnnotationModel: Codable, Equatable {
 }
 
 extension AnnotationModel {
-  /// Decodes `paths` one ink point at a time, so an array-form point (`[x, y]`) or a
-  /// malformed point never rejects the whole annotation set. Decoded points are kept in
-  /// object form, which is what the synthesised `encode(to:)` writes.
+  /// Decodes `paths` one ink stroke and one ink point at a time, so an array-form point
+  /// (`[x, y]`), a malformed point or a stroke that isn't an array never rejects the whole
+  /// annotation set: malformed strokes and points are skipped.
   init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     id = try container.decode(String.self, forKey: .id)
@@ -82,8 +82,8 @@ extension AnnotationModel {
     color = try container.decode(String.self, forKey: .color)
     lineWidth = try container.decodeIfPresent(CGFloat.self, forKey: .lineWidth)
     alpha = try container.decodeIfPresent(CGFloat.self, forKey: .alpha)
-    paths = try container.decodeIfPresent([[InkPointReader]].self, forKey: .paths)?
-      .map { stroke in stroke.compactMap(\.point).map { ["x": $0.x, "y": $0.y] } }
+    paths = try container.decodeIfPresent([InkStrokeReader].self, forKey: .paths)?
+      .compactMap(\.points)
     bounds = try container.decodeIfPresent(AnnotationBounds.self, forKey: .bounds)
     contents = try container.decodeIfPresent(String.self, forKey: .contents)
     fontSize = try container.decodeIfPresent(CGFloat.self, forKey: .fontSize)
@@ -94,8 +94,9 @@ extension AnnotationModel {
 }
 
 extension AnnotationModel {
-  /// Writes every field as the synthesised encoder did, except that ink points are cleaned
-  /// up (see `InkPointCleanup`). The model itself keeps full precision.
+  /// Writes every field as the synthesised encoder did, except that an ink annotation's points
+  /// are cleaned up and follow the ink point format (see `InkPointCleanup`). Paths on any other
+  /// type are written exactly as before. The model itself keeps full precision.
   func encode(to encoder: Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
     try container.encode(id, forKey: .id)
@@ -104,8 +105,10 @@ extension AnnotationModel {
     try container.encode(color, forKey: .color)
     try container.encodeIfPresent(lineWidth, forKey: .lineWidth)
     try container.encodeIfPresent(alpha, forKey: .alpha)
-    if paths != nil {
+    if type == "ink", paths != nil {
       try container.encode(InkPointCleanup.cleanedPaths(decodedPaths), forKey: .paths)
+    } else {
+      try container.encodeIfPresent(paths, forKey: .paths)
     }
     try container.encodeIfPresent(bounds, forKey: .bounds)
     try container.encodeIfPresent(contents, forKey: .contents)
@@ -116,10 +119,6 @@ extension AnnotationModel {
   }
 }
 
-/// Ink point clean-up applied only when an annotation set is written (same rule on every
-/// platform): each coordinate is rounded to 0.1 pt (the double `value * 10` rounded to the
-/// nearest integer, ties away from zero), consecutive duplicates within a stroke are dropped,
-/// and a stroke of 2+ points that collapses to one point is written as that point twice.
 /// How ink points are written: object form `{"x": …, "y": …}` (the default) or array form `[x, y]`.
 enum InkPointFormat: String {
   case object
@@ -133,6 +132,10 @@ enum InkPointFormat: String {
   }
 }
 
+/// Ink point clean-up applied only when an annotation set is written (same rule on every
+/// platform): each coordinate is rounded to 0.1 pt (the double `value * 10` rounded to the
+/// nearest integer, ties away from zero), consecutive duplicates within a stroke are dropped,
+/// and a stroke of 2+ points that collapses to one point is written as that point twice.
 enum InkPointCleanup {
   /// A rounded coordinate held as the integer number of tenths, so it is written from the
   /// integer (`307.7`, `100`, `-1.3`, never `.0`, `-0` or long trailing digits).
@@ -193,20 +196,29 @@ enum InkPointCleanup {
 /// The keys of an ink point in object form.
 private enum InkPointKeys: String, CodingKey { case x, y }
 
-/// Reads one ink point in object form (`{"x": …, "y": …}`) or array form (`[x, y]`).
-/// Anything else decodes to a nil `point` instead of throwing.
+/// Reads one ink stroke; anything that isn't an array decodes to nil `points` instead of throwing.
+private struct InkStrokeReader: Decodable {
+  let points: [[String: CGFloat]]?
+
+  init(from decoder: Decoder) {
+    points = (try? [InkPointReader](from: decoder))?.compactMap(\.point)
+  }
+}
+
+/// Reads one ink point in object form (`{"x": …, "y": …}`) or array form (`[x, y]`), straight
+/// into the model's object-form dictionary. Anything else decodes to a nil `point` instead of throwing.
 private struct InkPointReader: Decodable {
-  let point: AnnotationPoint?
+  let point: [String: CGFloat]?
 
   init(from decoder: Decoder) {
     if let object = try? decoder.container(keyedBy: InkPointKeys.self),
        let x = try? object.decode(CGFloat.self, forKey: .x),
        let y = try? object.decode(CGFloat.self, forKey: .y) {
-      point = AnnotationPoint(x: x, y: y)
+      point = ["x": x, "y": y]
     } else if var array = try? decoder.unkeyedContainer(), array.count == 2,
               let x = try? array.decode(CGFloat.self),
               let y = try? array.decode(CGFloat.self) {
-      point = AnnotationPoint(x: x, y: y)
+      point = ["x": x, "y": y]
     } else {
       point = nil
     }

@@ -92,7 +92,8 @@ object AnnotationSerializer {
         arr ?: return null
         val paths = mutableListOf<List<AnnotationPoint>>()
         for (i in 0 until arr.length()) {
-            val stroke = arr.getJSONArray(i)
+            // A stroke that isn't an array is malformed and skipped; the rest still loads.
+            val stroke = arr.optJSONArray(i) ?: continue
             val points = mutableListOf<AnnotationPoint>()
             for (j in 0 until stroke.length()) {
                 readInkPoint(stroke.opt(j))?.let { points.add(it) }
@@ -143,10 +144,12 @@ object AnnotationSerializer {
         model.alpha?.let { obj.put("alpha", it.toDouble()) }
         // Ink annotations always carry `paths`, even when empty: the JS `Annotation` type
         // declares it non-optional, so omitting the key crashes consumers that dereference it.
+        // Only ink points are cleaned up and follow the ink point format; any other paths are
+        // written as they always were.
         if (model.type == "ink") {
-            obj.put("paths", pathsToJson(model.paths ?: emptyList(), inkPointFormat))
+            obj.put("paths", inkPathsToJson(model.paths ?: emptyList(), inkPointFormat))
         } else {
-            model.paths?.let { obj.put("paths", pathsToJson(it, inkPointFormat)) }
+            model.paths?.let { obj.put("paths", rawPathsToJson(it)) }
         }
         model.bounds?.let { obj.put("bounds", boundsToJson(it)) }
         model.contents?.let { obj.put("contents", it) }
@@ -163,27 +166,35 @@ object AnnotationSerializer {
      * as two identical points so it still draws as a dot. In-memory points are untouched.
      * Each point is written in object form (`{"x": …, "y": …}`) or array form (`[x, y]`).
      */
-    private fun pathsToJson(
+    private fun inkPathsToJson(
         paths: List<List<AnnotationPoint>>,
         inkPointFormat: InkPointFormat
     ): JSONArray {
+        val writePoint: (Long, Long) -> Any = when (inkPointFormat) {
+            InkPointFormat.OBJECT -> { x, y ->
+                JSONObject().put("x", tenthsToJsonNumber(x)).put("y", tenthsToJsonNumber(y))
+            }
+
+            InkPointFormat.ARRAY -> { x, y ->
+                JSONArray().put(tenthsToJsonNumber(x)).put(tenthsToJsonNumber(y))
+            }
+        }
         val arr = JSONArray()
         for (stroke in paths) {
             val strokeArr = JSONArray()
-            for ((x, y) in cleanUpStroke(stroke)) {
-                when (inkPointFormat) {
-                    InkPointFormat.OBJECT -> strokeArr.put(
-                        JSONObject()
-                            .put("x", tenthsToJsonNumber(x))
-                            .put("y", tenthsToJsonNumber(y))
-                    )
+            for ((x, y) in cleanUpStroke(stroke)) strokeArr.put(writePoint(x, y))
+            arr.put(strokeArr)
+        }
+        return arr
+    }
 
-                    InkPointFormat.ARRAY -> strokeArr.put(
-                        JSONArray()
-                            .put(tenthsToJsonNumber(x))
-                            .put(tenthsToJsonNumber(y))
-                    )
-                }
+    /** Writes paths of a non-ink annotation unchanged, each point in object form. */
+    private fun rawPathsToJson(paths: List<List<AnnotationPoint>>): JSONArray {
+        val arr = JSONArray()
+        for (stroke in paths) {
+            val strokeArr = JSONArray()
+            for (pt in stroke) {
+                strokeArr.put(JSONObject().put("x", pt.x.toDouble()).put("y", pt.y.toDouble()))
             }
             arr.put(strokeArr)
         }

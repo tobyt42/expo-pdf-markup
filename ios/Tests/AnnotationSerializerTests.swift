@@ -348,6 +348,20 @@ final class AnnotationSerializerTests: XCTestCase {
     XCTAssertEqual(data.annotations[1].bounds, AnnotationBounds(x: 1, y: 2, width: 3, height: 4))
   }
 
+  func testAStrokeThatIsNotAnArrayIsSkippedAndTheRestOfTheSetLoads() throws {
+    let json = """
+    {"version": 1, "annotations": [
+      {"id": "ink", "type": "ink", "page": 0, "color": "#FF0000",
+       "paths": [[[1, 2]], "not a stroke", {"x": 5, "y": 6}, [{"x": 3, "y": 4}]]},
+      {"id": "hl", "type": "highlight", "page": 1, "color": "#FFCC00",
+       "bounds": {"x": 1, "y": 2, "width": 3, "height": 4}}
+    ]}
+    """
+    let data = try XCTUnwrap(AnnotationSerializer.deserialize(from: json))
+    XCTAssertEqual(data.annotations.map(\.id), ["ink", "hl"])
+    XCTAssertEqual(data.annotations[0].decodedPaths, [[AnnotationPoint(x: 1, y: 2)], [AnnotationPoint(x: 3, y: 4)]])
+  }
+
   func testArrayFormInkIsWrittenBackInObjectForm() throws {
     let data = try XCTUnwrap(AnnotationSerializer.deserialize(from: """
     {"version": 1, "annotations": [{"id": "ink", "type": "ink", "page": 0, "color": "#FF0000",
@@ -405,6 +419,25 @@ final class AnnotationSerializerTests: XCTestCase {
       "200.1", "301", "200.2", "300.9", "200.1", "301",
     ])
     XCTAssertEqual(inkCoordinateTokens(in: arrayForm), [], arrayForm)
+  }
+
+  func testPathsOnANonInkAnnotationAreWrittenUncleanedInObjectForm() throws {
+    let model = AnnotationModel(
+      id: "hl", type: "highlight", page: 0, color: "#FFCC00",
+      paths: [[["x": 1.23456, "y": 2.5], ["x": 1.23456, "y": 2.5]]],
+      bounds: AnnotationBounds(x: 1, y: 2, width: 3, height: 4)
+    )
+    for format in [InkPointFormat.object, .array] {
+      let data = AnnotationsData(annotations: [model])
+      let json = try XCTUnwrap(AnnotationSerializer.serialize(data, inkPointFormat: format))
+      let written = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+      let annotation = try XCTUnwrap((written["annotations"] as? [[String: Any]])?.first)
+      XCTAssertEqual(
+        annotation["paths"] as? [[[String: Double]]],
+        [[["x": 1.23456, "y": 2.5], ["x": 1.23456, "y": 2.5]]],
+        "\(format): \(json)"
+      )
+    }
   }
 
   func testInkPointFormatPropIsArrayOnlyForArray() {
