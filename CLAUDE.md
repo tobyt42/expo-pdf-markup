@@ -134,6 +134,8 @@ For the Dependabot queue or a specified dependency PR, use the repository's [dep
 
 To review the Pending changesets before a Release, the maintainer runs the user-invoked [changeset-review skill](.agents/skills/changeset-review/SKILL.md); start it only when they ask.
 
+To cut a Release, the maintainer runs the user-invoked [release skill](.agents/skills/release/SKILL.md); start it only when they ask.
+
 ### Issue tracker
 
 Issues are tracked in GitHub Issues on tobyt42/expo-pdf-markup (via the `gh` CLI). See `docs/agents/issue-tracker.md`.
