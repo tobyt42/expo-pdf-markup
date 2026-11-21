@@ -28,7 +28,7 @@ Always run `npm run qa` (or at minimum `npm run qa:ts`) before committing.
 
 ## Releasing
 
-This project uses [Changesets](https://github.com/changesets/changesets) to manage versioning and changelogs. Only CI publishes to npm, from `.github/workflows/release.yml`, using npm trusted publishing: there is no npm token and no local publish (see `docs/adr/0001-ci-only-trusted-publishing.md`). Terms (Changeset, Pending changesets, Release, Release PR, Release tag, Snapshot) are defined in `GLOSSARY.md`.
+This project uses [Changesets](https://github.com/changesets/changesets) to manage versioning and changelogs. Only CI publishes to npm, from `.github/workflows/release.yml`, using npm trusted publishing: there is no npm token and no local publish (see `docs/adr/0002-ci-only-trusted-publishing.md`). Terms (Changeset, Pending changesets, Release, Release PR, Release tag, Snapshot) are defined in `GLOSSARY.md`.
 
 **When making a Consumer-visible change:**
 ```

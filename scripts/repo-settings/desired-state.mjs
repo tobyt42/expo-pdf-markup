@@ -89,7 +89,7 @@ export const desiredState = {
 
   environments: [
     {
-      // The npm trusted publisher is bound to this environment (ADR 0001). No required reviewer:
+      // The npm trusted publisher is bound to this environment (ADR 0002). No required reviewer:
       // merging the Release PR is the approval. Admins cannot bypass the deployment policy.
       name: 'npm-publish',
       settings: { can_admins_bypass: false, reviewers: [], wait_timer: 0 },

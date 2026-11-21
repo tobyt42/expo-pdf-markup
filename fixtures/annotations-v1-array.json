@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "annotations": [
+    {
+      "id": "shared-ink",
+      "type": "ink",
+      "color": "#CC2244",
+      "lineWidth": 3,
+      "paths": [
+        [
+          [40, 100],
+          {
+            "x": 120,
+            "y": 160
+          },
+          [180, 130]
+        ]
+      ],
+      "page": 0,
+      "createdAt": 1741340000
+    },
+    {
+      "id": "shared-highlight",
+      "type": "highlight",
+      "color": "#FFCC00",
+      "alpha": 0.5,
+      "bounds": {
+        "x": 60,
+        "y": 300,
+        "width": 180,
+        "height": 24
+      },
+      "page": 0,
+      "createdAt": 1741340001
+    },
+    {
+      "id": "shared-underline",
+      "type": "underline",
+      "color": "#2244CC",
+      "bounds": {
+        "x": 80,
+        "y": 380,
+        "width": 160,
+        "height": 20
+      },
+      "page": 0,
+      "createdAt": 1741340002
+    },
+    {
+      "id": "shared-text",
+      "type": "text",
+      "color": "#114422",
+      "bounds": {
+        "x": 100,
+        "y": 450,
+        "width": 240,
+        "height": 40
+      },
+      "contents": "Shared note",
+      "fontSize": 16,
+      "fontFamily": "Helvetica",
+      "page": 0,
+      "createdAt": 1741340003
+    },
+    {
+      "id": "shared-free-text",
+      "type": "freeText",
+      "color": "#442211",
+      "bounds": {
+        "x": 100,
+        "y": 520,
+        "width": 240,
+        "height": 40
+      },
+      "contents": "Visible page",
+      "fontSize": 18,
+      "fontFamily": "Helvetica",
+      "page": 0,
+      "createdAt": 1741340004
+    },
+    {
+      "id": "shared-music",
+      "type": "stamp",
+      "color": "#332299",
+      "bounds": {
+        "x": 20,
+        "y": 700,
+        "width": 48,
+        "height": 48
+      },
+      "text": "♫",
+      "page": 0,
+      "createdAt": 1741340005
+    },
+    {
+      "id": "shared-star",
+      "type": "stamp",
+      "color": "#BB5500",
+      "bounds": {
+        "x": 270,
+        "y": 700,
+        "width": 48,
+        "height": 48
+      },
+      "text": "★",
+      "page": 0,
+      "createdAt": 1741340006
+    },
+    {
+      "id": "shared-emoji",
+      "type": "stamp",
+      "color": "#222222",
+      "bounds": {
+        "x": 530,
+        "y": 700,
+        "width": 48,
+        "height": 48
+      },
+      "text": "🎵",
+      "page": 0,
+      "createdAt": 1741340007
+    }
+  ]
+}

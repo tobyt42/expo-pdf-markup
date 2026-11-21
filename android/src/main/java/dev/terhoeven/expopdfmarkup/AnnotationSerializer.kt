@@ -20,12 +20,15 @@ object AnnotationSerializer {
         }
     }
 
-    fun serialize(data: AnnotationsData): String {
+    fun serialize(
+        data: AnnotationsData,
+        inkPointFormat: InkPointFormat = InkPointFormat.OBJECT
+    ): String {
         val obj = JSONObject()
         obj.put("version", data.version)
         val arr = JSONArray()
         for (annotation in data.annotations) {
-            arr.put(annotationToJson(annotation))
+            arr.put(annotationToJson(annotation, inkPointFormat))
         }
         obj.put("annotations", arr)
         return obj.toString()
@@ -89,18 +92,34 @@ object AnnotationSerializer {
         arr ?: return null
         val paths = mutableListOf<List<AnnotationPoint>>()
         for (i in 0 until arr.length()) {
-            val stroke = arr.getJSONArray(i)
+            // A stroke that isn't an array is malformed and skipped; the rest still loads.
+            val stroke = arr.optJSONArray(i) ?: continue
             val points = mutableListOf<AnnotationPoint>()
             for (j in 0 until stroke.length()) {
-                val pt = stroke.getJSONObject(j)
-                points.add(
-                    AnnotationPoint(pt.getDouble("x").toFloat(), pt.getDouble("y").toFloat())
-                )
+                readInkPoint(stroke.opt(j))?.let { points.add(it) }
             }
             paths.add(points)
         }
         return paths
     }
+
+    /**
+     * Reads one ink point in object form (`{"x": …, "y": …}`) or array form (`[x, y]`).
+     * Anything else is malformed and returns null, so the caller skips just that point.
+     */
+    private fun readInkPoint(value: Any?): AnnotationPoint? {
+        val (x, y) = when (value) {
+            is JSONObject -> value.opt("x") to value.opt("y")
+            is JSONArray -> if (value.length() == 2) value.opt(0) to value.opt(1) else return null
+            else -> return null
+        }
+        val xd = finiteNumber(x) ?: return null
+        val yd = finiteNumber(y) ?: return null
+        return AnnotationPoint(xd.toFloat(), yd.toFloat())
+    }
+
+    private fun finiteNumber(value: Any?): Double? =
+        (value as? Number)?.toDouble()?.takeIf { it.isFinite() }
 
     private fun parseBounds(obj: JSONObject?): AnnotationBounds? {
         obj ?: return null
@@ -112,7 +131,10 @@ object AnnotationSerializer {
         )
     }
 
-    private fun annotationToJson(model: AnnotationModel): JSONObject {
+    private fun annotationToJson(
+        model: AnnotationModel,
+        inkPointFormat: InkPointFormat
+    ): JSONObject {
         val obj = JSONObject()
         obj.put("id", model.id)
         obj.put("type", model.type)
@@ -122,10 +144,12 @@ object AnnotationSerializer {
         model.alpha?.let { obj.put("alpha", it.toDouble()) }
         // Ink annotations always carry `paths`, even when empty: the JS `Annotation` type
         // declares it non-optional, so omitting the key crashes consumers that dereference it.
+        // Only ink points are cleaned up and follow the ink point format; any other paths are
+        // written as they always were.
         if (model.type == "ink") {
-            obj.put("paths", pathsToJson(model.paths ?: emptyList()))
+            obj.put("paths", inkPathsToJson(model.paths ?: emptyList(), inkPointFormat))
         } else {
-            model.paths?.let { obj.put("paths", pathsToJson(it)) }
+            model.paths?.let { obj.put("paths", rawPathsToJson(it)) }
         }
         model.bounds?.let { obj.put("bounds", boundsToJson(it)) }
         model.contents?.let { obj.put("contents", it) }
@@ -136,20 +160,73 @@ object AnnotationSerializer {
         return obj
     }
 
-    private fun pathsToJson(paths: List<List<AnnotationPoint>>): JSONArray {
+    /**
+     * Writes ink strokes cleaned up: every coordinate rounded to 0.1 pt, consecutive duplicate
+     * points (after rounding) dropped, and a stroke that collapses from 2+ points to one kept
+     * as two identical points so it still draws as a dot. In-memory points are untouched.
+     * Each point is written in object form (`{"x": …, "y": …}`) or array form (`[x, y]`).
+     */
+    private fun inkPathsToJson(
+        paths: List<List<AnnotationPoint>>,
+        inkPointFormat: InkPointFormat
+    ): JSONArray {
+        val writePoint: (Long, Long) -> Any = when (inkPointFormat) {
+            InkPointFormat.OBJECT -> { x, y ->
+                JSONObject().put("x", tenthsToJsonNumber(x)).put("y", tenthsToJsonNumber(y))
+            }
+
+            InkPointFormat.ARRAY -> { x, y ->
+                JSONArray().put(tenthsToJsonNumber(x)).put(tenthsToJsonNumber(y))
+            }
+        }
+        val arr = JSONArray()
+        for (stroke in paths) {
+            val strokeArr = JSONArray()
+            for ((x, y) in cleanUpStroke(stroke)) strokeArr.put(writePoint(x, y))
+            arr.put(strokeArr)
+        }
+        return arr
+    }
+
+    /** Writes paths of a non-ink annotation unchanged, each point in object form. */
+    private fun rawPathsToJson(paths: List<List<AnnotationPoint>>): JSONArray {
         val arr = JSONArray()
         for (stroke in paths) {
             val strokeArr = JSONArray()
             for (pt in stroke) {
-                val ptObj = JSONObject()
-                ptObj.put("x", pt.x.toDouble())
-                ptObj.put("y", pt.y.toDouble())
-                strokeArr.put(ptObj)
+                strokeArr.put(JSONObject().put("x", pt.x.toDouble()).put("y", pt.y.toDouble()))
             }
             arr.put(strokeArr)
         }
         return arr
     }
+
+    /** Rounds a stroke to whole tenths of a point and drops consecutive duplicates. */
+    private fun cleanUpStroke(stroke: List<AnnotationPoint>): List<Pair<Long, Long>> {
+        val kept = mutableListOf<Pair<Long, Long>>()
+        for (pt in stroke) {
+            val rounded = toTenths(pt.x) to toTenths(pt.y)
+            if (kept.lastOrNull() != rounded) kept.add(rounded)
+        }
+        if (stroke.size >= 2 && kept.size == 1) kept.add(kept[0])
+        return kept
+    }
+
+    /**
+     * Nearest whole number of tenths, rounding the Double product with ties away from zero.
+     * The Float is widened to Double first; `kotlin.math.round` is half-even, so it isn't used.
+     */
+    private fun toTenths(value: Float): Long {
+        val scaled = value.toDouble() * 10
+        return (Math.signum(scaled) * Math.round(Math.abs(scaled))).toLong()
+    }
+
+    /**
+     * Whole numbers go in as Long so they print without `.0` (and negative zero as `0`);
+     * anything else is n / 10.0, whose shortest decimal has a single digit after the point.
+     */
+    private fun tenthsToJsonNumber(tenths: Long): Number =
+        if (tenths % 10 == 0L) tenths / 10 else tenths / 10.0
 
     private fun boundsToJson(bounds: AnnotationBounds): JSONObject {
         val obj = JSONObject()

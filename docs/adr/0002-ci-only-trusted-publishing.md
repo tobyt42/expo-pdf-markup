@@ -4,7 +4,7 @@ Releases and Snapshots are published to npm only by `.github/workflows/release.y
 
 ## Considered Options
 
-- **Local `npm publish` with 2FA** (previous process): safe but manual on every release, and not something an agent can drive.
+- **Local `npm publish` with 2FA** (previous process): safe but manual on every Release, and not something an agent can drive.
 - **Automation token as a repository secret**: a long-lived credential that leaks with any workflow compromise and has to be rotated.
 - **Required reviewer on the publish environment**: rejected because merging the Release PR is already the maintainer's approval, and a compromised GitHub session could approve anyway.
 

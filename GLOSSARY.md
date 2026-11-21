@@ -1,6 +1,40 @@
 # expo-pdf-markup
 
-An Expo module for displaying and annotating PDFs. This glossary covers the language used for the library itself and for how it is released.
+Displaying PDFs and letting people mark them up, with annotations exchanged as JSON shared by the iOS, Android and web implementations, and releasing the library to npm.
+
+**Host app**:
+The app that embeds this library and stores its annotation sets, such as the Choir App.
+_Avoid_: consumer (outside the term Consumer-visible change), client app
+
+## Annotations
+
+**Annotation set**:
+The full collection of annotations for one document, exchanged as a single JSON string.
+_Avoid_: markup set, annotations blob
+
+**Ink stroke**:
+One continuous freehand line within an ink annotation, made of ordered ink points.
+_Avoid_: path (when meaning a single stroke), line
+
+**Ink point**:
+One position on an ink stroke, in visible-page PDF points with y increasing upwards.
+_Avoid_: vertex, coordinate pair
+
+**Clean-up**:
+What happens to ink points only when an annotation set is written: each coordinate is rounded to 0.1 pt, consecutive duplicate ink points in an ink stroke are dropped, and a stroke of two or more points keeps at least two. Ink points in memory, and every other field, are untouched.
+_Avoid_: compression, simplification, normalisation
+
+**Ink point format**:
+How an ink point is written in an annotation set: object form or array form. Readers accept either, point by point.
+_Avoid_: compact encoding, ink encoding
+
+**Object form**:
+The ink point format `{"x": …, "y": …}`, and the default.
+_Avoid_: legacy format
+
+**Array form**:
+The ink point format `[x, y]`, chosen when the host app opts in.
+_Avoid_: compact format, tuple format
 
 ## Releasing
 
@@ -9,7 +43,7 @@ A small file describing one Consumer-visible change and its semver bump, waiting
 _Avoid_: Release note, changelog entry
 
 **Consumer-visible change**:
-A change that developers using the package can observe: its public API or behaviour, native code, dependency ranges, the Expo SDK and React Native versions it is tested against, or the contents of the published package. Only these get a Changeset.
+A change that a Host app, or the developers building one, can observe in the package: its public API or behaviour, native code, dependency ranges, the Expo SDK and React Native versions it is tested against, or the contents of the published package. Only these get a Changeset.
 _Avoid_: User-facing change, notable change
 
 **Pending changesets**:

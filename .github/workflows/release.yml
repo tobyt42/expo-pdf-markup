@@ -1,6 +1,6 @@
 name: Release
 
-# The only workflow allowed to publish to npm (see docs/adr/0001-ci-only-trusted-publishing.md).
+# The only workflow allowed to publish to npm (see docs/adr/0002-ci-only-trusted-publishing.md).
 # The npm trusted publisher is bound to this file name: do not rename or split it without
 # updating the trusted publisher on npmjs.com first.
 #

@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Release
 
-Takes one Release from the Pending changesets on `main` to a verified publish under npm `latest`. Terms are as defined in the [glossary](../../../GLOSSARY.md); only `.github/workflows/release.yml` publishes ([ADR 0001](../../../docs/adr/0001-ci-only-trusted-publishing.md)), so this skill prepares, waits, tags and verifies. Every command runs from the repository root of the Release worktree unless it says otherwise.
+Takes one Release from the Pending changesets on `main` to a verified publish under npm `latest`. Terms are as defined in the [glossary](../../../GLOSSARY.md); only `.github/workflows/release.yml` publishes ([ADR 0002](../../../docs/adr/0002-ci-only-trusted-publishing.md)), so this skill prepares, waits, tags and verifies. Every command runs from the repository root of the Release worktree unless it says otherwise.
 
 ## The go-ahead
 

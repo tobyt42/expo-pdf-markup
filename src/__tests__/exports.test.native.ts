@@ -17,6 +17,11 @@ describe('public API surface', () => {
       (k) => typeof (ExportedModule as any)[k] !== 'undefined'
     );
     // setPdfJsWasmUrl / setPdfJsWorkerSrc are no-ops on native (keys are sorted)
-    expect(nonTypeExports).toEqual(['ExpoPdfMarkupView', 'setPdfJsWasmUrl', 'setPdfJsWorkerSrc']);
+    expect(nonTypeExports).toEqual([
+      'ExpoPdfMarkupView',
+      'parseAnnotations',
+      'setPdfJsWasmUrl',
+      'setPdfJsWorkerSrc',
+    ]);
   });
 });

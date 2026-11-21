@@ -3,6 +3,20 @@ import type { StyleProp, ViewStyle } from 'react-native';
 /** Zero-origin visible-page points after page rotation, in PDF points with y increasing upward. */
 export type AnnotationPoint = { x: number; y: number };
 
+/**
+ * An ink point in array form (`[x, y]`), as it may appear in raw annotation set JSON.
+ * Use `parseAnnotations` to read raw JSON; it always returns ink points as {@link AnnotationPoint}.
+ */
+export type AnnotationPointArray = [number, number];
+
+/**
+ * How ink points are written in annotation set JSON:
+ * - `'object'`: `{"x": 12.3, "y": 45.6}`, readable by every release of this library.
+ * - `'array'`: `[12.3, 45.6]`, shorter, but only readable by releases that include the
+ *   array-form readers (see {@link ExpoPdfMarkupViewProps.inkPointFormat}).
+ */
+export type InkPointFormat = 'object' | 'array';
+
 /** Visible-page rectangle; x/y locate its bottom-left corner. See docs/annotation-coordinates.md. */
 export type AnnotationBounds = { x: number; y: number; width: number; height: number };
 
@@ -116,6 +130,18 @@ export type ExpoPdfMarkupViewProps = {
   backgroundColor?: string;
   /** Serialised {@link AnnotationsData} JSON string to load when the document opens. */
   annotations?: string;
+  /**
+   * How ink points are written in the annotation set JSON passed to `onAnnotationsChanged`:
+   * `'object'` (`{"x": …, "y": …}`, the default) or `'array'` (`[x, y]`, smaller). Ink points are
+   * rounded to 0.1 pt and consecutive duplicates dropped in both forms, and `version` stays 1.
+   *
+   * Rollout rule: only choose `'array'` once every version of your app that might read the
+   * annotation set includes the release of this library with the array-form readers. Older
+   * releases can't read array form (iOS rejects the whole set, Android throws, web draws `NaN`).
+   *
+   * Changing this prop writes nothing by itself; it applies from the next edit.
+   */
+  inkPointFormat?: InkPointFormat;
   /**
    * Active annotation tool. Defaults to `'none'` (view-only).
    * On iOS, highlight/underline use a one-finger area drag on scanned and text-bearing pages.
