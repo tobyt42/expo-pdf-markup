@@ -72,7 +72,50 @@ class AnnotationsChangeEmitterTest {
     fun changingInkPointFormatAloneWritesNothing() {
         emitter.inkPointFormat = InkPointFormat.ARRAY
         emitter.inkPointFormat = InkPointFormat.OBJECT
+        assertTrue(emitted.isEmpty())
 
+        emitter.annotationsChanged(listOf(drawnStroke))
+        emitter.inkPointFormat = InkPointFormat.ARRAY
+
+        assertEquals(1, emitted.size)
+        assertTrue(inkPoints(emitted.single()).all { it is JSONObject })
+    }
+
+    @Test
+    fun loadingAnAnnotationSetWritesNothing() {
+        emitter.inkPointFormat = InkPointFormat.ARRAY
+
+        val fromObjectForm = emitter.annotationsLoaded(resource("/ink-cleanup-input.json"))
+        val fromArrayForm = emitter.annotationsLoaded(resource("/annotations-v1-array.json"))
+
+        assertTrue(emitted.isEmpty())
+        assertTrue(fromObjectForm!!.isNotEmpty())
+        assertEquals(
+            AnnotationSerializer.deserialize(resource("/annotations-v1.json"))!!.annotations,
+            fromArrayForm
+        )
+    }
+
+    @Test
+    fun loadingKeepsTheLastAnnotationWithEachId() {
+        val json = """
+            {"version": 1, "annotations": [
+              {"id": "a", "type": "highlight", "page": 0, "color": "#FF0000"},
+              {"id": "b", "type": "highlight", "page": 0, "color": "#00FF00"},
+              {"id": "a", "type": "highlight", "page": 1, "color": "#0000FF"}
+            ]}
+        """.trimIndent()
+
+        val loaded = emitter.annotationsLoaded(json)
+
+        assertEquals(listOf("b" to "#00FF00", "a" to "#0000FF"), loaded!!.map { it.id to it.color })
+    }
+
+    @Test
+    fun loadingNothingOrUnreadableJsonGivesNoAnnotations() {
+        assertEquals(emptyList<AnnotationModel>(), emitter.annotationsLoaded(null))
+        assertEquals(emptyList<AnnotationModel>(), emitter.annotationsLoaded(""))
+        assertEquals(null, emitter.annotationsLoaded("{not json"))
         assertTrue(emitted.isEmpty())
     }
 

@@ -217,6 +217,52 @@ class AnnotationSerializerTest {
     }
 
     @Test
+    fun testAStrokeThatIsNotAnArrayIsSkippedAndTheRestOfTheSetLoads() {
+        val json = """
+            {"version": 1, "annotations": [
+              {"id": "ink", "type": "ink", "page": 0, "color": "#FF0000",
+               "paths": [[[1, 2]], "not a stroke", {"x": 5, "y": 6}, [{"x": 3, "y": 4}]]},
+              {"id": "hl", "type": "highlight", "page": 1, "color": "#FFCC00",
+               "bounds": {"x": 1, "y": 2, "width": 3, "height": 4}}
+            ]}
+        """.trimIndent()
+
+        val result = AnnotationSerializer.deserialize(json)
+
+        assertNotNull(result)
+        assertEquals(listOf("ink", "hl"), result!!.annotations.map { it.id })
+        assertEquals(
+            listOf(listOf(AnnotationPoint(1f, 2f)), listOf(AnnotationPoint(3f, 4f))),
+            result.annotations[0].paths
+        )
+    }
+
+    @Test
+    fun testPathsOnANonInkAnnotationAreWrittenUncleanedInObjectForm() {
+        val model = AnnotationModel(
+            id = "hl",
+            type = "highlight",
+            page = 0,
+            color = "#FFCC00",
+            paths = listOf(
+                listOf(AnnotationPoint(1.23456f, 2.5f), AnnotationPoint(1.23456f, 2.5f))
+            ),
+            bounds = AnnotationBounds(1f, 2f, 3f, 4f)
+        )
+        for (format in InkPointFormat.values()) {
+            val json = AnnotationSerializer.serialize(AnnotationsData(1, listOf(model)), format)
+            val stroke = JSONObject(json).getJSONArray("annotations").getJSONObject(0)
+                .getJSONArray("paths").getJSONArray(0)
+            assertEquals("$format: $json", 2, stroke.length())
+            for (i in 0 until stroke.length()) {
+                val point = stroke.getJSONObject(i)
+                assertEquals(1.23456f.toDouble(), point.getDouble("x"), 0.0)
+                assertEquals(2.5, point.getDouble("y"), 0.0)
+            }
+        }
+    }
+
+    @Test
     fun testMalformedJsonReturnsNull() {
         assertNull(AnnotationSerializer.deserialize("not json"))
         assertNull(AnnotationSerializer.deserialize("{broken"))
