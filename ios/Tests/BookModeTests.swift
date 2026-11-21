@@ -154,7 +154,7 @@ final class BookModeTests: XCTestCase {
   }
 
   @MainActor func testPDFKitDoubleTapZoomWaitsForTheEdgeDoubleTap() throws {
-    let window = hostInWindow()
+    let window = try hostInWindow()
     try loadBook()
     let edgeDoubleTap = try XCTUnwrap(view.bookEdgeDoubleTapGesture)
     XCTAssertEqual(edgeDoubleTap.numberOfTapsRequired, 2)
@@ -252,8 +252,12 @@ final class BookModeTests: XCTestCase {
 
   // MARK: - Animation on screen
 
-  private func hostInWindow() -> UIWindow {
-    let window = UIWindow(frame: view.frame)
+  private func hostInWindow() throws -> UIWindow {
+    let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first,
+                              "Native test host scene must exist")
+    let window = UIWindow(windowScene: scene)
+    window.frame = view.frame
+    window.rootViewController = UIViewController()
     window.addSubview(view)
     window.isHidden = false
     view.layoutIfNeeded()
@@ -267,7 +271,7 @@ final class BookModeTests: XCTestCase {
   }
 
   func testAnimatedTurnSlidesAndSettlesOnTheNewPage() throws {
-    let window = hostInWindow()
+    let window = try hostInWindow()
     try loadBook(startPage: 2)
     let subviewsBefore = view.subviews.count
 
@@ -284,7 +288,7 @@ final class BookModeTests: XCTestCase {
   }
 
   func testAnimatedBounceReturnsToRest() throws {
-    let window = hostInWindow()
+    let window = try hostInWindow()
     try loadBook(startPage: 5)
     view.handleBookTap(at: CGPoint(x: 395, y: 300))
     waitForAnimations()
@@ -496,7 +500,7 @@ final class BookModeTests: XCTestCase {
   }
 
   @MainActor func testBookModeTakesKeyFocusOnScreen() throws {
-    let window = hostInWindow()
+    let window = try hostInWindow()
     window.makeKey()
     try loadBook()
     // PDFKit's own views may hold first responder, but none of them claims these keys.
@@ -510,7 +514,7 @@ final class BookModeTests: XCTestCase {
   }
 
   func testKeysAreIgnoredWhileATextInputHasFocus() throws {
-    let window = hostInWindow()
+    let window = try hostInWindow()
     window.makeKey()
     try loadBook(startPage: 2)
     let field = UITextField(frame: CGRect(x: 0, y: 0, width: 100, height: 30))

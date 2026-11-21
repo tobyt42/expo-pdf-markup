@@ -24,7 +24,8 @@
       "favicon": "./assets/favicon.png"
     },
     "experiments": {
-      "baseUrl": "/expo-pdf-markup/example"
+      "baseUrl": "/expo-pdf-markup/example",
+      "reactCompiler": true
     },
     "plugins": [
       "expo-asset",

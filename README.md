@@ -136,6 +136,19 @@ annotation while the text tool is active.
 
 This module uses the [Expo Modules API](https://docs.expo.dev/modules/overview/). The `example` directory contains a test app.
 
+The library development environment and example use Expo SDK 58, React 19.3, and React Native
+0.88. Use Node.js 22.13+ or 24.3+ (even-numbered releases). Install dependencies with `npm ci`
+in both the root and `example` directories.
+
+Builds and type checks use TypeScript directly. ESLint uses the public Expo flat config,
+and Jest uses `jest-expo` presets for iOS, Android, Web, and Node. Test types are checked
+separately with `npm run typecheck:tests`, since Jest uses Babel to transform TypeScript.
+React and React DOM are pinned together for the web tests.
+
+`expo-doctor` in `example` reports duplicate copies of native dependencies from the separate
+root and example installs, including the library's peer dependencies. Their versions match;
+the native builds select the example's copies. Keep both installations aligned when upgrading.
+
 ```sh
 # Build the module
 npm run build

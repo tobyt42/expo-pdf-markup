@@ -11,7 +11,8 @@ __tests__
 # Dev config / tooling
 /babel.config.js
 /eslint.config.js
-/tsconfig.json
+/tsconfig*.json
+/jest.config.cjs
 /typedoc.json
 /CLAUDE.md
 /AGENTS.md
