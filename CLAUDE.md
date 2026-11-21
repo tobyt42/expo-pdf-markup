@@ -35,7 +35,7 @@ npm run changeset:add
 ```
 Follow the prompts to describe the change and select the semver bump type. Commit the generated `.changeset/*.md` file with your code changes.
 
-**Snapshots:** every push to `main` runs web, iOS and Android validation in `release.yml`. If `main` has Pending changesets, it then publishes a Snapshot (`<next version>-next.<UTC timestamp>`) under the `next` dist-tag. Snapshots never become `latest` and never commit anything back.
+**Snapshots:** every push to `main` runs web, iOS and Android validation in `release.yml`. If `main` has Pending changesets, it then publishes a Snapshot (`0.0.0-next.<UTC timestamp>`, a placeholder that predicts no Release version and sorts below every Release) under the `next` dist-tag. Snapshots never become `latest` and never commit anything back.
 
 **Cutting a Release:** the normal route is the `release` skill (`.agents/skills/release/SKILL.md`), which runs these steps in full, builds the Release PR body and stops for the maintainer's go-ahead before merging and tagging. By hand:
 1. On a branch off `main`, review the Pending changesets with the `changeset-review` skill and commit any edits as `docs: review changesets`

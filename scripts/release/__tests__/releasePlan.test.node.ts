@@ -18,10 +18,10 @@ function facts(overrides: Partial<ReleaseFacts> = {}): ReleaseFacts {
 }
 
 describe('planRelease on main', () => {
-  it('plans a Snapshot of the next patch version when Pending changesets are patches', () => {
+  it('plans a Snapshot with a 0.0.0 placeholder version when there are Pending changesets', () => {
     expect(
       planRelease(facts({ pendingChangesets: [{ id: 'calm-dogs-sing', bump: 'patch' }] }))
-    ).toEqual({ action: 'snapshot', version: '2.0.1-next.20261121090507', distTag: 'next' });
+    ).toEqual({ action: 'snapshot', version: '0.0.0-next.20261121090507', distTag: 'next' });
   });
 
   it('skips when there are no Pending changesets', () => {
@@ -32,29 +32,20 @@ describe('planRelease on main', () => {
   });
 
   it.each([
-    [
-      'minor',
-      [
-        { id: 'a', bump: 'patch' },
-        { id: 'b', bump: 'minor' },
-      ],
-      '2.1.0',
-    ],
+    ['patch', [{ id: 'a', bump: 'patch' }]],
     [
       'major',
       [
         { id: 'a', bump: 'minor' },
         { id: 'b', bump: 'major' },
-        { id: 'c', bump: 'patch' },
       ],
-      '3.0.0',
     ],
   ] as const)(
-    'bases the Snapshot on the highest bump (%s) of the Pending changesets',
-    (_, pendingChangesets, nextVersion) => {
+    'does not predict the next Release from the bump types (%s)',
+    (_, pendingChangesets) => {
       expect(planRelease(facts({ pendingChangesets: [...pendingChangesets] }))).toEqual({
         action: 'snapshot',
-        version: `${nextVersion}-next.20261121090507`,
+        version: '0.0.0-next.20261121090507',
         distTag: 'next',
       });
     }
@@ -67,35 +58,26 @@ describe('planRelease on main', () => {
     });
   });
 
-  it('gives Snapshots taken at increasing times increasing semver order', () => {
-    const times = [
-      '2026-11-21T09:05:07Z',
-      '2026-11-21T09:05:08Z',
-      '2026-11-21T10:00:00Z',
-      '2026-12-01T00:00:00Z',
-      '2027-01-01T00:00:00Z',
-    ];
-    const versions = times.map((time) => {
+  it('gives Snapshots taken at increasing times increasing semver order, whatever the bumps', () => {
+    // The bumps change between Snapshots, as a changeset review can reclassify them.
+    const snapshots = [
+      ['2026-11-21T09:05:07Z', 'minor'],
+      ['2026-11-21T09:05:08Z', 'patch'],
+      ['2026-11-21T10:00:00Z', 'major'],
+      ['2026-12-01T00:00:00Z', 'patch'],
+      ['2027-01-01T00:00:00Z', 'minor'],
+    ] as const;
+    const versions = snapshots.map(([time, bump]) => {
       const plan = planRelease(
-        facts({ pendingChangesets: [{ id: 'a', bump: 'patch' }], now: new Date(time) })
+        facts({ pendingChangesets: [{ id: 'a', bump }], now: new Date(time) })
       );
       if (plan.action !== 'snapshot') throw new Error(`expected a snapshot, got ${plan.action}`);
       return plan.version;
     });
     expect([...versions].reverse().sort(semverCompare)).toEqual(versions);
-    // A Snapshot sorts below the version it previews, so it never outranks that Release.
-    expect(semverCompare(versions[0]!, '2.0.1')).toBe(-1);
-    expect(semverCompare(versions[0]!, '2.0.0')).toBe(1);
+    // A Snapshot sorts below every Release, so it can never outrank latest.
+    expect(semverCompare(versions[versions.length - 1]!, '0.0.1')).toBe(-1);
   });
-
-  it.each(['2.1.0-next.20261121090507', 'not-a-version'])(
-    'refuses a Snapshot when the package.json version is %s',
-    (packageVersion) => {
-      expect(
-        planRelease(facts({ packageVersion, pendingChangesets: [{ id: 'a', bump: 'patch' }] }))
-      ).toEqual({ action: 'refuse', reason: expect.stringContaining('package.json version') });
-    }
-  );
 });
 
 describe('planRelease elsewhere', () => {

@@ -3,9 +3,6 @@
 // Pure: it takes plain facts collected by the CI wrapper (plan.cli.ts) and returns a plan. It
 // never reads files, runs git or calls npm, so every decision is covered by Jest tests.
 // See GLOSSARY.md (Releasing) for the terms used here.
-import semverInc from 'semver/functions/inc.js';
-import semverPrerelease from 'semver/functions/prerelease.js';
-
 /** A Changeset's semver bump for this package, as Changesets records it. */
 export type BumpType = 'major' | 'minor' | 'patch' | 'none';
 
@@ -28,7 +25,7 @@ export interface ReleaseFacts {
   versionPublished: boolean;
   /** The text of `CHANGELOG.md` at the pushed commit. */
   changelog: string;
-  /** The current time; Snapshot versions use it in UTC. */
+  /** The current time; Snapshot versions (`0.0.0-next.<UTC timestamp>`) use it. */
   now: Date;
 }
 
@@ -61,8 +58,12 @@ const TAG_PREFIX = 'refs/tags/';
 /** Release tags are `v<version>`; other tags never publish. */
 const RELEASE_TAG_PREFIX = `${TAG_PREFIX}v`;
 
-/** Changesets' order of bump types: the highest one across the Pending changesets wins. */
-const BUMP_ORDER: readonly BumpType[] = ['none', 'patch', 'minor', 'major'];
+/**
+ * Every Snapshot is `0.0.0-next.<UTC timestamp>`. The bump types can still change in the
+ * changeset review, so a Snapshot doesn't predict the next Release's version. The placeholder
+ * also sorts below every Release, so a Snapshot can never outrank `latest`.
+ */
+const SNAPSHOT_BASE = '0.0.0';
 
 export function planRelease(facts: ReleaseFacts): ReleasePlan {
   if (facts.ref === MAIN_REF) return planSnapshot(facts);
@@ -133,34 +134,17 @@ function planSnapshot(facts: ReleaseFacts): ReleasePlan {
       reason: 'main has no Pending changesets, so there is nothing to snapshot',
     };
   }
-  const bump = highestBump(facts.pendingChangesets);
-  if (bump === 'none') {
+  if (facts.pendingChangesets.every(({ bump }) => bump === 'none')) {
     return {
       action: 'skip',
       reason: 'the Pending changesets bump no version, so there is nothing to snapshot',
     };
   }
-  // The version `changeset version` would produce: Changesets applies semver's `inc` with the
-  // highest bump, exactly as @changesets/assemble-release-plan does for a single package.
-  const nextVersion = semverInc(facts.packageVersion, bump);
-  if (nextVersion === null || semverPrerelease(facts.packageVersion) !== null) {
-    return {
-      action: 'refuse',
-      reason: `package.json version check failed: ${JSON.stringify(facts.packageVersion)} is not a stable semver version`,
-    };
-  }
   return {
     action: 'snapshot',
-    version: `${nextVersion}-next.${utcTimestamp(facts.now)}`,
+    version: `${SNAPSHOT_BASE}-next.${utcTimestamp(facts.now)}`,
     distTag: 'next',
   };
-}
-
-function highestBump(changesets: PendingChangeset[]): BumpType {
-  return changesets.reduce<BumpType>(
-    (acc, { bump }) => (BUMP_ORDER.indexOf(bump) > BUMP_ORDER.indexOf(acc) ? bump : acc),
-    'none'
-  );
 }
 
 /** `YYYYMMDDHHMMSS` in UTC: fixed width, so later times sort higher as a semver identifier. */
