@@ -319,6 +319,47 @@ final class AnnotationSerializerTests: XCTestCase {
     XCTAssertEqual(hex, "#FF0000")
   }
 
+  // MARK: - Ink point forms
+
+  private func sharedFixture(_ name: String) throws -> AnnotationsData {
+    let url = try XCTUnwrap(Bundle(for: type(of: self)).url(forResource: name, withExtension: "json"))
+    return try XCTUnwrap(AnnotationSerializer.deserialize(from: String(contentsOf: url, encoding: .utf8)))
+  }
+
+  func testArrayFormFixtureDecodesToTheSameAnnotationsAsObjectFormFixture() throws {
+    XCTAssertEqual(try sharedFixture("annotations-v1-array"), try sharedFixture("annotations-v1"))
+  }
+
+  func testMalformedInkPointsAreSkippedAndTheRestOfTheSetLoads() throws {
+    let json = """
+    {"version": 1, "annotations": [
+      {"id": "ink", "type": "ink", "page": 0, "color": "#FF0000", "lineWidth": 2,
+       "paths": [[[1, 2], [3], [4, 5, 6], ["a", "b"], {"x": 7}, {"x": "8", "y": 9}, null, true, 10,
+                  {"x": 11.5, "y": 12}, [13, 14.25]]]},
+      {"id": "hl", "type": "highlight", "page": 1, "color": "#FFCC00",
+       "bounds": {"x": 1, "y": 2, "width": 3, "height": 4}}
+    ]}
+    """
+    let data = try XCTUnwrap(AnnotationSerializer.deserialize(from: json))
+    XCTAssertEqual(data.annotations.map(\.id), ["ink", "hl"])
+    XCTAssertEqual(data.annotations[0].decodedPaths, [[
+      AnnotationPoint(x: 1, y: 2), AnnotationPoint(x: 11.5, y: 12), AnnotationPoint(x: 13, y: 14.25),
+    ]])
+    XCTAssertEqual(data.annotations[1].bounds, AnnotationBounds(x: 1, y: 2, width: 3, height: 4))
+  }
+
+  func testArrayFormInkIsWrittenBackInObjectForm() throws {
+    let data = try XCTUnwrap(AnnotationSerializer.deserialize(from: """
+    {"version": 1, "annotations": [{"id": "ink", "type": "ink", "page": 0, "color": "#FF0000",
+      "paths": [[[40, 100], {"x": 120, "y": 160}, [180, 130]]]}]}
+    """))
+    let json = try XCTUnwrap(AnnotationSerializer.serialize(data))
+    let written = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+    let annotation = try XCTUnwrap((written["annotations"] as? [[String: Any]])?.first)
+    let stroke = try XCTUnwrap((annotation["paths"] as? [[Any]])?.first as? [[String: Double]])
+    XCTAssertEqual(stroke, [["x": 40, "y": 100], ["x": 120, "y": 160], ["x": 180, "y": 130]])
+  }
+
   func testHexRoundTrip() {
     let original = "#3366CC"
     guard let color = AnnotationSerializer.colorFromHex(original) else {

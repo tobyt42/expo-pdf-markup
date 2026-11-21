@@ -187,6 +187,93 @@ final class AnnotationCoordinateTests: XCTestCase {
     }
   }
 
+  private func sharedFixtureJSON(_ name: String) throws -> String {
+    let url = try XCTUnwrap(Bundle(for: type(of: self)).url(forResource: name, withExtension: "json"))
+    return try String(contentsOf: url, encoding: .utf8)
+  }
+
+  /// What PDFKit actually holds for an annotation set: native ink points and bounds.
+  private func nativePlacement(of json: String, crop: CGRect, rotation: Int) throws -> [String] {
+    let document = try AnnotationTestFixture.document(crop: crop, rotation: rotation)
+    let page = try XCTUnwrap(document.page(at: 0))
+    let data = try XCTUnwrap(AnnotationSerializer.deserialize(from: json))
+    for model in data.annotations {
+      try page.addAnnotation(XCTUnwrap(AnnotationSerializer.toPDFAnnotation(
+        model, pageBounds: crop, pageRotation: rotation
+      )))
+    }
+    return page.annotations.map { annotation in
+      let strokes = (annotation.paths ?? []).map { path in
+        var points: [String] = []
+        path.cgPath.applyWithBlock { element in
+          let point = element.pointee.points[0]
+          points.append("\(point.x + annotation.bounds.minX),\(point.y + annotation.bounds.minY)")
+        }
+        return points.joined(separator: " ")
+      }
+      return "\(annotation.type ?? "") \(annotation.bounds) \(strokes)"
+    }
+  }
+
+  func testArrayFormFixturePlacesAnnotationsLikeObjectFormOnCroppedAndRotatedPages() throws {
+    let objectForm = try sharedFixtureJSON("annotations-v1")
+    let arrayForm = try sharedFixtureJSON("annotations-v1-array")
+    for rotation in [0, 90, 180, 270] {
+      let expected = try nativePlacement(of: objectForm, crop: AnnotationTestFixture.crop, rotation: rotation)
+      XCTAssertEqual(expected.count, 8)
+      XCTAssertEqual(
+        try nativePlacement(of: arrayForm, crop: AnnotationTestFixture.crop, rotation: rotation),
+        expected,
+        "rotation \(rotation)"
+      )
+    }
+  }
+
+  @MainActor func testArrayFormInkCanBeMovedAndErasedAndIsWrittenInObjectForm() throws {
+    let document = try AnnotationTestFixture.document()
+    let page = try XCTUnwrap(document.page(at: 0))
+    let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 400, height: 700))
+    let controller = UIViewController()
+    window.rootViewController = controller
+    window.makeKeyAndVisible()
+    let view = ExpoPdfMarkupView(appContext: nil)
+    view.frame = controller.view.bounds
+    controller.view.addSubview(view)
+    view.pdfView.document = document
+    view.layoutIfNeeded()
+    view.pdfView.layoutDocumentView()
+    view.loadAnnotations(from: """
+    {"version": 1, "annotations": [{"id": "array-ink", "type": "ink", "page": 0, "color": "#FF0000",
+      "lineWidth": 8, "paths": [[[80, 120], {"x": 130, "y": 120}, [180, 120]]], "createdAt": 123}]}
+    """)
+    view.setAnnotationMode("move")
+    let pan = CoordinateTestPan()
+    pan.suppliedLocation = view.pdfView.convert(CGPoint(x: 230, y: 200), from: page)
+    pan.suppliedState = .began
+    view.handleMovePan(pan)
+    pan.suppliedLocation = view.pdfView.convert(CGPoint(x: 250, y: 230), from: page)
+    pan.suppliedState = .changed
+    view.handleMovePan(pan)
+    pan.suppliedState = .ended
+    view.handleMovePan(pan)
+
+    let moved = view.serializeCurrentAnnotations()
+    let written = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(moved.utf8)) as? [String: Any])
+    let annotation = try XCTUnwrap((written["annotations"] as? [[String: Any]])?.first)
+    let stroke = try XCTUnwrap((annotation["paths"] as? [[Any]])?.first as? [[String: Double]])
+    XCTAssertEqual(stroke.count, 3)
+    for (point, expected) in zip(stroke, [(100.0, 150.0), (150, 150), (200, 150)]) {
+      XCTAssertEqual(try XCTUnwrap(point["x"]), expected.0, accuracy: 0.001)
+      XCTAssertEqual(try XCTUnwrap(point["y"]), expected.1, accuracy: 0.001)
+    }
+
+    let erased = try XCTUnwrap(view.hitTestAnnotation(at: CGPoint(x: 250, y: 230), on: page))
+    page.removeAnnotation(erased)
+    XCTAssertEqual(try XCTUnwrap(AnnotationSerializer.deserialize(from: view.serializeCurrentAnnotations()))
+      .annotations, [])
+    window.isHidden = true
+  }
+
   @MainActor func testStampsAreVisibleInLivePdfViewBeforeAndAfterReopen() throws {
     let document = try AnnotationTestFixture.document()
     let page = try XCTUnwrap(document.page(at: 0))
