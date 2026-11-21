@@ -99,6 +99,8 @@ Tests live in `android/src/test/`. Run with `npm run test:kotlin`.
 
 For the Dependabot queue or a specified dependency PR, use the repository's [dependency-batches skill](.agents/skills/dependency-batches/SKILL.md).
 
+To review the Pending changesets before a Release, the maintainer runs the user-invoked [changeset-review skill](.agents/skills/changeset-review/SKILL.md); start it only when they ask.
+
 ### Issue tracker
 
 Issues are tracked in GitHub Issues on tobyt42/expo-pdf-markup (via the `gh` CLI). See `docs/agents/issue-tracker.md`.
