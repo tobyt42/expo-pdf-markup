@@ -10,7 +10,7 @@ npm run qa
 ```
 
 Platform-specific QA:
-- `npm run qa:ts` — typecheck + test typecheck (`typecheck:tests`) + Prettier (auto-fix) + ESLint + Jest tests
+- `npm run qa:ts` — typecheck + test typecheck (`typecheck:tests`) + Prettier (auto-fix) + ESLint + actionlint + Jest tests
 - `npm run qa:ios` — SwiftLint + SwiftFormat (auto-fix) + XCTest (requires simulator)
 - `npm run qa:android` — ktlint + ktlint --format (auto-fix) + Gradle JUnit tests
 
@@ -18,6 +18,7 @@ Individual commands:
 - `npm run typecheck` — TypeScript type checking
 - `npm run typecheck:tests` — strict TypeScript type checking of the test suites (`tsconfig.test.json`)
 - `npm run lint` / `npm run lint:swift` / `npm run lint:kotlin` — linting per platform
+- `npm run lint:workflows` — actionlint on `.github/workflows/` (skipped with a warning locally if actionlint isn't installed; required in CI)
 - `npm run format` / `npm run format:swift` / `npm run format:kotlin` — auto-fix formatting
 - `npm run format:check` / `npm run format:swift:check` / `npm run format:kotlin:check` — check formatting
 - `npm run test` / `npm run test:swift` / `npm run test:kotlin` — tests per platform
@@ -86,6 +87,12 @@ Tests live in `android/src/test/`. Run with `npm run test:kotlin`.
 - ktlint with `android_studio` code style (see `android/.editorconfig`)
 - 4-space indent (Kotlin standard)
 - Requires `brew install ktlint`
+
+### GitHub Actions workflows
+- Linted with actionlint (`npm run lint:workflows`); requires `brew install actionlint` (and `shellcheck` for `run:` steps)
+- `validate-web.yml`, `validate-ios.yml` and `validate-android.yml` run on pull requests and manual dispatch, and are reusable (`workflow_call`)
+- `release.yml` is the only workflow triggered by a push to `main`; it calls all three validate workflows, so each platform is validated exactly once per push. Don't add `push` triggers to the validate workflows
+- Job names are required status checks on `main`: don't rename `TypeScript, tests, and web builds`, `PDF browser rendering`, `iOS XCTest` or `Android JUnit` without updating the repository settings
 
 ## Project structure
 

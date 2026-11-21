@@ -3,13 +3,17 @@ name: Validate TypeScript and web
 on:
   pull_request:
   workflow_dispatch:
+  # Called by release.yml on every push to `main` and on Release tags.
+  workflow_call:
 
 permissions:
   contents: read
 
+# Pull requests cancel superseded runs. Every other run (manual dispatch, or a call from
+# release.yml) gets its own group, so validation of each push to `main` always completes.
 concurrency:
-  group: validate-web-${{ github.ref }}
-  cancel-in-progress: true
+  group: validate-web-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CI: '1'
@@ -30,6 +34,23 @@ jobs:
             example/package-lock.json
       - name: Install library dependencies
         run: npm ci
+      # Downloaded from the release and checked against its published SHA-256, so no
+      # third-party action is needed. To upgrade, update both the version and the checksum
+      # (from actionlint_<version>_checksums.txt on the release page).
+      - name: Install actionlint
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -sSfL -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/$archive"
+          echo "$ACTIONLINT_SHA256  $RUNNER_TEMP/$archive" | sha256sum --check --strict
+          mkdir -p "$RUNNER_TEMP/actionlint"
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/actionlint" actionlint
+          echo "$RUNNER_TEMP/actionlint" >> "$GITHUB_PATH"
+      - name: Lint workflows
+        run: npm run lint:workflows
       - name: Install example dependencies
         run: npm ci
         working-directory: example

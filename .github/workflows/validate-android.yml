@@ -3,13 +3,17 @@ name: Validate Android
 on:
   pull_request:
   workflow_dispatch:
+  # Called by release.yml on every push to `main` and on Release tags.
+  workflow_call:
 
 permissions:
   contents: read
 
+# Pull requests cancel superseded runs. Every other run (manual dispatch, or a call from
+# release.yml) gets its own group, so validation of each push to `main` always completes.
 concurrency:
-  group: android-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: validate-android-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   junit:

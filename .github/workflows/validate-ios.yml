@@ -2,19 +2,22 @@ name: Validate iOS
 
 on:
   pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
+  # Called by release.yml on every push to `main` and on Release tags.
+  workflow_call:
 
 permissions:
   contents: read
 
+# Pull requests cancel superseded runs. Every other run (manual dispatch, or a call from
+# release.yml) gets its own group, so validation of each push to `main` always completes.
 concurrency:
-  group: ios-${{ github.ref }}
-  cancel-in-progress: true
+  group: validate-ios-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   xctest:
+    name: iOS XCTest
     runs-on: macos-26
     timeout-minutes: 60
     env:

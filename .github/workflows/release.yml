@@ -1,0 +1,28 @@
+name: Release
+
+# The only workflow allowed to publish to npm (see docs/adr/0001-ci-only-trusted-publishing.md).
+# The npm trusted publisher is bound to this file name: do not rename or split it without
+# updating the trusted publisher on npmjs.com first.
+#
+# Every push to `main` runs web, iOS and Android validation here, exactly once each. The
+# validate workflows themselves only trigger on pull requests and manual dispatch.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Web
+    uses: ./.github/workflows/validate-web.yml
+
+  ios:
+    name: iOS
+    uses: ./.github/workflows/validate-ios.yml
+
+  android:
+    name: Android
+    uses: ./.github/workflows/validate-android.yml
