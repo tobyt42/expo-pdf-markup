@@ -4,6 +4,7 @@ import type {
   AnnotationPoint,
   AnnotationsData,
 } from '../ExpoPdfMarkup.types';
+import { parseAnnotations as parsePublicAnnotations } from '../parseAnnotations';
 import type { PdfPageMeta } from './types';
 
 // ---------------------------------------------------------------------------
@@ -365,20 +366,21 @@ export function drawAnnotationsOnCanvas(
 // Serialization
 // ---------------------------------------------------------------------------
 
+/** Forgiving variant of the public parser: malformed input becomes an empty set. */
 export function parseAnnotations(json?: string): AnnotationsData {
   if (!json) return { version: 1, annotations: [] };
+  let data: AnnotationsData;
   try {
-    const data = JSON.parse(json) as AnnotationsData;
-    if (!Array.isArray(data?.annotations)) return { version: 1, annotations: [] };
-    // Deduplicate by id — last wins
-    const seen = new Map<string, Annotation>();
-    for (const a of data.annotations) {
-      seen.set(a.id, a);
-    }
-    return { version: 1, annotations: Array.from(seen.values()) };
+    data = parsePublicAnnotations(json);
   } catch {
     return { version: 1, annotations: [] };
   }
+  // Deduplicate by id — last wins
+  const seen = new Map<string, Annotation>();
+  for (const a of data.annotations) {
+    seen.set(a.id, a);
+  }
+  return { version: 1, annotations: Array.from(seen.values()) };
 }
 
 export function serializeAnnotations(data: AnnotationsData): string {

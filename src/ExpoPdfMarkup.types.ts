@@ -3,6 +3,12 @@ import type { StyleProp, ViewStyle } from 'react-native';
 /** Zero-origin visible-page points after page rotation, in PDF points with y increasing upward. */
 export type AnnotationPoint = { x: number; y: number };
 
+/**
+ * An ink point in array form (`[x, y]`), as it may appear in raw annotation set JSON.
+ * Use `parseAnnotations` to read raw JSON; it always returns ink points as {@link AnnotationPoint}.
+ */
+export type AnnotationPointArray = [number, number];
+
 /** Visible-page rectangle; x/y locate its bottom-left corner. See docs/annotation-coordinates.md. */
 export type AnnotationBounds = { x: number; y: number; width: number; height: number };
 

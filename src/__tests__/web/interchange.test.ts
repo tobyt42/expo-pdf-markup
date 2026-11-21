@@ -1,3 +1,4 @@
+import arrayFixture from '../../../fixtures/annotations-v1-array.json';
 import fixture from '../../../fixtures/annotations-v1.json';
 import {
   drawAnnotationsOnCanvas,
@@ -16,6 +17,10 @@ describe('shared v1 annotation interchange', () => {
       data = parseAnnotations(serializeAnnotations(data));
     }
     expect(data).toEqual(fixture);
+  });
+
+  it('decodes the array-form fixture, including a mixed-form ink stroke, to the object-form set', () => {
+    expect(parseAnnotations(JSON.stringify(arrayFixture))).toEqual(fixture);
   });
 
   it('renders the shared marks at fixed visible-page positions', () => {

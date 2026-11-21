@@ -180,6 +180,24 @@ Annotations use zero-origin visible-page coordinates, in PDF points with y incre
 See [the coordinate contract and upgrade guidance](docs/annotation-coordinates.md) for cropped
 and rotated pages, v1 compatibility limits, and native rebuild requirements.
 
+### Reading annotation JSON
+
+Ink points in an annotation set may be stored in object form (`{"x": 40, "y": 100}`) or array
+form (`[40, 100]`), and one ink stroke may mix both. Use `parseAnnotations` to read raw
+annotation JSON in your own code: it accepts either form and always returns ink points as
+`{ x, y }` objects, so the `AnnotationPoint` and `InkAnnotation` types are unchanged.
+
+```tsx
+import { parseAnnotations, type InkAnnotation } from '@tobyt/expo-pdf-markup';
+
+const { annotations } = parseAnnotations(storedJson);
+const inks = annotations.filter((a): a is InkAnnotation => a.type === 'ink');
+```
+
+Malformed ink points are skipped. `parseAnnotations` throws if the JSON can't be parsed or has
+no `annotations` array, so lost data isn't mistaken for an empty set. It doesn't round values.
+`AnnotationPointArray` (`[number, number]`) types raw array-form ink points.
+
 ### Highlighting and underlining on iOS
 
 With `annotationMode="highlight"` or `"underline"`, drag one finger to mark a rectangular area on
