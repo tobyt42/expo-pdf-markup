@@ -17,6 +17,13 @@ function facts(overrides: Partial<ReleaseFacts> = {}): ReleaseFacts {
   };
 }
 
+/** The Snapshot version planned for these facts on main; throws unless the plan is a Snapshot. */
+function snapshotVersion(overrides: Partial<ReleaseFacts>): string {
+  const plan = planRelease(facts(overrides));
+  if (plan.action !== 'snapshot') throw new Error(`expected a snapshot, got ${plan.action}`);
+  return plan.version;
+}
+
 describe('planRelease on main', () => {
   it('plans a Snapshot based on the latest Release version when there are Pending changesets', () => {
     expect(
@@ -75,30 +82,21 @@ describe('planRelease on main', () => {
       ['2026-12-01T00:00:00Z', 'patch'],
       ['2027-01-01T00:00:00Z', 'minor'],
     ] as const;
-    const versions = snapshots.map(([time, bump]) => {
-      const plan = planRelease(
-        facts({ pendingChangesets: [{ id: 'a', bump }], now: new Date(time) })
-      );
-      if (plan.action !== 'snapshot') throw new Error(`expected a snapshot, got ${plan.action}`);
-      return plan.version;
-    });
+    const versions = snapshots.map(([time, bump]) =>
+      snapshotVersion({ pendingChangesets: [{ id: 'a', bump }], now: new Date(time) })
+    );
     expect([...versions].reverse().sort(semverCompare)).toEqual(versions);
     // A Snapshot sorts below the Release it is based on, so it can never outrank latest.
     expect(semverCompare(versions[versions.length - 1]!, '2.0.0')).toBe(-1);
   });
 
   it('sorts Snapshots taken after a Release above the earlier ones', () => {
-    const snapshot = (packageVersion: string, time: string) => {
-      const plan = planRelease(
-        facts({
-          packageVersion,
-          pendingChangesets: [{ id: 'a', bump: 'patch' }],
-          now: new Date(time),
-        })
-      );
-      if (plan.action !== 'snapshot') throw new Error(`expected a snapshot, got ${plan.action}`);
-      return plan.version;
-    };
+    const snapshot = (packageVersion: string, time: string) =>
+      snapshotVersion({
+        packageVersion,
+        pendingChangesets: [{ id: 'a', bump: 'patch' }],
+        now: new Date(time),
+      });
     const versions = [
       '0.0.0-next.20261121170125', // published under the former 0.0.0 scheme
       snapshot('2.0.0', '2026-11-21T19:00:00Z'),

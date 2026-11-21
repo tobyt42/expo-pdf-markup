@@ -60,6 +60,8 @@ const MAIN_REF = 'refs/heads/main';
 const TAG_PREFIX = 'refs/tags/';
 /** Release tags are `v<version>`; other tags never publish. */
 const RELEASE_TAG_PREFIX = `${TAG_PREFIX}v`;
+/** A stable semver version, `X.Y.Z` with no prerelease or build metadata. */
+const STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 
 export function planRelease(facts: ReleaseFacts): ReleasePlan {
   if (facts.ref === MAIN_REF) return planSnapshot(facts);
@@ -145,16 +147,15 @@ function planSnapshot(facts: ReleaseFacts): ReleasePlan {
     };
   }
   const base = facts.packageVersion;
-  if (!STABLE_VERSION.test(base)) {
+  const problem = !STABLE_VERSION.test(base)
+    ? 'is not a stable X.Y.Z Release version'
+    : base === '0.0.0'
+      ? 'has no Release yet, and CocoaPods rejects a prerelease of 0.0.0, so the Snapshot would not install on iOS'
+      : null;
+  if (problem !== null) {
     return {
       action: 'refuse',
-      reason: `Snapshot base check failed: package.json on main has ${base}, not a stable X.Y.Z Release version`,
-    };
-  }
-  if (base === '0.0.0') {
-    return {
-      action: 'refuse',
-      reason: `Snapshot base check failed: package.json on main has 0.0.0, and CocoaPods rejects a prerelease of 0.0.0, so the Snapshot would not install on iOS`,
+      reason: `Snapshot base check failed: package.json on main has ${base}, which ${problem}`,
     };
   }
   return {
@@ -163,9 +164,6 @@ function planSnapshot(facts: ReleaseFacts): ReleasePlan {
     distTag: 'next',
   };
 }
-
-/** A stable semver version, `X.Y.Z` with no prerelease or build metadata. */
-const STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 
 /** `YYYYMMDDHHMMSS` in UTC: fixed width, so later times sort higher as a semver identifier. */
 function utcTimestamp(date: Date): string {
