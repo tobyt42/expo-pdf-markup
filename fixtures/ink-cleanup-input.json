@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "annotations": [
+    {
+      "id": "cleanup-ink",
+      "type": "ink",
+      "color": "#CC2244",
+      "lineWidth": 3,
+      "paths": [
+        [
+          { "x": 307.6921296296296, "y": 462.6087962962961 },
+          { "x": 307.6921296296296, "y": 462.6087962962961 },
+          { "x": 307.7049, "y": 462.5501 },
+          { "x": 1.75, "y": 12.25 },
+          { "x": 100.04, "y": 99.96 },
+          { "x": -0.04, "y": -1.25 },
+          { "x": -0.04, "y": -1.25 },
+          { "x": 0.05, "y": 2.675 }
+        ],
+        [
+          { "x": 50.01, "y": 60.02 },
+          { "x": 50.03, "y": 59.98 },
+          { "x": 49.96, "y": 60.04 }
+        ],
+        [
+          { "x": 5, "y": 5 },
+          { "x": 5, "y": 5 }
+        ],
+        [{ "x": 10.123, "y": 20.987 }],
+        []
+      ],
+      "page": 0,
+      "createdAt": 1741340000
+    },
+    {
+      "id": "cleanup-ink-fractional-width",
+      "type": "ink",
+      "color": "#2244CC",
+      "lineWidth": 2.5,
+      "paths": [
+        [
+          { "x": 200.123456, "y": 300.987654 },
+          { "x": 200.16, "y": 300.94 },
+          { "x": 200.14, "y": 301.01 }
+        ]
+      ],
+      "page": 1,
+      "createdAt": 1741340001
+    },
+    {
+      "id": "cleanup-highlight",
+      "type": "highlight",
+      "color": "#FFCC00",
+      "alpha": 0.25,
+      "bounds": { "x": 60.125, "y": 300.875, "width": 180.5, "height": 24.25 },
+      "page": 0,
+      "createdAt": 1741340002
+    },
+    {
+      "id": "cleanup-underline",
+      "type": "underline",
+      "color": "#2244CC",
+      "bounds": { "x": 80.0625, "y": 380.375, "width": 160.25, "height": 20.5 },
+      "page": 0,
+      "createdAt": 1741340003
+    },
+    {
+      "id": "cleanup-text",
+      "type": "text",
+      "color": "#114422",
+      "bounds": { "x": 100.125, "y": 450.75, "width": 240.375, "height": 40.5 },
+      "contents": "Unrounded note",
+      "fontSize": 16.5,
+      "fontFamily": "Helvetica",
+      "page": 0,
+      "createdAt": 1741340004
+    },
+    {
+      "id": "cleanup-free-text",
+      "type": "freeText",
+      "color": "#442211",
+      "bounds": { "x": 100.0625, "y": 520.875, "width": 240.25, "height": 40.25 },
+      "contents": "Unrounded free text",
+      "fontSize": 18.5,
+      "fontFamily": "Helvetica",
+      "page": 0,
+      "createdAt": 1741340005
+    },
+    {
+      "id": "cleanup-stamp",
+      "type": "stamp",
+      "color": "#332299",
+      "bounds": { "x": 20.125, "y": 700.875, "width": 48.5, "height": 48.5 },
+      "text": "♫",
+      "page": 0,
+      "createdAt": 1741340006
+    }
+  ]
+}
