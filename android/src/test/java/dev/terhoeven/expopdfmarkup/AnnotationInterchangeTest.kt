@@ -4,6 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AnnotationInterchangeTest {
@@ -47,6 +48,59 @@ class AnnotationInterchangeTest {
             javaClass.getResource("/annotations-v1-array.json")
         ).readText()
         assertEquals(fixture(), AnnotationSerializer.deserialize(arrayJson))
+    }
+
+    @Test
+    fun sharedCleanUpFixtureIsWrittenExactlyAsExpectedInObjectForm() {
+        val input = AnnotationSerializer.deserialize(resource("/ink-cleanup-input.json"))!!
+        assertEquals(
+            jsonValue(JSONObject(resource("/ink-cleanup-expected-object.json"))),
+            jsonValue(JSONObject(AnnotationSerializer.serialize(input)))
+        )
+    }
+
+    @Test
+    fun everyWrittenInkCoordinateHasAtMostOneDecimalDigitAndNoTrailingZero() {
+        val input = AnnotationSerializer.deserialize(resource("/ink-cleanup-input.json"))!!
+        val written = AnnotationSerializer.serialize(input)
+        val coordinates = inkCoordinateTexts(written)
+        assertEquals(
+            listOf(
+                "307.7", "462.6", "1.8", "12.3", "100", "100", "0", "-1.3", "0.1", "2.7",
+                "50", "60", "50", "60", "5", "5", "5", "5", "10.1", "21",
+                "200.1", "301", "200.2", "300.9", "200.1", "301"
+            ),
+            coordinates
+        )
+        for (text in coordinates) {
+            assertTrue("bad coordinate text: $text", Regex("-?\\d+(\\.[1-9])?").matches(text))
+            assertTrue("negative zero written: $text", text != "-0")
+        }
+    }
+
+    private fun resource(name: String): String =
+        requireNotNull(javaClass.getResource(name)).readText()
+
+    /** Raw number texts of every ink coordinate in the written JSON, in order. */
+    private fun inkCoordinateTexts(json: String): List<String> {
+        val texts = mutableListOf<String>()
+        var from = 0
+        while (true) {
+            val start = json.indexOf("\"paths\":", from).takeIf { it >= 0 } ?: break
+            var depth = 0
+            var end = json.indexOf('[', start)
+            do {
+                when (json[end]) {
+                    '[' -> depth++
+                    ']' -> depth--
+                }
+                end++
+            } while (depth > 0)
+            val section = json.substring(start + "\"paths\":".length, end)
+            Regex("-?[0-9][0-9.eE+-]*").findAll(section).forEach { texts.add(it.value) }
+            from = end
+        }
+        return texts
     }
 
     @Test
