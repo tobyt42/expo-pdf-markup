@@ -2,8 +2,11 @@ import type {
   Annotation,
   AnnotationBounds,
   AnnotationPoint,
+  AnnotationPointArray,
   AnnotationsData,
+  InkPointFormat,
 } from '../ExpoPdfMarkup.types';
+import { parseAnnotations as parsePublicAnnotations } from '../parseAnnotations';
 import type { PdfPageMeta } from './types';
 
 // ---------------------------------------------------------------------------
@@ -365,24 +368,80 @@ export function drawAnnotationsOnCanvas(
 // Serialization
 // ---------------------------------------------------------------------------
 
+/** Forgiving variant of the public parser: malformed input becomes an empty set. */
 export function parseAnnotations(json?: string): AnnotationsData {
   if (!json) return { version: 1, annotations: [] };
+  let data: AnnotationsData;
   try {
-    const data = JSON.parse(json) as AnnotationsData;
-    if (!Array.isArray(data?.annotations)) return { version: 1, annotations: [] };
-    // Deduplicate by id — last wins
-    const seen = new Map<string, Annotation>();
-    for (const a of data.annotations) {
-      seen.set(a.id, a);
-    }
-    return { version: 1, annotations: Array.from(seen.values()) };
+    data = parsePublicAnnotations(json);
   } catch {
     return { version: 1, annotations: [] };
   }
+  // Deduplicate by id — last wins
+  const seen = new Map<string, Annotation>();
+  for (const a of data.annotations) {
+    seen.set(a.id, a);
+  }
+  return { version: 1, annotations: Array.from(seen.values()) };
 }
 
-export function serializeAnnotations(data: AnnotationsData): string {
-  return JSON.stringify(data);
+/**
+ * Round a coordinate to the nearest 0.1 pt, matching the iOS and Android writers:
+ * scale by 10 in double precision, round half away from zero, divide by 10.
+ * Negative zero becomes zero so it is written as `0`.
+ */
+function roundInkCoordinate(value: number): number {
+  const scaled = value * 10;
+  const rounded = Math.sign(scaled) * Math.round(Math.abs(scaled));
+  return rounded / 10 + 0;
+}
+
+/**
+ * Round each ink point to 0.1 pt and drop consecutive duplicates (compared after
+ * rounding). A stroke that collapses to one point keeps two identical points so it
+ * still draws as a dot; strokes that started with fewer points are left that short.
+ */
+function cleanUpInkStroke(stroke: AnnotationPoint[]): AnnotationPoint[] {
+  const cleaned: AnnotationPoint[] = [];
+  for (const point of stroke) {
+    const rounded = { x: roundInkCoordinate(point.x), y: roundInkCoordinate(point.y) };
+    const previous = cleaned[cleaned.length - 1];
+    if (previous && previous.x === rounded.x && previous.y === rounded.y) continue;
+    cleaned.push(rounded);
+  }
+  if (stroke.length >= 2 && cleaned.length === 1) {
+    cleaned.push({ ...cleaned[0]! });
+  }
+  return cleaned;
+}
+
+export type SerializeOptions = {
+  /** How ink points are written; defaults to object form. */
+  inkPointFormat?: InkPointFormat;
+};
+
+/**
+ * Write an annotation set. Ink points are cleaned up here, and only here: in memory
+ * they keep full precision. Bounds and every non-ink field are written unchanged.
+ */
+export function serializeAnnotations(
+  data: AnnotationsData,
+  { inkPointFormat = 'object' }: SerializeOptions = {}
+): string {
+  const writeStroke = (stroke: AnnotationPoint[]): (AnnotationPoint | AnnotationPointArray)[] => {
+    const cleaned = cleanUpInkStroke(stroke);
+    return inkPointFormat === 'array'
+      ? cleaned.map((p): AnnotationPointArray => [p.x, p.y])
+      : cleaned;
+  };
+  return JSON.stringify({
+    ...data,
+    annotations: data.annotations.map((annotation) =>
+      annotation.type === 'ink'
+        ? { ...annotation, paths: (annotation.paths ?? []).map(writeStroke) }
+        : annotation
+    ),
+  });
 }
 
 export function newAnnotationId(): string {

@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "annotations": [
+    {
+      "id": "cleanup-ink",
+      "type": "ink",
+      "color": "#CC2244",
+      "lineWidth": 3,
+      "paths": [
+        [
+          { "x": 307.7, "y": 462.6 },
+          { "x": 1.8, "y": 12.3 },
+          { "x": 100, "y": 100 },
+          { "x": 0, "y": -1.3 },
+          { "x": 0.1, "y": 2.7 }
+        ],
+        [
+          { "x": 50, "y": 60 },
+          { "x": 50, "y": 60 }
+        ],
+        [
+          { "x": 5, "y": 5 },
+          { "x": 5, "y": 5 }
+        ],
+        [{ "x": 10.1, "y": 21 }],
+        []
+      ],
+      "page": 0,
+      "createdAt": 1741340000
+    },
+    {
+      "id": "cleanup-ink-fractional-width",
+      "type": "ink",
+      "color": "#2244CC",
+      "lineWidth": 2.5,
+      "paths": [
+        [
+          { "x": 200.1, "y": 301 },
+          { "x": 200.2, "y": 300.9 },
+          { "x": 200.1, "y": 301 }
+        ]
+      ],
+      "page": 1,
+      "createdAt": 1741340001
+    },
+    {
+      "id": "cleanup-highlight",
+      "type": "highlight",
+      "color": "#FFCC00",
+      "alpha": 0.25,
+      "bounds": { "x": 60.125, "y": 300.875, "width": 180.5, "height": 24.25 },
+      "page": 0,
+      "createdAt": 1741340002
+    },
+    {
+      "id": "cleanup-underline",
+      "type": "underline",
+      "color": "#2244CC",
+      "bounds": { "x": 80.0625, "y": 380.375, "width": 160.25, "height": 20.5 },
+      "page": 0,
+      "createdAt": 1741340003
+    },
+    {
+      "id": "cleanup-text",
+      "type": "text",
+      "color": "#114422",
+      "bounds": { "x": 100.125, "y": 450.75, "width": 240.375, "height": 40.5 },
+      "contents": "Unrounded note",
+      "fontSize": 16.5,
+      "fontFamily": "Helvetica",
+      "page": 0,
+      "createdAt": 1741340004
+    },
+    {
+      "id": "cleanup-free-text",
+      "type": "freeText",
+      "color": "#442211",
+      "bounds": { "x": 100.0625, "y": 520.875, "width": 240.25, "height": 40.25 },
+      "contents": "Unrounded free text",
+      "fontSize": 18.5,
+      "fontFamily": "Helvetica",
+      "page": 0,
+      "createdAt": 1741340005
+    },
+    {
+      "id": "cleanup-stamp",
+      "type": "stamp",
+      "color": "#332299",
+      "bounds": { "x": 20.125, "y": 700.875, "width": 48.5, "height": 48.5 },
+      "text": "♫",
+      "page": 0,
+      "createdAt": 1741340006
+    }
+  ]
+}

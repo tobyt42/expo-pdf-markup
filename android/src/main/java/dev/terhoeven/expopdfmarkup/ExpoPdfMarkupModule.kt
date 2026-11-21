@@ -100,6 +100,10 @@ class ExpoPdfMarkupModule : Module() {
                 view.useJsTextDialog = use ?: false
             }
 
+            Prop("inkPointFormat") { view: ExpoPdfMarkupView, format: String? ->
+                view.inkPointFormat = InkPointFormat.fromProp(format)
+            }
+
             Events(
                 "onPageChanged",
                 "onLoadComplete",

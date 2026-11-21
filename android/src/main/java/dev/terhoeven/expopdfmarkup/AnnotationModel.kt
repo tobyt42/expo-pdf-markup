@@ -27,3 +27,15 @@ data class AnnotationsData(
     val version: Int = 1,
     val annotations: List<AnnotationModel> = emptyList()
 )
+
+/** How ink points are written: object form `{"x": …, "y": …}` (default) or array form `[x, y]`. */
+enum class InkPointFormat {
+    OBJECT,
+    ARRAY
+    ;
+
+    companion object {
+        /** Maps the `inkPointFormat` view prop; anything other than `"array"` is object form. */
+        fun fromProp(value: String?): InkPointFormat = if (value == "array") ARRAY else OBJECT
+    }
+}

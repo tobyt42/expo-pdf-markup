@@ -1,6 +1,8 @@
 import * as pdfjs from 'pdfjs-dist';
 import { act, type ReactNode } from 'react';
 
+import arrayFormSet from '../../fixtures/annotations-v1-array.json';
+import objectFormSet from '../../fixtures/annotations-v1.json';
 import type { ExpoPdfMarkupViewProps } from '../ExpoPdfMarkup.types';
 import ExpoPdfMarkupView from '../ExpoPdfMarkupView.web';
 
@@ -913,6 +915,80 @@ describeDom('ExpoPdfMarkupView (web) book mode', () => {
 
       expect(press('ArrowRight').defaultPrevented).toBe(false);
       expect(onPageChanged).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('ink point format', () => {
+    beforeEach(() => {
+      // jsdom has no FontFaceSet; the fixtures' text annotations ask it to load their fonts.
+      Object.defineProperty(document, 'fonts', {
+        configurable: true,
+        value: { load: jest.fn().mockResolvedValue([]) },
+      });
+    });
+
+    afterEach(() => {
+      delete (document as { fonts?: unknown }).fonts;
+    });
+
+    const inkPointsOf = (json: string): unknown[] =>
+      (JSON.parse(json) as { annotations: { type: string; paths?: unknown[][] }[] }).annotations
+        .filter((annotation) => annotation.type === 'ink')
+        .flatMap((annotation) => annotation.paths!.flat());
+
+    async function drawInk(props: Partial<ExpoPdfMarkupViewProps>): Promise<string> {
+      const onAnnotationsChanged = jest.fn();
+      await render({ displayMode: 'book', annotationMode: 'ink', onAnnotationsChanged, ...props });
+      const canvas = view().querySelectorAll('[data-book-slot="0"] canvas')[1]!;
+      drag(100, 200, 100, canvas);
+      return onAnnotationsChanged.mock.calls.at(-1)[0].nativeEvent.annotations;
+    }
+
+    it('writes ink points in object form by default', async () => {
+      const points = inkPointsOf(await drawInk({}));
+
+      expect(points.length).toBeGreaterThanOrEqual(2);
+      for (const point of points) {
+        expect(point).toEqual({ x: expect.any(Number), y: expect.any(Number) });
+      }
+    });
+
+    it('writes ink points in array form with inkPointFormat="array"', async () => {
+      const points = inkPointsOf(await drawInk({ inkPointFormat: 'array' }));
+
+      expect(points.length).toBeGreaterThanOrEqual(2);
+      for (const point of points) {
+        expect(point).toEqual([expect.any(Number), expect.any(Number)]);
+      }
+    });
+
+    it('writes nothing when only inkPointFormat changes', async () => {
+      const onAnnotationsChanged = jest.fn();
+      const annotations = JSON.stringify(objectFormSet);
+      await render({ displayMode: 'book', annotations, onAnnotationsChanged });
+
+      await render({
+        displayMode: 'book',
+        annotations,
+        onAnnotationsChanged,
+        inkPointFormat: 'array',
+      });
+      await render({ displayMode: 'book', annotations, onAnnotationsChanged });
+
+      expect(onAnnotationsChanged).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['an object-form set', 'array' as const, objectFormSet],
+      ['an array-form set', 'object' as const, arrayFormSet],
+    ])('writes %s in the chosen form (%s) on the next edit', async (_, inkPointFormat, loaded) => {
+      const json = await drawInk({ annotations: JSON.stringify(loaded), inkPointFormat });
+
+      const points = inkPointsOf(json);
+      expect(points.length).toBeGreaterThan(2);
+      for (const point of points) {
+        expect(Array.isArray(point)).toBe(inkPointFormat === 'array');
+      }
     });
   });
 });

@@ -1,4 +1,9 @@
-import type { Annotation, AnnotationPoint, StampAnnotation } from '../../ExpoPdfMarkup.types';
+import type {
+  Annotation,
+  AnnotationPoint,
+  InkAnnotation,
+  StampAnnotation,
+} from '../../ExpoPdfMarkup.types';
 import {
   clampAnnotationTranslation,
   canvasToPdf,
@@ -313,6 +318,49 @@ describe('parseAnnotations', () => {
     const result = parseAnnotations(data);
     expect(result.annotations).toHaveLength(1);
     expect(result.annotations[0]!.color).toBe('#00FF00');
+  });
+
+  it('returns empty data when there is no annotations array', () => {
+    expect(parseAnnotations('{"version":1}').annotations).toHaveLength(0);
+  });
+
+  it('skips malformed ink points and keeps the rest of the stroke and set', () => {
+    const json = JSON.stringify({
+      version: 1,
+      annotations: [
+        {
+          id: 'ink1',
+          type: 'ink',
+          page: 0,
+          color: '#000000',
+          lineWidth: 2,
+          paths: [
+            [
+              [1, 2],
+              [3],
+              { x: 4 },
+              ['5', 6],
+              { x: 7, y: 8 },
+              [9, 10, 11],
+              null,
+              { x: 'a', y: 1 },
+              [12.345, 13.678],
+            ],
+          ],
+        },
+        highlightAnnotation,
+      ],
+    });
+    const result = parseAnnotations(json);
+    expect(result.annotations).toHaveLength(2);
+    expect((result.annotations[0] as InkAnnotation).paths).toEqual([
+      [
+        { x: 1, y: 2 },
+        { x: 7, y: 8 },
+        { x: 12.345, y: 13.678 },
+      ],
+    ]);
+    expect(result.annotations[1]!.id).toBe('hl1');
   });
 });
 

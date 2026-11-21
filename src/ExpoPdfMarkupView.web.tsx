@@ -485,6 +485,7 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
     page: propPage,
     backgroundColor = '#f0f0f0',
     annotations: annotationsProp,
+    inkPointFormat = 'object',
     annotationMode = 'none',
     annotationColor = '#FF0000',
     annotationLineWidth = 2,
@@ -559,13 +560,13 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
     (updater: (prev: Annotation[]) => Annotation[]) => {
       setAnnotations((prev) => {
         const next = updater(prev);
-        const json = serializeAnnotations({ version: 1, annotations: next });
+        const json = serializeAnnotations({ version: 1, annotations: next }, { inkPointFormat });
         lastAnnotationsJsonRef.current = json;
         onAnnotationsChanged?.({ nativeEvent: { annotations: json } });
         return next;
       });
     },
-    [onAnnotationsChanged]
+    [onAnnotationsChanged, inkPointFormat]
   );
 
   // ResizeObserver → containerSize
