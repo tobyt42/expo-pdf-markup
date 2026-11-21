@@ -62,6 +62,12 @@ describe('parseAnnotations (public)', () => {
     expect(parseAnnotations(json).annotations[1]!.id).toBe('hl');
   });
 
+  it('skips a stroke that is not an array and keeps the other strokes and the set', () => {
+    const json = inkSet([[[1, 2]], 'not a stroke' as never, [{ x: 3, y: 4 }]]);
+    expect(inkPaths(json)).toEqual([[{ x: 1, y: 2 }], [{ x: 3, y: 4 }]]);
+    expect(parseAnnotations(json).annotations[1]!.id).toBe('hl');
+  });
+
   it('does not round ink points or bounds', () => {
     const json = inkSet([[[307.6921296296296, 462.6087962962961], { x: 0.123456, y: 0.987654 }]]);
     expect(inkPaths(json)).toEqual([

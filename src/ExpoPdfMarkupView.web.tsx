@@ -16,7 +16,7 @@ import {
   drawAnnotationsOnCanvas,
   hitTestAnnotation,
   newAnnotationId,
-  parseAnnotations,
+  parseAnnotationsOrEmpty,
   serializeAnnotations,
   translateAnnotation,
 } from './web/annotationUtils';
@@ -733,7 +733,7 @@ export default function ExpoPdfMarkupView(props: ExpoPdfMarkupViewProps) {
   React.useEffect(() => {
     if (annotationsProp === lastAnnotationsJsonRef.current) return;
     lastAnnotationsJsonRef.current = annotationsProp;
-    const parsed = parseAnnotations(annotationsProp);
+    const parsed = parseAnnotationsOrEmpty(annotationsProp);
     setAnnotations(parsed.annotations);
   }, [annotationsProp]);
 

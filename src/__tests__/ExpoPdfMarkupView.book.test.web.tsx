@@ -979,6 +979,23 @@ describeDom('ExpoPdfMarkupView (web) book mode', () => {
     });
 
     it.each([
+      ['an object-form set', objectFormSet],
+      ['an array-form set', arrayFormSet],
+    ])('writes nothing when loading %s', async (_, loaded) => {
+      const onAnnotationsChanged = jest.fn();
+      await render({ displayMode: 'book', onAnnotationsChanged });
+
+      await render({
+        displayMode: 'book',
+        annotations: JSON.stringify(loaded),
+        onAnnotationsChanged,
+        inkPointFormat: 'array',
+      });
+
+      expect(onAnnotationsChanged).not.toHaveBeenCalled();
+    });
+
+    it.each([
       ['an object-form set', 'array' as const, objectFormSet],
       ['an array-form set', 'object' as const, arrayFormSet],
     ])('writes %s in the chosen form (%s) on the next edit', async (_, inkPointFormat, loaded) => {

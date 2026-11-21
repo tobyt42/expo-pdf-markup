@@ -3,7 +3,7 @@ import fixture from '../../../fixtures/annotations-v1.json';
 import {
   drawAnnotationsOnCanvas,
   hitTestAnnotation,
-  parseAnnotations,
+  parseAnnotationsOrEmpty,
   serializeAnnotations,
   translateAnnotation,
 } from '../../web/annotationUtils';
@@ -12,19 +12,19 @@ import {
 // the displayed 600 x 840 pt visible page, independent of its native crop origin.
 describe('shared v1 annotation interchange', () => {
   it('preserves placement, identity, content and style over repeated save/reopen cycles', () => {
-    let data = parseAnnotations(JSON.stringify(fixture));
+    let data = parseAnnotationsOrEmpty(JSON.stringify(fixture));
     for (let cycle = 0; cycle < 5; cycle++) {
-      data = parseAnnotations(serializeAnnotations(data));
+      data = parseAnnotationsOrEmpty(serializeAnnotations(data));
     }
     expect(data).toEqual(fixture);
   });
 
   it('decodes the array-form fixture, including a mixed-form ink stroke, to the object-form set', () => {
-    expect(parseAnnotations(JSON.stringify(arrayFixture))).toEqual(fixture);
+    expect(parseAnnotationsOrEmpty(JSON.stringify(arrayFixture))).toEqual(fixture);
   });
 
   it('renders the shared marks at fixed visible-page positions', () => {
-    const data = parseAnnotations(JSON.stringify(fixture));
+    const data = parseAnnotationsOrEmpty(JSON.stringify(fixture));
     const ctx = {
       save: jest.fn(),
       restore: jest.fn(),
@@ -57,7 +57,7 @@ describe('shared v1 annotation interchange', () => {
   });
 
   it('moves and hit-tests every category without accumulating a crop offset', () => {
-    const data = parseAnnotations(JSON.stringify(fixture));
+    const data = parseAnnotationsOrEmpty(JSON.stringify(fixture));
     const targets = [
       { x: 120, y: 160 },
       { x: 150, y: 312 },

@@ -6,7 +6,7 @@ import type {
   AnnotationsData,
   InkPointFormat,
 } from '../ExpoPdfMarkup.types';
-import { parseAnnotations as parsePublicAnnotations } from '../parseAnnotations';
+import { parseAnnotations } from '../parseAnnotations';
 import type { PdfPageMeta } from './types';
 
 // ---------------------------------------------------------------------------
@@ -369,11 +369,11 @@ export function drawAnnotationsOnCanvas(
 // ---------------------------------------------------------------------------
 
 /** Forgiving variant of the public parser: malformed input becomes an empty set. */
-export function parseAnnotations(json?: string): AnnotationsData {
+export function parseAnnotationsOrEmpty(json?: string): AnnotationsData {
   if (!json) return { version: 1, annotations: [] };
   let data: AnnotationsData;
   try {
-    data = parsePublicAnnotations(json);
+    data = parseAnnotations(json);
   } catch {
     return { version: 1, annotations: [] };
   }
