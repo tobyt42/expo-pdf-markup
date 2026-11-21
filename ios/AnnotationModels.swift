@@ -66,6 +66,51 @@ struct AnnotationModel: Codable, Equatable {
   }
 }
 
+extension AnnotationModel {
+  /// Decodes `paths` one ink point at a time, so an array-form point (`[x, y]`) or a
+  /// malformed point never rejects the whole annotation set. Decoded points are kept in
+  /// object form, which is what the synthesised `encode(to:)` writes.
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(String.self, forKey: .id)
+    type = try container.decode(String.self, forKey: .type)
+    page = try container.decode(Int.self, forKey: .page)
+    color = try container.decode(String.self, forKey: .color)
+    lineWidth = try container.decodeIfPresent(CGFloat.self, forKey: .lineWidth)
+    alpha = try container.decodeIfPresent(CGFloat.self, forKey: .alpha)
+    paths = try container.decodeIfPresent([[InkPointReader]].self, forKey: .paths)?
+      .map { stroke in stroke.compactMap(\.point).map { ["x": $0.x, "y": $0.y] } }
+    bounds = try container.decodeIfPresent(AnnotationBounds.self, forKey: .bounds)
+    contents = try container.decodeIfPresent(String.self, forKey: .contents)
+    fontSize = try container.decodeIfPresent(CGFloat.self, forKey: .fontSize)
+    fontFamily = try container.decodeIfPresent(String.self, forKey: .fontFamily)
+    createdAt = try container.decodeIfPresent(Double.self, forKey: .createdAt)
+    text = try container.decodeIfPresent(String.self, forKey: .text)
+  }
+}
+
+/// Reads one ink point in object form (`{"x": …, "y": …}`) or array form (`[x, y]`).
+/// Anything else decodes to a nil `point` instead of throwing.
+private struct InkPointReader: Decodable {
+  let point: AnnotationPoint?
+
+  private enum Keys: String, CodingKey { case x, y }
+
+  init(from decoder: Decoder) {
+    if let object = try? decoder.container(keyedBy: Keys.self),
+       let x = try? object.decode(CGFloat.self, forKey: .x),
+       let y = try? object.decode(CGFloat.self, forKey: .y) {
+      point = AnnotationPoint(x: x, y: y)
+    } else if var array = try? decoder.unkeyedContainer(), array.count == 2,
+              let x = try? array.decode(CGFloat.self),
+              let y = try? array.decode(CGFloat.self) {
+      point = AnnotationPoint(x: x, y: y)
+    } else {
+      point = nil
+    }
+  }
+}
+
 struct AnnotationsData: Codable, Equatable {
   let version: Int
   let annotations: [AnnotationModel]
