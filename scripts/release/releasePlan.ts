@@ -1,6 +1,6 @@
 // Release plan module: decides what the publish job in .github/workflows/release.yml does.
 //
-// Pure: it takes plain facts collected by the CI wrapper (plan.ts) and returns a plan. It
+// Pure: it takes plain facts collected by the CI wrapper (plan.cli.ts) and returns a plan. It
 // never reads files, runs git or calls npm, so every decision is covered by Jest tests.
 // See GLOSSARY.md (Releasing) for the terms used here.
 import semverInc from 'semver/functions/inc.js';
@@ -37,6 +37,24 @@ export type ReleasePlan =
   | { action: 'snapshot'; version: string; distTag: 'next' }
   | { action: 'release'; version: string; distTag: 'latest'; notes: string }
   | { action: 'refuse'; reason: string };
+
+/**
+ * The plan as `$GITHUB_OUTPUT` values for the later jobs in release.yml. `publish` is `true`
+ * exactly when the publish job should run, so the workflow tests one flag, not each action.
+ */
+export function planOutputs(plan: ReleasePlan): Record<string, string> {
+  if (plan.action === 'skip' || plan.action === 'refuse') {
+    return { action: plan.action, publish: 'false' };
+  }
+  const outputs: Record<string, string> = {
+    action: plan.action,
+    publish: 'true',
+    version: plan.version,
+    'dist-tag': plan.distTag,
+  };
+  if (plan.action === 'release') outputs.notes = plan.notes;
+  return outputs;
+}
 
 const MAIN_REF = 'refs/heads/main';
 const TAG_PREFIX = 'refs/tags/';
@@ -75,7 +93,7 @@ function planFromReleaseTag(facts: ReleaseFacts): ReleasePlan {
     const ids = facts.pendingChangesets.map(({ id }) => id).join(', ');
     return {
       action: 'refuse',
-      reason: `Pending changesets check failed: run the version step first, these remain: ${ids}`,
+      reason: `Pending changesets check failed: a merged Release PR leaves none, but these remain: ${ids}. Tag the Release PR's merge commit`,
     };
   }
   if (facts.versionPublished) {
@@ -98,7 +116,7 @@ function planFromReleaseTag(facts: ReleaseFacts): ReleasePlan {
  * The body of the changelog section headed `## <version>`, up to the next `## ` heading,
  * without the blank lines around it. Null when there is no such section or it is empty.
  */
-function releaseNotes(changelog: string, version: string): string | null {
+export function releaseNotes(changelog: string, version: string): string | null {
   const lines = changelog.split(/\r?\n/);
   const start = lines.findIndex((line) => line.trim() === `## ${version}`);
   if (start === -1) return null;

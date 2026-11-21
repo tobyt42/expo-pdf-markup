@@ -1,6 +1,6 @@
 import semverCompare from 'semver/functions/compare.js';
 
-import { planRelease, type ReleaseFacts } from '../releasePlan.ts';
+import { planOutputs, planRelease, releaseNotes, type ReleaseFacts } from '../releasePlan.ts';
 
 const MAIN = 'refs/heads/main';
 
@@ -186,13 +186,16 @@ describe('planRelease on a Release tag', () => {
     });
   });
 
-  it('refuses while Pending changesets remain, naming them', () => {
-    expect(
-      planRelease(release({ pendingChangesets: [{ id: 'calm-dogs-sing', bump: 'patch' }] }))
-    ).toEqual({
+  it('refuses while Pending changesets remain, naming them and pointing at the Release PR', () => {
+    const plan = planRelease(
+      release({ pendingChangesets: [{ id: 'calm-dogs-sing', bump: 'patch' }] })
+    );
+    expect(plan).toEqual({
       action: 'refuse',
       reason: expect.stringMatching(/^Pending changesets check failed: .*calm-dogs-sing/),
     });
+    expect(plan).toMatchObject({ reason: expect.stringContaining('Release PR') });
+    expect(plan).not.toMatchObject({ reason: expect.stringContaining('version step') });
   });
 
   it('refuses a version that is already on npm', () => {
@@ -215,5 +218,47 @@ describe('planRelease on a Release tag', () => {
       action: 'release',
       notes: '### Major Changes\n\n- 0123456: Something older.',
     });
+  });
+});
+
+describe('planOutputs, the plan as the later release.yml jobs read it', () => {
+  it('publishes a Snapshot under next', () => {
+    expect(
+      planOutputs({ action: 'snapshot', version: '2.1.0-next.20261121090507', distTag: 'next' })
+    ).toEqual({
+      action: 'snapshot',
+      publish: 'true',
+      version: '2.1.0-next.20261121090507',
+      'dist-tag': 'next',
+    });
+  });
+
+  it('publishes a Release under latest, with its notes', () => {
+    expect(
+      planOutputs({ action: 'release', version: '2.1.0', distTag: 'latest', notes: '- A thing.' })
+    ).toEqual({
+      action: 'release',
+      publish: 'true',
+      version: '2.1.0',
+      'dist-tag': 'latest',
+      notes: '- A thing.',
+    });
+  });
+
+  it.each(['skip', 'refuse'] as const)('publishes nothing on %s', (action) => {
+    expect(planOutputs({ action, reason: 'because' })).toEqual({ action, publish: 'false' });
+  });
+});
+
+describe('releaseNotes, the changelog section the Release PR and GitHub Release show', () => {
+  const changelog =
+    '# pkg\n\n## 2.1.0\n\n### Minor Changes\n\n- Add a thing.\n\n## 2.0.0\n\n- Old.\n';
+
+  it('is the body of the section for the version', () => {
+    expect(releaseNotes(changelog, '2.1.0')).toBe('### Minor Changes\n\n- Add a thing.');
+  });
+
+  it('is null when the changelog has no section for the version', () => {
+    expect(releaseNotes(changelog, '2.2.0')).toBeNull();
   });
 });

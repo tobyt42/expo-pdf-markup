@@ -42,6 +42,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       action: ${{ steps.plan.outputs.action }}
+      publish: ${{ steps.plan.outputs.publish }}
       version: ${{ steps.plan.outputs.version }}
       dist-tag: ${{ steps.plan.outputs.dist-tag }}
       notes: ${{ steps.plan.outputs.notes }}
@@ -59,7 +60,7 @@ jobs:
         run: npm ci --ignore-scripts
       - name: Plan
         id: plan
-        run: node scripts/release/plan.ts
+        run: node scripts/release/plan.cli.ts
 
   # Publishes the Snapshot or Release the plan asked for, only once web, iOS and Android
   # validation have passed in this run. The only job with npm's trust (id-token) and the
@@ -68,7 +69,8 @@ jobs:
   publish:
     name: Publish
     needs: [web, ios, android, plan]
-    if: needs.plan.outputs.action == 'snapshot' || needs.plan.outputs.action == 'release'
+    # `publish` is 'true' exactly for a Snapshot or a Release (planOutputs in releasePlan.ts).
+    if: needs.plan.outputs.publish == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: npm-publish

@@ -1,31 +1,64 @@
 // Tests for the repository settings plan: given the desired state and a snapshot of the live
 // settings (fixture JSON, no network), which differences are reported and which requests
-// `apply` would send. Run with `npm run test:scripts`.
-import assert from 'node:assert/strict';
+// `apply` would send.
 import { readFileSync } from 'node:fs';
-import { describe, it } from 'node:test';
+import { resolve } from 'node:path';
 
-import { desiredState } from './desired-state.mjs';
-import { planChanges } from './plan.mjs';
+import { desiredState } from '../desiredState.ts';
+import {
+  planChanges,
+  type LiveEnvironment,
+  type LiveRuleset,
+  type Ruleset,
+  type SettingChange,
+  type Snapshot,
+} from '../settingsPlan.ts';
 
-const fixture = (name) =>
-  JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), 'utf8'));
+const fixture = (name: string): Snapshot =>
+  JSON.parse(readFileSync(resolve(__dirname, `../fixtures/${name}.json`), 'utf8')) as Snapshot;
 
-const settingsWithChanges = (plan) => plan.map((change) => change.setting);
+const settingsWithChanges = (plan: SettingChange[]) => plan.map((change) => change.setting);
+
+/** The planned change to one setting; fails the test when that setting has none. */
+function changeTo(plan: SettingChange[], setting: string): SettingChange {
+  const change = plan.find((candidate) => candidate.setting === setting);
+  if (!change) throw new Error(`no change planned for ${setting}`);
+  return change;
+}
+
+function ruleset(snapshot: Snapshot, name: string): LiveRuleset {
+  const found = snapshot.rulesets.find((candidate) => candidate.name === name);
+  if (!found) throw new Error(`no ruleset named ${name}`);
+  return found;
+}
+
+/** The required status check list of a ruleset, as GitHub stores it. */
+function statusChecks(ruleset: Ruleset): { context: string }[] {
+  const rule = ruleset.rules.find((candidate) => candidate.type === 'required_status_checks');
+  return (rule?.parameters?.required_status_checks ?? []) as { context: string }[];
+}
+
+function npmPublish(snapshot: Snapshot): LiveEnvironment {
+  const found = snapshot.environments['npm-publish'];
+  if (!found) throw new Error('no npm-publish environment');
+  return found;
+}
+
+const requiredChecks = (ruleset: Ruleset) => statusChecks(ruleset).map((check) => check.context);
 
 describe('planChanges against the settings before the lockdown', () => {
   const plan = planChanges(desiredState, fixture('before-lockdown'));
 
   it('switches on immutable releases', () => {
-    const change = plan.find((c) => c.setting === 'Immutable releases');
-    assert.deepEqual(change.differences, ['enabled: expected true, found false']);
-    assert.deepEqual(change.requests, [{ method: 'PUT', path: 'immutable-releases' }]);
+    const change = changeTo(plan, 'Immutable releases');
+    expect(change.differences).toEqual(['enabled: expected true, found false']);
+    expect(change.requests).toEqual([{ method: 'PUT', path: 'immutable-releases' }]);
   });
 
   it('limits Actions to the allowed list, enabling the list after selecting it', () => {
-    const allowed = plan.find((c) => c.setting === 'Actions: allowed actions');
-    assert.deepEqual(allowed.differences, ['allowed_actions: expected "selected", found "all"']);
-    assert.deepEqual(allowed.requests, [
+    const allowed = changeTo(plan, 'Actions: allowed actions');
+    expect(allowed.differences).toEqual(['allowed_actions: expected "selected", found "all"']);
+    expect(allowed.requests).toEqual([
       {
         method: 'PUT',
         path: 'actions/permissions',
@@ -34,9 +67,9 @@ describe('planChanges against the settings before the lockdown', () => {
     ]);
 
     // GitHub answers 409 for the list while all actions are allowed, so there is no list yet.
-    const list = plan.find((c) => c.setting === 'Actions: allowed actions list');
-    assert.deepEqual(list.differences, ['no list yet (all actions are allowed)']);
-    assert.deepEqual(list.requests, [
+    const list = changeTo(plan, 'Actions: allowed actions list');
+    expect(list.differences).toEqual(['no list yet (all actions are allowed)']);
+    expect(list.requests).toEqual([
       {
         method: 'PUT',
         path: 'actions/permissions/selected-actions',
@@ -52,18 +85,17 @@ describe('planChanges against the settings before the lockdown', () => {
       },
     ]);
     const settings = settingsWithChanges(plan);
-    assert.ok(
-      settings.indexOf('Actions: allowed actions') <
-        settings.indexOf('Actions: allowed actions list')
+    expect(settings.indexOf('Actions: allowed actions')).toBeLessThan(
+      settings.indexOf('Actions: allowed actions list')
     );
   });
 
   it('requires approval for workflows from all outside contributors', () => {
-    const change = plan.find((c) => c.setting === 'Actions: outside contributor approval');
-    assert.deepEqual(change.differences, [
+    const change = changeTo(plan, 'Actions: outside contributor approval');
+    expect(change.differences).toEqual([
       'approval_policy: expected "all_external_contributors", found "first_time_contributors"',
     ]);
-    assert.deepEqual(change.requests, [
+    expect(change.requests).toEqual([
       {
         method: 'PUT',
         path: 'actions/permissions/fork-pr-contributor-approval',
@@ -73,30 +105,34 @@ describe('planChanges against the settings before the lockdown', () => {
   });
 
   it('extends the existing main ruleset in place', () => {
-    const change = plan.find((c) => c.setting === 'Ruleset "Protect main from accidents"');
-    assert.deepEqual(change.differences, [
+    const change = changeTo(plan, 'Ruleset "Protect main from accidents"');
+    expect(change.differences).toEqual([
       'bypass_actors: expected [{"actor_id":5,"actor_type":"RepositoryRole","bypass_mode":"always"}], found []',
       'rules: missing pull_request',
       'rules: missing required_status_checks',
     ]);
-    assert.equal(change.requests.length, 1);
-    const [request] = change.requests;
-    assert.equal(request.method, 'PUT');
-    assert.equal(request.path, 'rulesets/21795519');
-    assert.deepEqual(
-      request.body.rules.map((rule) => rule.type),
-      ['deletion', 'non_fast_forward', 'pull_request', 'required_status_checks']
-    );
-    assert.deepEqual(
-      request.body.rules[3].parameters.required_status_checks.map((check) => check.context),
-      ['TypeScript, tests, and web builds', 'PDF browser rendering', 'iOS XCTest', 'Android JUnit']
-    );
+    expect(change.requests).toEqual([
+      { method: 'PUT', path: 'rulesets/21795519', body: expect.any(Object) },
+    ]);
+    const body = change.requests[0]?.body as Ruleset;
+    expect(body.rules.map((rule) => rule.type)).toEqual([
+      'deletion',
+      'non_fast_forward',
+      'pull_request',
+      'required_status_checks',
+    ]);
+    expect(requiredChecks(body)).toEqual([
+      'TypeScript, tests, and web builds',
+      'PDF browser rendering',
+      'iOS XCTest',
+      'Android JUnit',
+    ]);
   });
 
   it('creates the Release tag ruleset that only the admin role can bypass', () => {
-    const change = plan.find((c) => c.setting === 'Ruleset "Release tags"');
-    assert.deepEqual(change.differences, ['ruleset does not exist']);
-    assert.deepEqual(change.requests, [
+    const change = changeTo(plan, 'Ruleset "Release tags"');
+    expect(change.differences).toEqual(['ruleset does not exist']);
+    expect(change.requests).toEqual([
       {
         method: 'POST',
         path: 'rulesets',
@@ -113,9 +149,9 @@ describe('planChanges against the settings before the lockdown', () => {
   });
 
   it('creates the npm-publish environment limited to main and v* tags', () => {
-    const change = plan.find((c) => c.setting === 'Environment "npm-publish"');
-    assert.deepEqual(change.differences, ['environment does not exist']);
-    assert.deepEqual(change.requests, [
+    const change = changeTo(plan, 'Environment "npm-publish"');
+    expect(change.differences).toEqual(['environment does not exist']);
+    expect(change.requests).toEqual([
       {
         method: 'PUT',
         path: 'environments/npm-publish',
@@ -140,12 +176,12 @@ describe('planChanges against the settings before the lockdown', () => {
   });
 
   it('limits the github-pages deployment policy to v* tags, adding them before removing main', () => {
-    const change = plan.find((c) => c.setting === 'Environment "github-pages"');
-    assert.deepEqual(change.differences, [
+    const change = changeTo(plan, 'Environment "github-pages"');
+    expect(change.differences).toEqual([
       'deployment policy: missing tag "v*"',
       'deployment policy: unexpected branch "main"',
     ]);
-    assert.deepEqual(change.requests, [
+    expect(change.requests).toEqual([
       {
         method: 'POST',
         path: 'environments/github-pages/deployment-branch-policies',
@@ -159,7 +195,7 @@ describe('planChanges against the settings before the lockdown', () => {
   });
 
   it('leaves the already read-only workflow token alone', () => {
-    assert.ok(!settingsWithChanges(plan).includes('Actions: workflow token'));
+    expect(settingsWithChanges(plan)).not.toContain('Actions: workflow token');
   });
 });
 
@@ -168,17 +204,16 @@ describe('planChanges against settings already in the desired state', () => {
   const compliant = fixture('after-lockdown');
 
   it('finds nothing to change, so a second apply sends no requests', () => {
-    assert.deepEqual(planChanges(desiredState, compliant), []);
+    expect(planChanges(desiredState, compliant)).toEqual([]);
   });
 });
 
 describe('planChanges reports drift from the desired state', () => {
-  const drifted = (mutate) => {
+  const drifted = (mutate: (snapshot: Snapshot) => void) => {
     const snapshot = fixture('after-lockdown');
     mutate(snapshot);
     return planChanges(desiredState, snapshot);
   };
-  const ruleset = (snapshot, name) => snapshot.rulesets.find((r) => r.name === name);
 
   it('reports an app added as a Release tag bypass actor', () => {
     const plan = drifted((s) =>
@@ -188,23 +223,20 @@ describe('planChanges reports drift from the desired state', () => {
         bypass_mode: 'always',
       })
     );
-    assert.deepEqual(settingsWithChanges(plan), ['Ruleset "Release tags"']);
-    assert.match(plan[0].differences[0], /^bypass_actors: expected .* found .*Integration/);
+    expect(settingsWithChanges(plan)).toEqual(['Ruleset "Release tags"']);
+    expect(plan[0]?.differences[0]).toMatch(/^bypass_actors: expected .* found .*Integration/);
   });
 
   it('reports a required check that was removed from main', () => {
     const plan = drifted((s) => {
-      const checks = ruleset(s, 'Protect main from accidents').rules.find(
-        (r) => r.type === 'required_status_checks'
-      ).parameters.required_status_checks;
+      const checks = statusChecks(ruleset(s, 'Protect main from accidents'));
       checks.splice(
         checks.findIndex((c) => c.context === 'iOS XCTest'),
         1
       );
     });
-    assert.deepEqual(settingsWithChanges(plan), ['Ruleset "Protect main from accidents"']);
-    assert.match(
-      plan[0].differences[0],
+    expect(settingsWithChanges(plan)).toEqual(['Ruleset "Protect main from accidents"']);
+    expect(plan[0]?.differences[0]).toMatch(
       /^rules\.required_status_checks\.required_status_checks: /
     );
   });
@@ -213,45 +245,42 @@ describe('planChanges reports drift from the desired state', () => {
     const plan = drifted((s) =>
       ruleset(s, 'Release tags').rules.push({ type: 'non_fast_forward' })
     );
-    assert.deepEqual(plan[0].differences, ['rules: unexpected non_fast_forward']);
+    expect(plan[0]?.differences).toEqual(['rules: unexpected non_fast_forward']);
   });
 
   it('reports a required reviewer on npm-publish and puts the environment back', () => {
     const plan = drifted((s) =>
-      s.environments['npm-publish'].environment.protection_rules.push({
+      npmPublish(s).environment.protection_rules.push({
         id: 1,
         type: 'required_reviewers',
         prevent_self_review: false,
         reviewers: [{ type: 'User', reviewer: { id: 42, login: 'someone' } }],
       })
     );
-    assert.deepEqual(plan[0].differences, [
+    expect(plan[0]?.differences).toEqual([
       'reviewers: expected [], found [{"type":"User","id":42}]',
     ]);
-    assert.equal(plan[0].requests[0].method, 'PUT');
-    assert.equal(plan[0].requests[0].path, 'environments/npm-publish');
+    expect(plan[0]?.requests[0]?.method).toBe('PUT');
+    expect(plan[0]?.requests[0]?.path).toBe('environments/npm-publish');
   });
 
   it('deletes an extra deployment policy on npm-publish', () => {
     const plan = drifted((s) =>
-      s.environments['npm-publish'].branchPolicies.push({ id: 777, name: 'feat/*', type: 'branch' })
+      npmPublish(s).branchPolicies.push({ id: 777, name: 'feat/*', type: 'branch' })
     );
-    assert.deepEqual(plan[0].differences, ['deployment policy: unexpected branch "feat/*"']);
-    assert.deepEqual(plan[0].requests, [
+    expect(plan[0]?.differences).toEqual(['deployment policy: unexpected branch "feat/*"']);
+    expect(plan[0]?.requests).toEqual([
       { method: 'DELETE', path: 'environments/npm-publish/deployment-branch-policies/777' },
     ]);
   });
 
   it('ignores the order GitHub returns the allowed actions in', () => {
-    assert.deepEqual(
-      drifted((s) => s.selectedActions.patterns_allowed.reverse()),
-      []
-    );
+    expect(drifted((s) => s.selectedActions?.patterns_allowed.reverse())).toEqual([]);
   });
 
   it('reports a workflow token that can approve pull requests', () => {
     const plan = drifted((s) => (s.workflowPermissions.can_approve_pull_request_reviews = true));
-    assert.deepEqual(plan[0].differences, [
+    expect(plan[0]?.differences).toEqual([
       'can_approve_pull_request_reviews: expected false, found true',
     ]);
   });

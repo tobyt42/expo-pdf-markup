@@ -1,6 +1,6 @@
 // The published-package diff for a Release PR: compares what `npm pack --dry-run --json`
 // reports for the new version with the same report for the version on npm, as Markdown.
-// Pure: the wrapper (pack-diff.ts) runs npm and passes the parsed reports in.
+// Pure: the wrapper (pack-diff.cli.ts) runs npm and passes the parsed reports in.
 
 /** One file in a pack report. */
 export interface PackFile {

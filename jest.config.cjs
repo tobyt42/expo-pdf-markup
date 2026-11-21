@@ -1,9 +1,10 @@
 const universalPreset = require('jest-expo/universal/jest-preset');
 
-// The release scripts (scripts/release/) are Node-only tooling and never shipped, so their
-// tests run in the Node project only.
+// The repository scripts (scripts/release/, scripts/repo-settings/) are Node-only tooling and
+// never shipped, so their tests (`*.test.node.ts`) run in the Node project only.
+const scriptRoots = ['<rootDir>/scripts/release', '<rootDir>/scripts/repo-settings'];
 const rootsFor = ({ displayName }) =>
-  displayName?.name === 'Node' ? ['<rootDir>/src', '<rootDir>/scripts/release'] : ['<rootDir>/src'];
+  displayName?.name === 'Node' ? ['<rootDir>/src', ...scriptRoots] : ['<rootDir>/src'];
 
 module.exports = {
   ...universalPreset,

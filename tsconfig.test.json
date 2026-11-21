@@ -1,7 +1,8 @@
 // Type-checks the test suites, including the compile-time type tests, which
 // Jest (Babel) and the library build (tests excluded) never type-check. Also
-// type-checks the release scripts (scripts/release/), which Node runs directly
-// with type stripping, so they import each other with `.ts` extensions.
+// type-checks the repository scripts (scripts/lib, scripts/release,
+// scripts/repo-settings), which Node runs directly with type stripping, so they
+// import each other with `.ts` extensions.
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
@@ -9,6 +10,6 @@
     "allowImportingTsExtensions": true,
     "types": ["jest", "node"]
   },
-  "include": ["./src", "./scripts/release"],
+  "include": ["./src", "./scripts/lib", "./scripts/release", "./scripts/repo-settings"],
   "exclude": []
 }

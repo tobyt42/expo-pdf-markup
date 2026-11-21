@@ -2,31 +2,27 @@
 // to do and reports the answer. It holds no decisions of its own.
 //
 // Run by the `plan` job in .github/workflows/release.yml (Node runs this file directly with
-// type stripping). Writes `action`, `version`, `dist-tag` and, for a Release, `notes` to
-// $GITHUB_OUTPUT for the later jobs, prints the plan and exits non-zero on a refusal.
+// type stripping). Writes `action`, `publish` and, when publishing, `version`, `dist-tag` and
+// (for a Release) `notes` to $GITHUB_OUTPUT for the later jobs, prints the plan and exits
+// non-zero on a refusal.
 //
 // Local dry run (read-only; needs a fetched `origin/main`):
-//   GITHUB_REF=refs/heads/main node scripts/release/plan.ts
-//   GITHUB_REF=refs/tags/v2.0.0 node scripts/release/plan.ts
+//   GITHUB_REF=refs/heads/main node scripts/release/plan.cli.ts
+//   GITHUB_REF=refs/tags/v2.0.0 node scripts/release/plan.cli.ts
 import { readChangesets } from '@changesets/read';
-import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { readPackageJson, root, run } from '../lib/repo.ts';
 import {
+  planOutputs,
   planRelease,
   type BumpType,
   type PendingChangeset,
   type ReleaseFacts,
   type ReleasePlan,
 } from './releasePlan.ts';
-
-const root = resolve(import.meta.dirname, '../..');
-
-function run(command: string, args: string[]): string {
-  return execFileSync(command, args, { cwd: root, encoding: 'utf8' }).trim();
-}
 
 function commitOnMain(): boolean {
   try {
@@ -60,10 +56,7 @@ async function pendingChangesets(name: string): Promise<PendingChangeset[]> {
 async function collectFacts(): Promise<ReleaseFacts> {
   const ref = process.env.GITHUB_REF;
   if (!ref) throw new Error('GITHUB_REF is not set');
-  const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as {
-    name: string;
-    version: string;
-  };
+  const pkg = readPackageJson();
   return {
     ref,
     packageVersion: pkg.version,
@@ -80,12 +73,7 @@ function report(facts: ReleaseFacts, plan: ReleasePlan): void {
   console.log('Facts:', JSON.stringify(shown, null, 2));
   console.log('Plan:', JSON.stringify(plan, null, 2));
 
-  const outputs: Record<string, string> = { action: plan.action };
-  if (plan.action === 'snapshot' || plan.action === 'release') {
-    outputs.version = plan.version;
-    outputs['dist-tag'] = plan.distTag;
-  }
-  if (plan.action === 'release') outputs.notes = plan.notes;
+  const outputs = planOutputs(plan);
   if (process.env.GITHUB_OUTPUT) {
     // Multiline values use GitHub's heredoc form, with a delimiter no changelog can contain.
     const delimiter = `EOF_${randomUUID()}`;

@@ -1,14 +1,17 @@
-// The desired repository settings, as data. `scripts/repo-settings.mjs` compares the live
+// The desired repository settings, as data. `settings.cli.ts` compares the live
 // settings with this (`--check`) or makes them match (`apply`). See CLAUDE.md "Repository
 // settings" and spec #143.
 //
 // Only the fields listed here are managed: fields GitHub returns that are not listed are
 // ignored, and lists (rules, required checks, bypass actors, patterns, deployment policies)
 // must match exactly.
+import type { DesiredState, Ruleset } from './settingsPlan.ts';
 
 // The Repository admin role. It is the only actor allowed to bypass either ruleset, so only the
 // maintainer can create, move or delete Release tags or push to `main` without a pull request.
-const adminBypass = [{ actor_id: 5, actor_type: 'RepositoryRole', bypass_mode: 'always' }];
+const adminBypass: Ruleset['bypass_actors'] = [
+  { actor_id: 5, actor_type: 'RepositoryRole', bypass_mode: 'always' },
+];
 
 // GitHub Actions app: the required checks must come from Actions, not any other status source.
 const githubActions = 15368;
@@ -22,7 +25,7 @@ const requiredChecks = [
   'Android JUnit',
 ];
 
-export const desiredState = {
+export const desiredState: DesiredState = {
   rulesets: [
     {
       // The existing `main` ruleset, extended; it is found by this name.
@@ -70,22 +73,23 @@ export const desiredState = {
 
   immutableReleases: { enabled: true },
 
-  actions: {
-    permissions: { enabled: true, allowed_actions: 'selected' },
-    // GitHub's own actions (actions/*, github/*) plus the third-party actions the workflows use.
-    // Local reusable workflows (./.github/workflows/...) are always allowed.
-    selectedActions: {
-      github_owned_allowed: true,
-      verified_allowed: false,
-      patterns_allowed: [
-        'android-actions/setup-android@*',
-        'gradle/actions/setup-gradle@*',
-        'ruby/setup-ruby@*',
-      ],
-    },
-    workflow: { default_workflow_permissions: 'read', can_approve_pull_request_reviews: false },
-    forkPrApproval: { approval_policy: 'all_external_contributors' },
+  actionsPermissions: { enabled: true, allowed_actions: 'selected' },
+  // GitHub's own actions (actions/*, github/*) plus the third-party actions the workflows use.
+  // Local reusable workflows (./.github/workflows/...) are always allowed.
+  selectedActions: {
+    github_owned_allowed: true,
+    verified_allowed: false,
+    patterns_allowed: [
+      'android-actions/setup-android@*',
+      'gradle/actions/setup-gradle@*',
+      'ruby/setup-ruby@*',
+    ],
   },
+  workflowPermissions: {
+    default_workflow_permissions: 'read',
+    can_approve_pull_request_reviews: false,
+  },
+  forkPrApproval: { approval_policy: 'all_external_contributors' },
 
   environments: [
     {

@@ -1,30 +1,32 @@
-#!/usr/bin/env node
-// Puts the repository settings into the desired state in scripts/repo-settings/desired-state.mjs
-// (rulesets, immutable releases, Actions permissions, deployment environments).
+// Puts the repository settings into the desired state in desiredState.ts (rulesets, immutable
+// releases, Actions permissions, deployment environments). Node runs this file directly.
 //
-//   node scripts/repo-settings.mjs --check     read-only; lists every difference, exits 1 on drift
-//   node scripts/repo-settings.mjs apply       sends only the changes --check reports, then checks
-//   node scripts/repo-settings.mjs --snapshot  read-only; prints the live settings as fixture JSON
+//   node scripts/repo-settings/settings.cli.ts --check     read-only; lists every difference,
+//                                                          exits 1 on drift
+//   node scripts/repo-settings/settings.cli.ts apply       sends only the changes --check
+//                                                          reports, then checks again
+//   node scripts/repo-settings/settings.cli.ts --snapshot  read-only; prints the live settings
+//                                                          as fixture JSON
 //
 // Needs `gh` authenticated as a repository admin. Runs against the repository `gh` resolves from
 // the current directory, or the one passed with --repo owner/name.
-import { desiredState } from './repo-settings/desired-state.mjs';
-import { currentRepository, readSnapshot, send } from './repo-settings/github.mjs';
-import { planChanges } from './repo-settings/plan.mjs';
+import { desiredState } from './desiredState.ts';
+import { currentRepository, readSnapshot, send } from './github.ts';
+import { planChanges, type SettingChange } from './settingsPlan.ts';
 
 const usage =
-  'Usage: node scripts/repo-settings.mjs (--check | apply | --snapshot) [--repo owner/name]';
+  'Usage: node scripts/repo-settings/settings.cli.ts (--check | apply | --snapshot) [--repo owner/name]';
 
 const args = process.argv.slice(2);
 const repoIndex = args.indexOf('--repo');
 const repository = repoIndex === -1 ? currentRepository() : args[repoIndex + 1];
 const modes = repoIndex === -1 ? args : args.toSpliced(repoIndex, 2);
 
-if (modes.length !== 1 || !['--check', 'apply', '--snapshot'].includes(modes[0]) || !repository) {
+const [mode] = modes;
+if (modes.length !== 1 || !['--check', 'apply', '--snapshot'].includes(mode ?? '') || !repository) {
   console.error(usage);
   process.exit(2);
 }
-const [mode] = modes;
 
 if (mode === '--snapshot') {
   console.log(JSON.stringify(readSnapshot(repository), null, 2));
@@ -51,7 +53,7 @@ if (plan.length > 0) {
   process.exit(remaining.length === 0 ? 0 : 1);
 }
 
-function report(changes) {
+function report(changes: SettingChange[]): void {
   if (changes.length === 0) {
     console.log(`${repository}: settings match the desired state.`);
     return;

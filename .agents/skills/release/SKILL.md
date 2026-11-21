@@ -30,8 +30,8 @@ Takes one Release from the Pending changesets on `main` to a verified publish un
    ```
    `git log --oneline origin/main..HEAD` now shows the review commit (if any) and the version commit, nothing else. `.changeset/` holds only `README.md` and `config.json`.
 4. **Open the Release PR.** Build the body in a scratch file with these sections:
-   - **Changelog**: the new section, from `## <version>` up to the next `## ` heading: `awk -v v="## $version" '$0==v{p=1;next} /^## /{p=0} p' CHANGELOG.md`.
-   - **Published package**: `node scripts/release/pack-diff.ts` (rebuilds `build/`, compares a dry-run `npm pack` of the worktree with the version under `latest`; publishes nothing). Under its output, give a one-line explanation for every Added, Removed and Size changed file, or fix the cause in another commit first. A file nobody can explain is a blocker.
+   - **Changelog**: `node scripts/release/notes.cli.ts` (the new `## <version>` section's body, exactly as the GitHub Release will show it; exits 1 if the section is missing).
+   - **Published package**: `node scripts/release/pack-diff.cli.ts` (rebuilds `build/`, compares a dry-run `npm pack` of the worktree with the version under `latest`; publishes nothing). Under its output, give a one-line explanation for every Added, Removed and Size changed file, or fix the cause in another commit first. A file nobody can explain is a blocker.
    - **Build comparison** (first Release only, see below).
    - **Go-ahead**: one line saying the agent merges and tags only after the maintainer's go-ahead in chat.
 
