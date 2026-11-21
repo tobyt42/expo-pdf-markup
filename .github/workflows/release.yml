@@ -5,7 +5,9 @@ name: Release
 # updating the trusted publisher on npmjs.com first.
 #
 # Every push to `main` runs web, iOS and Android validation here, exactly once each. The
-# validate workflows themselves only trigger on pull requests and manual dispatch.
+# validate workflows themselves only trigger on pull requests and manual dispatch. If `main`
+# has Pending changesets, the publish job then publishes a Snapshot under the `next`
+# dist-tag; the release plan module (scripts/release/) makes that decision.
 
 on:
   push:
@@ -26,3 +28,71 @@ jobs:
   android:
     name: Android
     uses: ./.github/workflows/validate-android.yml
+
+  # Asks the release plan module (scripts/release/) what this push should publish. Runs
+  # alongside validation and holds no publishing rights. No dependency cache in this
+  # workflow: a poisoned cache could change the plan or reach the publish job.
+  plan:
+    name: Release plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      action: ${{ steps.plan.outputs.action }}
+      version: ${{ steps.plan.outputs.version }}
+      dist-tag: ${{ steps.plan.outputs.dist-tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history, so the plan can check whether the commit is reachable from `main`.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Plan
+        id: plan
+        run: node scripts/release/plan.ts
+
+  # Publishes the Snapshot the plan asked for, only once web, iOS and Android validation
+  # have passed in this run. The only job with npm's trust (id-token) and the `npm-publish`
+  # environment the trusted publisher is bound to. The version bump happens only in this
+  # runner and is never committed: the checkout keeps no credentials to push with.
+  publish:
+    name: Publish
+    needs: [web, ios, android, plan]
+    if: needs.plan.outputs.action == 'snapshot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write
+    # One publish at a time across Snapshots and Releases. Deliberately not prefixed
+    # `validate-`, so it never shares a group with the validate workflows called above.
+    concurrency:
+      group: release-publish
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # No `cache:`: nothing restored from a cache may run in the job that holds npm's trust.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Set the Snapshot version
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: npm version "$VERSION" --no-git-tag-version --ignore-scripts
+      # Trusted publishing (OIDC) needs npm >= 11.5.1, which Node 24 bundles. No token is
+      # used. `prepublishOnly` builds the package. Provenance links it to this run. The
+      # dist-tag is fixed rather than taken from the plan, so a Snapshot can never reach
+      # `latest`.
+      - name: Publish the Snapshot to npm
+        run: |
+          npm --version
+          npm publish --provenance --tag next
