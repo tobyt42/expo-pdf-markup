@@ -30,6 +30,10 @@ Use current configuration to identify remaining coverage:
 
 Use standard GitHub-hosted Linux/macOS runners, including for Dependabot; exclude private/self-hosted and paid larger runners. Preserve docs deployment. Distinguish local checks from actual hosted results, and report missing hosted coverage as a gap. Supplement genuine gaps and repairs with focused local checks; avoid repeating applicable green suites, speculative rebases, or pushes solely for duplicate evidence.
 
+## Changesets
+
+A batch that makes a Consumer-visible change (see the [glossary](../../../GLOSSARY.md)) adds a Changeset in the same PR, before it merges. For dependency work that means a change to the library's runtime `dependencies` or `peerDependencies` ranges, or to the tested Expo SDK or React Native version (a minor or major change to the root `expo` or `react-native` devDependency). Lockfile-only changes, other devDependencies, `example/`, `scripts/` and Actions updates get none. Write it in British English, following the editorial lens in the [changeset-review skill](../changeset-review/SKILL.md#the-editorial-lens): breaking peer ranges or a raised minimum Expo SDK are `major` with migration steps; a tested-version change is a `patch` reading "Tested with Expo SDK X and React Native Y." Include the proposed Changeset text in the plan below; approval of the plan covers it.
+
 ## Propose and approve
 
 Keep individual PRs by default. When compatibility requires combining updates or meaningful remaining CI runs can be saved, read [consolidation](references/consolidation.md). Completed CI is sunk cost; reducing PR count alone is insufficient.
